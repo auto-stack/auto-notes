@@ -1,0 +1,3 @@
+[submodule "vendor/auto-down"]
+	path = vendor/auto-down
+	url = https://github.com/auto-stack/auto-down.git
