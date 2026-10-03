@@ -1,0 +1,150 @@
+{
+  "repository": "auto-notes",
+  "date": "2026-10-03",
+  "sources": [
+    {
+      "repo": "auto-lang",
+      "commit": "17292c07e792e80d4e4da5495fc3fc2917e8aa1e",
+      "path": "examples/ui/015-notes",
+      "primary": true,
+      "fileCount": 24,
+      "pacFields": {
+        "name": "notes",
+        "version": "1.0.0",
+        "scene": "ui",
+        "render": "vue",
+        "icon": "notebook",
+        "title": "Notes",
+        "title_zh": "备忘录",
+        "theme": "dark",
+        "accent": "indigo",
+        "api": "rust",
+        "npm_deps": "[",
+        "desktop": "true"
+      },
+      "files": [
+        {
+          "sourcePath": "examples/ui/015-notes/README.md",
+          "path": "README.md",
+          "sha256": "c0e9207b64ffff81285911b99f5282bf13993292651531ca60376a23eafd9bf0"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/data/notes.json",
+          "path": "data/notes.json",
+          "sha256": "767a16b56bf1a8e1d08fb2417ba04e8a2b575796c14021b9ba172d9ebeff048c"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/examples/rust-workspace/.cargo/config.toml",
+          "path": "examples/rust-workspace/.cargo/config.toml",
+          "sha256": "a2589dbf5433a010f327e5c6187ad13880bdb0ced56309500236f13800f053bd"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/examples/rust-workspace/015-notes/Cargo.toml",
+          "path": "examples/rust-workspace/015-notes/Cargo.toml",
+          "sha256": "1d1d52b0463723cb090071b0825be7485ed70b62a269c386e0ef92bfb0be5b5f"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/examples/rust-workspace/Cargo.toml",
+          "path": "examples/rust-workspace/Cargo.toml",
+          "sha256": "1cb626990f46d5c1036dfcb0a31275b187b749eba9c4809b3330b3cb5fb2676a"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/pac.at",
+          "path": "pac.at",
+          "sha256": "2747b19353571539ce910492ffdaa7233d82705c650f8d34fb81817f631f548e"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/src/back/api.at",
+          "path": "src/back/api.at",
+          "sha256": "ac99b3fd3d6a98010d5cb3ef47a2ab74a5e83a7fddee88ee7aa50d510fe65a5c"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/src/back/db.at",
+          "path": "src/back/db.at",
+          "sha256": "a7664dc6c168dafeef53f276185f82756dc360ec0cc4b0a0ec1cf0057ee1ab0a"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/src/front/app.at",
+          "path": "src/front/app.at",
+          "sha256": "b6985ad8b5c31a330c08765b586863464d5267d833403ac3e185af4c2f707dfd"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/src/front/editor.at",
+          "path": "src/front/editor.at",
+          "sha256": "333c583788796f28b2e59345e59f1e32f0a32007cd5a961ee7b8aeefcff61265"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/src/front/notes_store.at",
+          "path": "src/front/notes_store.at",
+          "sha256": "26d7a1b989ee1fed2a4be063a691623c7d767cf5db02b066bed1e0c6db2fef5e"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/src/front/sidebar.at",
+          "path": "src/front/sidebar.at",
+          "sha256": "1708846d252a10f765148ff739bbda981239a06c684a028e01d9f5a20efcaedc"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/src/front/types.at",
+          "path": "src/front/types.at",
+          "sha256": "b06969d30d5c93a9ff1fa7b5474c0bea9a56045201f9d000fcf9103e05bbd64e"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/tests/.gitignore",
+          "path": "tests/.gitignore",
+          "sha256": "269a0504cddbea3f4462c6b28511fe186f7ad89854ddbdd7d54079b2ac53f8df"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/tests/015-notes.autotest",
+          "path": "tests/015-notes.autotest",
+          "sha256": "c18912f83d094b8597bb76842a76425b971e0844a5c02ffe07921fd564bb8deb"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/tests/__pycache__/desktop_mcp.cpython-314.pyc",
+          "path": "tests/__pycache__/desktop_mcp.cpython-314.pyc",
+          "sha256": "64f6448913b9cc826c85769d23feddc79eb8e6d1b6ce428b2157ebc8f5f44f22"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/tests/accent-dark.spec.ts",
+          "path": "tests/accent-dark.spec.ts",
+          "sha256": "b196e07170b3cc3fd478202dadc9a0b0931cffb1d3c12bdd4ead1e9656cc1773"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/tests/acceptance.atd",
+          "path": "tests/acceptance.atd",
+          "sha256": "1f6328eb9e3c8ad3810ec305e231ced810b87369949cb46461d1bf6f1489efb6"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/tests/autotest/__init__.py",
+          "path": "tests/autotest/__init__.py",
+          "sha256": "595a2e5aa8a154c062871b5722e62c070b24a8d0f7b36c28d4eae42cb07c204a"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/tests/desktop_mcp.py",
+          "path": "tests/desktop_mcp.py",
+          "sha256": "6d00a04b5b9d47111c1c6595dce1c895400c24c9b7804cb004ce8887500164ae"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/tests/package.json",
+          "path": "tests/package.json",
+          "sha256": "55f0fb821075d18fa379acb2255994b58723894e88783dec907ebbc04bec8384"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/tests/playwright.config.ts",
+          "path": "tests/playwright.config.ts",
+          "sha256": "c7de3fabdca35fc80b1dc7a55cf4ac1a0f4a24f7f68a9cdd135f10de8a70ec4f"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/tests/run_autotest.py",
+          "path": "tests/run_autotest.py",
+          "sha256": "d850faca9bccbc0b3f1dca82ca98d34de5831de591f41e8490a90b16adc2a410"
+        },
+        {
+          "sourcePath": "examples/ui/015-notes/tests/smoke.spec.ts",
+          "path": "tests/smoke.spec.ts",
+          "sha256": "c6cf148dc0d235179bff5f2d4974cfa08f7a02ca0c0d4f9bd82e647b9b730613"
+        }
+      ]
+    }
+  ],
+  "note": "Exact committed source snapshots; packaging changes follow in a separate commit. References are not additional installed apps."
+}
