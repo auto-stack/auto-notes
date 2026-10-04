@@ -899,7 +899,24 @@ pub fn open_repository() str {
         return open_err_str()
     }
     m_loaded = true
+    // 显式 seed 模式（NOTES_SEED=1）：仅全新目录写入示例笔记（tag "seed"
+    // 标记，非用户数据）；默认绝不注入（AC-05）
+    if env.get("NOTES_SEED") == "1" {
+        var s1 = repo_create("Welcome", "This is your notes app. Click on any note to view it.", "", seed_tags("intro"), "seed-1")
+        var s2 = repo_create("Quick Ideas", "Build a markdown editor with live preview.", "", seed_tags("ideas"), "seed-2")
+        var s3 = repo_create("Shopping List", "Milk, Eggs, Bread, Cheese", "personal", seed_tags("home"), "seed-3")
+        var s4 = repo_create("Recipe: Pasta", "200g flour, 2 eggs, pinch of salt.", "personal", seed_tags("home"), "seed-4")
+        var s5 = repo_create("Meeting Notes", "Q3 roadmap discussion.", "work", seed_tags("work"), "seed-5")
+        var s6 = repo_create("Sprint Planning", "Sprint 12 planning notes.", "work", seed_tags("work"), "seed-6")
+    }
     return ""
+}
+
+fn seed_tags(tag str) List<str> {
+    var t List<str> = List<str>.new([])
+    t.push(tag)
+    t.push("seed")
+    return t
 }
 
 pub fn empty_result() RepoResult {
@@ -1594,3 +1611,14 @@ pub fn test_list_once() int {
     }
     return out.len()
 }
+
+/// UI 调用的请求 id（legacy API 无 request_id；单写者下计数器保证唯一）
+pub fn ui_request_id(prefix str) str {
+    return prefix + "-" + json.encode(m_counter)
+}
+
+/// 旧整数 id → note_id
+pub fn nid_of(id int) str {
+    return "n-" + json.encode(id)
+}
+
