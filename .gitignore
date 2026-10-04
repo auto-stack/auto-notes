@@ -17,3 +17,5 @@ __pycache__/
 /tmp/
 /test-results/
 /playwright-report/
+/tests/probe/evidence/v1/wk/
+/tests/probe/evidence/v1/direct/data/

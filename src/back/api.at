@@ -92,6 +92,71 @@ pub type RepoResult = {
 
 use db
 
+// ═══════════════════════════════════════════════════════════
+// NOTES-001 v1 端点（T-01/T-02 采证面；测试端点在 T-04 收尾时评估保留）
+// ═══════════════════════════════════════════════════════════
+
+/// 仓储诊断状态（条目数/计数器/打开错误/数据目录）
+#[api(method = "GET", path = "/api/v1/status")]
+pub fn v1_status() str {
+    return db.v1_status()
+}
+
+/// 测试控制：切换隔离数据目录与旧档样本并复位进程内状态。
+/// 返回 "ok" 或存储错误码。
+#[api(method = "POST", path = "/api/v1/test/setup")]
+pub fn v1_test_setup(data_dir str, legacy_file str) str {
+    return db.v1_test_setup(data_dir, legacy_file)
+}
+
+/// 对当前 NOTES_LEGACY_FILE 执行迁移（幂等：已有 manifest 则 skipped）
+#[api(method = "POST", path = "/api/v1/migrate")]
+pub fn v1_migrate() MigrationReport {
+    return db.v1_migrate()
+}
+
+/// 幂等创建（request_id 重放返回原对象）
+#[api(method = "POST", path = "/api/v1/notes")]
+pub fn v1_create_note(request_id str, title str, body str, folder str) RepoResult {
+    return db.v1_create_note(request_id, title, body, folder)
+}
+
+/// 条件更新：expected_revision 不符返回 revision_conflict
+#[api(method = "PUT", path = "/api/v1/notes/:nid")]
+pub fn v1_update_note(nid str, expected_revision int, title str, body str, request_id str) RepoResult {
+    return db.v1_update_note(nid, expected_revision, title, body, request_id)
+}
+
+/// 读取单个文档（含回收站）
+#[api(method = "GET", path = "/api/v1/notes/:nid")]
+pub fn v1_get_note(nid str) RepoResult {
+    return db.v1_get_note(nid)
+}
+
+/// 软删除 → 回收站
+#[api(method = "DELETE", path = "/api/v1/notes/:nid")]
+pub fn v1_trash_note(nid str) RepoResult {
+    return db.v1_trash_note(nid)
+}
+
+/// 从回收站恢复
+#[api(method = "POST", path = "/api/v1/notes/:nid/restore")]
+pub fn v1_restore_note(nid str) RepoResult {
+    return db.v1_restore_note(nid)
+}
+
+/// active 列表（seq 降序）
+#[api(method = "GET", path = "/api/v1/notes")]
+pub fn v1_list_notes() []NoteDocument {
+    return db.v1_list_notes()
+}
+
+/// 注入下一次提交的故障点：stage = after_journal|after_entity|after_manifest|off
+#[api(method = "POST", path = "/api/v1/test/fault")]
+pub fn v1_test_fault(stage str) str {
+    return db.v1_test_fault(stage)
+}
+
 /// List all notes (most recently created first)
 /// GET /api/notes
 #[api(method = "GET", path = "/api/notes")]

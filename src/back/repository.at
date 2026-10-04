@@ -36,6 +36,7 @@ use api: RepoResult
 var m_loaded bool = false
 var m_open_err_code int = 0
 var m_counter int = 1
+var m_lock_held bool = false
 
 var e_note_id List<str> = List<str>.new([])
 var e_revision List<str> = List<str>.new([])
@@ -319,6 +320,7 @@ fn split_objects(raw str) str {
     var esc bool = false
     var str_start int = 0
     var byte_pos int = 0
+    var resync_byte int = -1
     var n int = raw.len()
     for i in 0..n {
         var cp int = raw.char_at(i)
@@ -349,6 +351,50 @@ fn split_objects(raw str) str {
                         } else {
                             if cp == 34 {
                                 in_str = false
+                                // 闭合后窥探下一字符：非 [,、:、}]、空白、引号
+                                // ⇒ 该字符串吞掉了结构（截断形态）⇒ 弃区复位
+                                var nxt int = raw.char_at(i + 1)
+                                var structural bool = false
+                                if nxt == 44 {
+                                    structural = true
+                                }
+                                if nxt == 58 {
+                                    structural = true
+                                }
+                                if nxt == 125 {
+                                    structural = true
+                                }
+                                if nxt == 93 {
+                                    structural = true
+                                }
+                                if nxt == 34 {
+                                    structural = true
+                                }
+                                if nxt == 32 {
+                                    structural = true
+                                }
+                                if nxt == 10 {
+                                    structural = true
+                                }
+                                if nxt == 13 {
+                                    structural = true
+                                }
+                                if nxt == 9 {
+                                    structural = true
+                                }
+                                if nxt == 0 {
+                                    structural = true
+                                }
+                                if structural == false {
+                                    if depth > 0 {
+                                        // 闭引号是双重角色：既是截断字符串的终点，
+                                        // 又是下一个 token 的起始引号 ⇒ 保持 in_str
+                                        in_str = true
+                                        esc = false
+                                        // 重同步点=闭引号本身（它兼任下一 token 的起始引号）
+                                        resync_byte = byte_pos
+                                    }
+                                }
                             }
                         }
                     }
@@ -376,6 +422,15 @@ fn split_objects(raw str) str {
                                             out = out + ","
                                         }
                                         out = out + json.encode(piece)
+                                    }
+                                    // 若中途发生过截断重同步，再产出合成修复候选
+                                    //（"{" + 重同步点之后的余文）：坏段与幸存段
+                                    // 各自独立判定，互不拖累
+                                    if resync_byte >= 0 {
+                                        var endb2 int = byte_pos + cp_byte_len(cp)
+                                        var synth str = "{" + raw.sub(resync_byte, endb2)
+                                        out = out + "," + json.encode(synth)
+                                        resync_byte = -1
                                     }
                                     obj_start = -1
                                 }
@@ -408,6 +463,14 @@ fn split_objects(raw str) str {
 fn doc_from_legacy(obj_text str) RepoResult {
     var r RepoResult = empty_result()
     var it = json.parse(obj_text)
+    // 打捞路径的候选是「字符串值」（片段文本被 JSON 编码进候选数组）：
+    // 首次解析得到字符串 ⇒ 再解析一次得到对象
+    var kind1 str = json.encode(it)
+    var k1 str = kind1.sub(0, 1)
+    if k1 == "\"" {
+        var inner str = json.as_string(it)
+        it = json.parse(inner)
+    }
 
     var idv = json.get(it, "id")
     var idtxt str = json.encode(idv)
@@ -764,17 +827,21 @@ pub fn open_repository() str {
         m_open_err_code = 3
         return open_err_str()
     }
-    var lock str = writer_lock_file()
-    var has_lock bool = fs.exists(lock)
-    var force str = env.get("NOTES_FORCE_LOCK")
-    if has_lock {
-        if force != "1" {
-            m_open_err_code = 1
-            return open_err_str()
+    // 写者锁只拦跨进程的第二写者；本进程已持锁（同一数据目录）直接放行
+    if m_lock_held == false {
+        var lock str = writer_lock_file()
+        var has_lock bool = fs.exists(lock)
+        var force str = env.get("NOTES_FORCE_LOCK")
+        if has_lock {
+            if force != "1" {
+                m_open_err_code = 1
+                return open_err_str()
+            }
         }
+        var token str = "boot-" + json.encode(m_counter)
+        fs.write_text(lock, token)
+        m_lock_held = true
     }
-    var token str = "boot-" + json.encode(m_counter)
-    fs.write_text(lock, token)
 
     if manifest_exists() {
         var ok bool = load_manifest_from_disk()
@@ -1079,7 +1146,7 @@ fn tags_of(i int) []str {
 
 /// 幂等创建：同 request_id 已有 committed 收据 ⇒ 直接返回原对象（AC-02）。
 /// handle（稳定整数 ID）取自计数器且不复用；note_id = "n-<handle>"。
-pub fn repo_create(title str, body str, folder str, tags []str, request_id str) RepoResult {
+pub fn repo_create(title str, body str, folder str, tags List<str>, request_id str) RepoResult {
     var f_title str = title.to_string()
     var f_folder str = folder.to_string()
     var f_req str = request_id.to_string()
@@ -1478,4 +1545,20 @@ pub fn repo_search(query str) []NoteDocument {
         }
     }
     return out
+}
+
+/// 供测试驱动切换数据目录后复位进程内仓储状态（仅测试端点调用）。
+pub fn test_reset() {
+    m_loaded = false
+    m_open_err_code = 0
+    m_counter = 1
+    e_note_id = List<str>.new([])
+    e_revision = List<str>.new([])
+    e_file = List<str>.new([])
+    e_state = List<str>.new([])
+    e_folder = List<str>.new([])
+    e_tags_json = List<str>.new([])
+    e_pinned = List<bool>.new([])
+    e_seq = List<str>.new([])
+    e_legacy_id = List<str>.new([])
 }

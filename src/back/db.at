@@ -2,9 +2,71 @@
 // In-memory storage with JSON file persistence
 
 use api: Note
+use api: MigrationReport
+use api: RepoResult
+use api: NoteDocument
+use auto.env
 
 // TEMP：仓储模块接线（T-02 将把 db.at 变为仓储 adapter；编译检查用）
 use repository
+
+// ═══════════════════════════════════════════════════════════
+// NOTES-001 v1 端点服务层（临时：T-04 将把 legacy CRUD 全量接到仓储）
+// ═══════════════════════════════════════════════════════════
+
+pub fn v1_status() str {
+    return repository.repo_status()
+}
+
+pub fn v1_test_setup(data_dir str, legacy_file str) str {
+    env.set("NOTES_DATA_DIR", data_dir)
+    env.set("NOTES_LEGACY_FILE", legacy_file)
+    repository.test_reset()
+    return "ok"
+}
+
+pub fn v1_migrate() MigrationReport {
+    var legacy str = env.get("NOTES_LEGACY_FILE")
+    if legacy == "" {
+        var d str = repository.data_dir()
+        legacy = d + "/notes.json"
+    }
+    return repository.migrate_legacy_at(legacy.as_str())
+}
+
+pub fn v1_create_note(request_id str, title str, body str, folder str) RepoResult {
+    var tags List<str> = List<str>.new([])
+    return repository.repo_create(title, body, folder, tags, request_id.as_str())
+}
+
+pub fn v1_update_note(nid str, expected_revision int, title str, body str, request_id str) RepoResult {
+    return repository.repo_update(nid, expected_revision, title, body, request_id)
+}
+
+pub fn v1_get_note(nid str) RepoResult {
+    return repository.repo_get(nid)
+}
+
+pub fn v1_trash_note(nid str) RepoResult {
+    return repository.repo_trash(nid)
+}
+
+pub fn v1_restore_note(nid str) RepoResult {
+    return repository.repo_restore(nid)
+}
+
+pub fn v1_list_notes() []NoteDocument {
+    return repository.repo_list_active()
+}
+
+pub fn v1_test_fault(stage str) str {
+    if stage == "off" {
+        env.set("NOTES_FAULT", "")
+        return "off"
+    }
+    env.set("NOTES_FAULT", stage)
+    return stage
+}
 
 // Folder type (also defined in api.at for frontend; duplicated here to
 // avoid circular import issues with collect_module_imports).
