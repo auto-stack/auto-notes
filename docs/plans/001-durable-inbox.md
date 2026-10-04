@@ -5,9 +5,9 @@ status: executing
 feature_name: "可靠 Inbox、稳定标识与恢复"
 author: [Codex]
 created_at: 2026-10-04T00:00:00Z
-updated_at: 2026-10-04T14:05:00+08:00
+updated_at: 2026-10-04T21:10:00+08:00
 plan_revision: 2
-current_step: 1
+current_step: 4
 total_steps: 5
 created: 2026-10-04
 base_branch: v0.6-dev
@@ -64,7 +64,8 @@ T-00先行；T-01→T-02→T-03→T-04顺序实施。T-00输出能力报告，T-
   [✅ 已完成 2026-10-04] 报告 `tests/probe/CAPABILITY-REPORT.md`；证据 `tests/probe/evidence/*.json`（VM 路径 13 步全过 + 崩溃重启读回；Vue 路径 12/13，唯一差异为探针非幂等）。关键结论：两路径后端同为 a2r Rust；无 rename/read_dir/时钟；可用面 fs.*/env.get/json.*/字符串拼接。
 - [ ] T-01: 定义 NoteDocument v1、revision、request_id 收据、旧整数 ID 映射；写迁移 fixture 和损坏数据报告。
 - [ ] T-02: 实现单写者仓储、正文提交/恢复、搜索、标签、置顶、归档/回收站；存储错误返回结构化结果。
-- [ ] T-03: 加入独立临时数据目录与显式 seed 模式；迁移前备份，失败不改原件。
+- [x] T-03: 加入独立临时数据目录与显式 seed 模式；迁移前备份，失败不改原件。
+  [✅ 已完成 2026-10-04] NOTES_DATA_DIR 隔离 + NOTES_SEED=1 显式示例（tag "seed"）；迁移备份/失败不改原件由电池 S2 采证（backup/notes.json.bak + 原件 md5 前后一致）。
 - [ ] T-04: 将现有 Notes CRUD 适配到新仓储，保留原 UI；把实现的 API/格式记录到文档和测试。
 
 ## 6. 测试设计
@@ -121,6 +122,14 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
   - Vue 应用于主检出 ：17818 正常运行（engine junction 修复；worktree 副本报错属旧环境，已废弃）。
 
   阻塞（唯一）：故障序列 + 重开后 `GET /api/v1/notes` 偶发挂死 worker（status/migrate 饿死，migrate 空体 200）。已排除：repo_list_active 生成码正确、无 panic 输出、单操作直击均正常。需要下一步：后端插桩（eprintln 跟踪 load_manifest_from_disk/doc_from_value 各循环）或最小复现后修复；疑似与 count-loop + get_at 在特定 Value 形态下的行为相关。期间 AC-01 的"正常重启恢复"已由 manifest 落盘 + S9-recovery-list 初步覆盖（重启后 n-1 可见），但完整恢复采证（含 fault 后重启）待挂死修复后补。
+
+- work 记录 4：stage=work | plan_id=NOTES-001 | plan_revision=2 | outcome=executing（T-01/T-02 采证全绿；T-03 完成；挂死根因修复；T-04 受生成器限制登记） | code_commit=3bcf5bf | task_ids=T-01, T-02, T-03 | evidence=tests/probe/run_v1_battery.sh 全绿（S1-S9，summary.txt）；tests/probe/evidence/v1/direct/s9-crash-recovery.json（kill+重启后 n-1 rev2 "doc1-updated" 从磁盘恢复） | blockers=T-04 适配（见下） | next=T-04 适配改造（二选一）→ 冒烟 → 复审
+
+  挂死根因（已修复）：repo_list_active 的参数表达式 `load_doc(e_note_id[i].as_str())` 使 E_NOTE_ID 的 MutexGuard 存活到语句结束，load_doc→entry_index 再锁同一非重入 Mutex → 自死锁。manifest 有 ≥1 条目时必现（空清单路径从未触发，故 S4/S5 未暴露）。修复=先拷贝到局部变量再调用（repository.at 内有注释）。此前的"多实例互扰"判断为伴生现象（多个 auto run 孤儿进程抢占 17818/17819，其中 vnode dev server 挤占后端端口导致请求随机命中），单实例下挂死 100% 复现→修复后 26ms 返回。
+
+  T-04 适配（当前状态）：api.at/db.at 的直调改造触碰 api.rs 生成器发射限制——(a) `List<Note>.new(vec![])` 原样发射非 Rust；(b) 参数表达式缺 `crate::repository` 导入；(c) `==` 链式比较。已回滚 api.at/db.at 至绿版本（legacy 仍走内存 CRUD，UI/冒烟不受影响），repository.at 保留 seed 模式与 ui_request_id/nid_of 助手。二选一续作：① 修 api_gen 对 api.at 函数体的这三类发射（跨仓 AutoLang 计划）；② adapter 放 db.at 并解决 Note 构造在 db.at 的 'undefined variable'（注意：`use api: Note` 在 db.at/repository.at 均报 Note 未定义，api.at 本地定义+本地构造正常——疑似跨模块导入类型构造的解析缺陷，也是跨仓项）。两案均不影响已提交的 AC-01..AC-05 证据。
+
+  T-03 补充：seed 模式=NOTES_SEED=1 时全新目录写入 6 条示例（tag "seed"，request_id seed-1..6）；默认空（AC-05）。T-04 的 store 映射改造若选②还需前端 notes_store 适配 NoteDocument 形状（UI 视觉不变）。
 
 [整体roadmap](../roadmap-v0.6.md) · [agent执行说明](../README.md)
 
