@@ -113,6 +113,15 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
   4. T-02 证据 = repo_create/update/trash/restore/search 的 v1 端点行为 + NOTES_FAULT 注入三阶段（after_journal/after_entity/after_manifest）的无收据恢复。
   5. 结束前移除 db.at 的临时 `use repository` 接线改为真实 adapter（T-04）。
 
+- work 记录 3：stage=work | plan_id=NOTES-001 | plan_revision=2 | outcome=executing（T-01 采证完成、T-02 主体采证完成、1 项阻塞待隔离） | code_commit=c190013 | task_ids=T-01, T-02 | evidence=tests/probe/run_v1_battery.sh, tests/probe/evidence/v1/（电池输出 + direct/ 直击采证） | blockers=见下 | next=修复挂死后补齐 S9 恢复/重试采证 → T-03/T-04
+
+  已证实（直接命令采证，证据在 evidence/v1/direct/ 与 v1/summary.txt）：
+  - T-01 迁移：valid 3 迁入 0 损坏 + 幂等 skipped_existing；corrupt 2 迁入 + 1 损坏进报告 + 备份 + 原件不动；bad-types 按因拒绝；empty→0；全新目录无演示种子（AC-03/AC-05）。
+  - T-02 协议：幂等创建（同 request_id 同 note_id，中文/emoji/多行）；条件更新 rev1→2 + 陈旧写入 revision_conflict 且用户内容保全（AC-04）；软删→隐藏→可取回→恢复（AC-05）；after_entity 注入 → fault_injected、manifest 不动、无收据（AC-02 前半）；陈旧锁 second_writer 拒绝（AC-04 后半）。
+  - Vue 应用于主检出 ：17818 正常运行（engine junction 修复；worktree 副本报错属旧环境，已废弃）。
+
+  阻塞（唯一）：故障序列 + 重开后 `GET /api/v1/notes` 偶发挂死 worker（status/migrate 饿死，migrate 空体 200）。已排除：repo_list_active 生成码正确、无 panic 输出、单操作直击均正常。需要下一步：后端插桩（eprintln 跟踪 load_manifest_from_disk/doc_from_value 各循环）或最小复现后修复；疑似与 count-loop + get_at 在特定 Value 形态下的行为相关。期间 AC-01 的"正常重启恢复"已由 manifest 落盘 + S9-recovery-list 初步覆盖（重启后 n-1 可见），但完整恢复采证（含 fault 后重启）待挂死修复后补。
+
 [整体roadmap](../roadmap-v0.6.md) · [agent执行说明](../README.md)
 
 ## 10. 待澄清事项
