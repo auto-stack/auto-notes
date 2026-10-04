@@ -1,0 +1,1481 @@
+// repository.at — NOTES-001 可靠 Inbox 仓储（T-01 契约与迁移 / T-02 协议实现）。
+//
+// 能力边界（tests/probe/CAPABILITY-REPORT.md，T-00 实证）：
+//   * a2r 后端无 rename/read_dir/时钟 ⇒ manifest 是唯一索引（文件按 note_id
+//     寻址，不需要目录枚举）；时间戳显式空串，排序/版本用持久化单调 seq。
+//   * write_text 是 truncate+write，无原子替换 ⇒ 提交协议：
+//     journal intent（新文件）→ 实体文件（新文件 r<rev>，天然完整）→
+//     manifest 重写（提交点，小文件单写）→ 收据（新文件）。
+//     任何一步中断：无收据即未提交（AC-02），manifest 仍指旧版（AC-01）。
+//   * 并发：进程内由生成器对模块状态加锁（单写者）；跨进程用 writer.lock
+//     拒绝第二写者（陈旧锁需 NOTES_FORCE_LOCK=1 显式接管，记录于 Spec）。
+//
+// 工程约束（T-00/T-01 采证）：
+//   * 契约类型一律声明在 api.at（本模块 `use api: …`）——api.at 之外的类型
+//     声明 `[]T` 字段转译为 `&[T]`（E0106），且非端点引用类型不进 types.rs。
+//   * 内部 manifest 状态用并行数组模块变量（结构体数组字段同样触 E0106；
+//     tags 以 JSON 字符串内嵌，读写时编解码）。
+//   * fs.delete 的参数按值移动（传一次性副本）；调用结果先落局部变量再传
+//     str 参数；.sub 是字节切片，只允许在 ASCII 标记（find 命中位）间使用；
+//     .char_at 是字符索引，与 .sub 字节索引不可混用。
+
+use auto.env
+use auto.fs
+use auto.json
+use api: NoteDocument
+use api: NoteBlock
+use api: CaptureReceipt
+use api: CorruptItem
+use api: MigrationReport
+use api: RepoResult
+
+// ═══════════════════════════════════════════════════════════
+// 进程内单写者状态：manifest 条目的并行数组（生成器对模块状态加锁）
+// ═══════════════════════════════════════════════════════════
+
+var m_loaded bool = false
+var m_open_err_code int = 0
+var m_counter int = 1
+
+var e_note_id List<str> = List<str>.new([])
+var e_revision List<str> = List<str>.new([])
+var e_file List<str> = List<str>.new([])
+var e_state List<str> = List<str>.new([])
+var e_folder List<str> = List<str>.new([])
+var e_tags_json List<str> = List<str>.new([])
+var e_pinned List<bool> = List<bool>.new([])
+var e_seq List<str> = List<str>.new([])
+var e_legacy_id List<str> = List<str>.new([])
+
+// ═══════════════════════════════════════════════════════════
+// 路径与目录
+// ═══════════════════════════════════════════════════════════
+
+/// 数据目录：NOTES_DATA_DIR 显式覆盖（测试隔离）；否则用户 app-data。
+/// 统一正斜杠（std::fs 在 Windows 也接受）。
+pub fn data_dir() str {
+    var ov str = env.get("NOTES_DATA_DIR")
+    if ov != "" {
+        return ov
+    }
+    var base str = env.get("APPDATA")
+    if base == "" {
+        base = env.get("XDG_DATA_HOME")
+    }
+    if base == "" {
+        base = env.get("HOME") + "/.local/share"
+    }
+    if base == "" {
+        base = "."
+    }
+    return base + "/auto-notes/data"
+}
+
+pub fn notes_dir() str {
+    return data_dir() + "/notes"
+}
+
+pub fn receipts_dir() str {
+    return data_dir() + "/receipts"
+}
+
+pub fn journal_dir() str {
+    return data_dir() + "/journal"
+}
+
+pub fn backup_dir() str {
+    return data_dir() + "/backup"
+}
+
+pub fn corrupted_dir() str {
+    return data_dir() + "/corrupted"
+}
+
+fn manifest_file() str {
+    return data_dir() + "/manifest.json"
+}
+
+fn writer_lock_file() str {
+    return data_dir() + "/writer.lock"
+}
+
+fn entry_index(note_id str) int {
+    var n int = e_note_id.len()
+    for i in 0..n {
+        if e_note_id[i] == note_id {
+            return i
+        }
+    }
+    return -1
+}
+
+fn state_of(note_id str) str {
+    var i int = entry_index(note_id)
+    if i >= 0 {
+        return e_state[i]
+    }
+    return "active"
+}
+
+fn pinned_of(note_id str) bool {
+    var i int = entry_index(note_id)
+    if i >= 0 {
+        return e_pinned[i]
+    }
+    return false
+}
+
+// ═══════════════════════════════════════════════════════════
+// manifest 读写（提交点）：写路径 concat 拼 JSON；读路径 Value 游走
+// ═══════════════════════════════════════════════════════════
+
+pub fn manifest_exists() bool {
+    var p str = manifest_file()
+    return fs.exists(p)
+}
+
+fn save_manifest_to_disk() bool {
+    var text str = "{\"schema_version\":1,\"counter\":"
+    text = text + json.encode(m_counter)
+    text = text + ",\"entries\":["
+    var n int = e_note_id.len()
+    for i in 0..n {
+        if i > 0 {
+            text = text + ","
+        }
+        text = text + "{\"note_id\":" + json.encode(e_note_id[i])
+        text = text + ",\"revision\":" + json.encode(e_revision[i])
+        text = text + ",\"file\":" + json.encode(e_file[i])
+        text = text + ",\"state\":" + json.encode(e_state[i])
+        text = text + ",\"folder\":" + json.encode(e_folder[i])
+        text = text + ",\"tags\":" + e_tags_json[i]
+        text = text + ",\"pinned\":" + json.encode(e_pinned[i])
+        text = text + ",\"seq\":" + json.encode(e_seq[i])
+        text = text + ",\"legacy_id\":" + json.encode(e_legacy_id[i])
+        text = text + "}"
+    }
+    text = text + "]}"
+    var p str = manifest_file()
+    var w bool = fs.write_text(p, text)
+    return w
+}
+
+/// 读磁盘 manifest 填充并行数组；缺失或损坏返回 false。
+fn load_manifest_from_disk() bool {
+    var p str = manifest_file()
+    var raw str = fs.read_text(p)
+    if raw == "" {
+        return false
+    }
+    var ok bool = json.is_valid(raw)
+    if ok == false {
+        return false
+    }
+    var v = json.parse(raw)
+    var arr = json.get(v, "entries")
+        var isnull_arr str = json.encode(arr)
+        if isnull_arr == "null" {
+            return false
+    }
+    var cv = json.get(v, "counter")
+    m_counter = json.as_int(cv)
+    if m_counter < 1 {
+        m_counter = 1
+    }
+    e_note_id = List<str>.new([])
+    e_revision = List<str>.new([])
+    e_file = List<str>.new([])
+    e_state = List<str>.new([])
+    e_folder = List<str>.new([])
+    e_tags_json = List<str>.new([])
+    e_pinned = List<bool>.new([])
+    e_seq = List<str>.new([])
+    e_legacy_id = List<str>.new([])
+    var n int = 0
+    var n_guard int = 0
+    while n_guard < 1000000 {
+        n_guard = n_guard + 1
+        var n_probe = json.get_at(arr, n)
+        var n_t str = json.encode(n_probe)
+        if n_t == "null" {
+            break
+        }
+        n = n + 1
+    }
+    for i in 0..n {
+        var it = json.get_at(arr, i)
+        var nid str = json.get_str(it, "note_id")
+        if nid != "" {
+            var state str = json.get_str(it, "state")
+            if state == "" {
+                state = "active"
+            }
+            var tags_v = json.get(it, "tags")
+            var tags_json str = "[]"
+                var isnull_tags_v str = json.encode(tags_v)
+                if isnull_tags_v != "null" {
+                    tags_json = json.encode(tags_v)
+            }
+            var rev_v = json.get(it, "revision")
+            var rev int = json.as_int(rev_v)
+            var pin_v = json.get(it, "pinned")
+            var pin bool = json.as_bool(pin_v)
+            var seq_v = json.get(it, "seq")
+            var seq int = json.as_int(seq_v)
+            var leg_v = json.get(it, "legacy_id")
+            var leg int = json.as_int(leg_v)
+            e_note_id.push(nid)
+            e_revision.push(json.encode(rev))
+            e_file.push(json.get_str(it, "file"))
+            e_state.push(state)
+            e_folder.push(json.get_str(it, "folder"))
+            e_tags_json.push(tags_json)
+            e_pinned.push(pin)
+            e_seq.push(json.encode(seq))
+            e_legacy_id.push(json.encode(leg))
+        }
+    }
+    return true
+}
+
+
+/// 十进制整数字符串解析（char_at 逐码点；非数位跳过；支持前导负号）。
+/// a2r 的 to_uint 路由发射损坏（String as u32 / 索引接收者错位），自实现。
+fn parse_int(s str) int {
+    var r int = 0
+    var neg bool = false
+    var i int = 0
+    var n int = s.len()
+    if n > 0 {
+        var c0 int = s.char_at(0)
+        if c0 == 45 {
+            neg = true
+            i = 1
+        }
+    }
+    while i < n {
+        var cp int = s.char_at(i)
+        if cp != 0 {
+            if cp >= 48 {
+                if cp <= 57 {
+                    r = r * 10 + (cp - 48)
+                }
+            }
+        }
+        i = i + 1
+    }
+    if neg {
+        r = 0 - r
+    }
+    return r
+}
+
+/// 空标签列表（repo_set_meta 调用点的 [] 实参转译为切片引用，类型不符）
+fn empty_tags() List<str> {
+    var t List<str> = List<str>.new([])
+    return t
+}
+
+/// 十进制整数 → 字符串（json.encode 的轻量别名，语义直白）
+fn int_str(v int) str {
+    return json.encode(v)
+}
+
+// ═══════════════════════════════════════════════════════════
+// 字节安全扫描原语（find 只从头搜索 ⇒ 用已知边界切片模拟 find_from）
+// ═══════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════
+// 旧档对象切分（UTF-8 安全）：逐码点扫描 + 字节偏移跟踪。
+// a2r 的 str.find 路由缺参不可用、str.sub 是不查边界的字节切片——
+// 因此本扫描器只用 char_at（chars().nth，UTF-8 安全）判定结构，
+// 并自行累计字节偏移；对象边界均为 ASCII 字符的起始字节位，
+// sub 在这些位之间切片不会撕开多字节字符。
+// ═══════════════════════════════════════════════════════════
+
+/// 码点 → UTF-8 字节长度
+fn cp_byte_len(cp int) int {
+    if cp < 128 {
+        return 1
+    }
+    if cp < 2048 {
+        return 2
+    }
+    if cp < 65536 {
+        return 3
+    }
+    return 4
+}
+
+/// 从旧版 notes.json 文本中切出顶层对象，返回 JSON 数组字符串（元素为对象
+/// 文本原文）。引号状态机跳过字符串内的花括号；字符串超长（截断写入的
+/// 典型形态）时把弃区作为（必无效的）候选输出供报告，随后复位继续——
+/// 弃区之后的合法条目仍可打捞（AC-03 skip-and-continue）。
+fn split_objects(raw str) str {
+    var out str = "["
+    var depth int = 0
+    var obj_start int = -1
+    var in_str bool = false
+    var esc bool = false
+    var str_start int = 0
+    var byte_pos int = 0
+    var n int = raw.len()
+    for i in 0..n {
+        var cp int = raw.char_at(i)
+        if cp != 0 {
+            if in_str {
+                var too_long bool = byte_pos - str_start > 65536
+                if too_long {
+                    // 截断字符串：弃区候选 + 复位（放弃该对象，继续扫描）
+                    if depth > 0 {
+                        if obj_start >= 0 {
+                            var frag str = raw.sub(obj_start, byte_pos)
+                            if out != "[" {
+                                out = out + ","
+                            }
+                            out = out + json.encode(frag)
+                        }
+                        depth = 0
+                        obj_start = -1
+                    }
+                    in_str = false
+                    esc = false
+                } else {
+                    if esc {
+                        esc = false
+                    } else {
+                        if cp == 92 {
+                            esc = true
+                        } else {
+                            if cp == 34 {
+                                in_str = false
+                            }
+                        }
+                    }
+                }
+            } else {
+                if cp == 34 {
+                    in_str = true
+                    esc = false
+                    str_start = byte_pos
+                } else {
+                    if cp == 123 {
+                        depth = depth + 1
+                        if depth == 1 {
+                            obj_start = byte_pos
+                        }
+                    } else {
+                        if cp == 125 {
+                            if depth > 0 {
+                                depth = depth - 1
+                                if depth == 0 {
+                                    if obj_start >= 0 {
+                                        var endb int = byte_pos + cp_byte_len(cp)
+                                        var piece str = raw.sub(obj_start, endb)
+                                        if out != "[" {
+                                            out = out + ","
+                                        }
+                                        out = out + json.encode(piece)
+                                    }
+                                    obj_start = -1
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            byte_pos = byte_pos + cp_byte_len(cp)
+        }
+    }
+    // 收尾：仍有未闭合对象（文件在对象中间截断）
+    if depth > 0 {
+        if obj_start >= 0 {
+            var frag2 str = raw.sub(obj_start, byte_pos)
+            if out != "[" {
+                out = out + ","
+            }
+            out = out + json.encode(frag2)
+        }
+    }
+    out = out + "]"
+    return out
+}
+
+// ═══════════════════════════════════════════════════════════
+// manifest 读写（提交点）：写路径 concat 拼 JSON；读路径 Value 游走
+// ═══════════════════════════════════════════════════════════
+
+fn doc_from_legacy(obj_text str) RepoResult {
+    var r RepoResult = empty_result()
+    var it = json.parse(obj_text)
+
+    var idv = json.get(it, "id")
+    var idtxt str = json.encode(idv)
+    if idtxt == "null" {
+        r.err_code = "invalid_request"
+        r.err_detail = "missing id"
+        return r
+    }
+    var q1 str = idtxt.sub(0, 1)
+    if q1 == "\"" {
+        r.err_code = "invalid_request"
+        r.err_detail = "id not an integer"
+        return r
+    }
+    var hasdot bool = idtxt.contains(".")
+    if hasdot {
+        r.err_code = "invalid_request"
+        r.err_detail = "id not an integer"
+        return r
+    }
+    var lid int = json.as_int(idv)
+
+    var tv = json.get(it, "title")
+    var l_title str = json.as_string(tv)
+    var pv = json.get(it, "pinned")
+    var l_pinned bool = json.as_bool(pv)
+    var fv = json.get(it, "folder")
+    var l_folder str = json.as_string(fv)
+    var bv = json.get(it, "body")
+    var body str = json.as_string(bv)
+    var d NoteDocument = NoteDocument {
+        schema_version: 1,
+        note_id: "n-" + idtxt,
+        revision: 1,
+        title: l_title,
+        blocks: [],
+        tags: [],
+        color: "",
+        pinned: l_pinned,
+        state: "active",
+        folder: l_folder,
+        created_at: "",
+        updated_at: "",
+        legacy_id: lid,
+        seq: 0,
+    }
+    var blk NoteBlock = NoteBlock { kind: "text", text: body, checked: false }
+    d.blocks.push(blk)
+
+    var tags_note str = ""
+    var tags_v = json.get(it, "tags")
+        var isnull_tags_v str = json.encode(tags_v)
+        if isnull_tags_v != "null" {
+            var tj str = json.encode(tags_v)
+        var tj1 str = tj.sub(0, 1)
+        if tj1 == "[" {
+            var tn int = 0
+            var tn_guard int = 0
+            while tn_guard < 1000000 {
+                tn_guard = tn_guard + 1
+                var tn_probe = json.get_at(tags_v, tn)
+                var tn_t str = json.encode(tn_probe)
+                if tn_t == "null" {
+                    break
+                }
+                tn = tn + 1
+            }
+            for k in 0..tn {
+                var tv = json.get_at(tags_v, k)
+                d.tags.push(json.as_string(tv))
+            }
+        } else {
+            tags_note = "TAGS_NOT_ARRAY"
+        }
+    }
+
+    r.ok = true
+    r.doc = d
+    r.err_detail = tags_note
+    return r
+}
+
+
+/// 诊断：当前仓储状态摘要。
+pub fn repo_status() str {
+    var s str = "{\"loaded\":"
+    if m_loaded {
+        s = s + "true"
+    } else {
+        s = s + "false"
+    }
+    s = s + ",\"counter\":" + json.encode(m_counter)
+    s = s + ",\"entries\":" + json.encode(e_note_id.len())
+    s = s + "}"
+    return s
+}
+
+// ═══════════════════════════════════════════════════════════
+// 旧条目转换（T-01）：Value → NoteDocument，严格校验 id
+// ═══════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════
+// 迁移驱动（T-01/T-03）：备份先行 → 打捞 → 实体文件 → 报告 → manifest 提交
+// ═══════════════════════════════════════════════════════════
+
+/// 对单个旧档执行迁移。幂等：manifest 已存在时直接 skipped_existing。
+/// 写序（AC-03）：备份 → 实体文件 → 损坏报告 → manifest（提交点）。
+/// 任一磁盘步失败：err=storage_unwritable，manifest 不写（原件不动）。
+pub fn migrate_legacy_at(legacy_path str) MigrationReport {
+    var report MigrationReport = MigrationReport {
+        attempted: true,
+        migrated: 0,
+        skipped_existing: false,
+        saved: false,
+        err: "",
+        backup_file: "",
+        corrupted: [],
+    }
+
+    if manifest_exists() {
+        report.skipped_existing = true
+        return report
+    }
+    var ex bool = fs.exists(legacy_path)
+    if ex == false {
+        report.attempted = false
+        return report
+    }
+    var raw str = fs.read_text(legacy_path)
+    if raw == "" {
+        report.err = "storage_unwritable"
+        return report
+    }
+
+    // 1. 备份（迁移任何写入之前；失败即中止）
+    var cdb bool = fs.create_dir(backup_dir())
+    if cdb == false {
+        report.err = "storage_unwritable"
+        return report
+    }
+    var bdst str = backup_dir() + "/notes.json.bak"
+    var cp bool = fs.copy_recursive(legacy_path, bdst)
+    if cp == false {
+        report.err = "storage_unwritable"
+        return report
+    }
+    report.backup_file = bdst
+
+    // 2. 候选对象序列：整档合法 → 直用；否则打捞扫描
+    var arr_v = json.parse("[]")
+    var whole_valid bool = json.is_valid(raw)
+    if whole_valid {
+        arr_v = json.parse(raw)
+    } else {
+        var chunks str = split_objects(raw)
+        arr_v = json.parse(chunks)
+    }
+    var n int = 0
+    var n_guard int = 0
+    while n_guard < 1000000 {
+        n_guard = n_guard + 1
+        var n_probe = json.get_at(arr_v, n)
+        var n_t str = json.encode(n_probe)
+        if n_t == "null" {
+            break
+        }
+        n = n + 1
+    }
+
+    // 3. 逐条判定与转换（并行数组暂存，避免结构体数组字段）
+    var d_ok List<bool> = List<bool>.new([])
+    var d_note_id List<str> = List<str>.new([])
+    var d_title List<str> = List<str>.new([])
+    var d_body List<str> = List<str>.new([])
+    var d_folder List<str> = List<str>.new([])
+    var d_tags_json List<str> = List<str>.new([])
+    var d_pinned List<bool> = List<bool>.new([])
+    var d_legacy List<str> = List<str>.new([])
+    var d_seq List<str> = List<str>.new([])
+    var d_flag List<str> = List<str>.new([])
+
+    for i in 0..n {
+        var it = json.get_at(arr_v, i)
+            var isnull_it str = json.encode(it)
+            if isnull_it == "null" {
+                var ci CorruptItem = CorruptItem { index: i, reason: "unparsable object", snippet: "" }
+            report.corrupted.push(ci)
+        } else {
+            var it_text str = json.encode(it)
+            var conv = doc_from_legacy(it_text)
+            if conv.ok == false {
+                var snip str = json.encode(it)
+                var ci4 CorruptItem = CorruptItem { index: i, reason: conv.err_detail, snippet: snip }
+                report.corrupted.push(ci4)
+            } else {
+                // 旧整数 ID 唯一性：本批内冲突列入损坏（不覆盖既有映射）
+                var dup bool = false
+                var dn int = d_legacy.len()
+                var cid str = conv.doc.note_id
+                var lid_text str = json.encode(conv.doc.legacy_id)
+                var flags str = conv.err_detail
+                for k in 0..dn {
+                    var lk str = d_legacy[k]
+                    if lk == lid_text {
+                        dup = true
+                    }
+                }
+                if dup {
+                    var ci5 CorruptItem = CorruptItem {
+                        index: i,
+                        reason: "duplicate legacy id",
+                        snippet: cid,
+                    }
+                    report.corrupted.push(ci5)
+                } else {
+                    // seq 取自计数器；计数器越过旧 ID 空间，保证新建不撞号
+                    var seq int = m_counter
+                    m_counter = seq + 1
+                    var lid1 int = conv.doc.legacy_id + 1
+                    if lid1 > m_counter {
+                        m_counter = lid1
+                    }
+                    d_ok.push(true)
+                    d_note_id.push(cid)
+                    d_title.push(conv.doc.title)
+                    var btext str = ""
+                    if conv.doc.blocks.len() > 0 {
+                        btext = conv.doc.blocks[0].text
+                    }
+                    d_body.push(btext)
+                    d_folder.push(conv.doc.folder)
+                    d_tags_json.push(json.encode(conv.doc.tags))
+                    d_pinned.push(conv.doc.pinned)
+                    d_legacy.push(json.encode(conv.doc.legacy_id))
+                    d_seq.push(json.encode(seq))
+                    d_flag.push(flags)
+                    if conv.err_detail == "TAGS_NOT_ARRAY" {
+                        var ci6 CorruptItem = CorruptItem {
+                            index: i,
+                            reason: "tags not an array (migrated with tags cleared)",
+                            snippet: cid,
+                        }
+                        report.corrupted.push(ci6)
+                    }
+                    report.migrated = report.migrated + 1
+                }
+            }
+        }
+    }
+
+    // 4. 实体文件 + 并行数组条目（写序：实体 → 报告 → manifest 提交点）
+    var cdn bool = fs.create_dir(notes_dir())
+    if cdn == false {
+        report.err = "storage_unwritable"
+        return report
+    }
+    var dn2 int = d_ok.len()
+    for i in 0..dn2 {
+        var note_id str = d_note_id[i]
+        var d_nid str = note_id + ""
+        var fname str = note_id.as_str() + ".r1.json"
+        var fpath str = notes_dir() + "/" + fname
+        var d NoteDocument = NoteDocument {
+            schema_version: 1,
+            note_id: d_nid,
+            revision: 1,
+            title: d_title[i],
+            blocks: [],
+            tags: [],
+            color: "",
+            pinned: d_pinned[i],
+            state: "active",
+            folder: d_folder[i],
+            created_at: "",
+            updated_at: "",
+                legacy_id: parse_int(d_legacy[i]),
+                        seq: parse_int(d_seq[i]),
+        }
+        var blk NoteBlock = NoteBlock { kind: "text", text: d_body[i], checked: false }
+        d.blocks.push(blk)
+        var w bool = fs.write_text(fpath, json.encode(d))
+        if w == false {
+            report.err = "storage_unwritable"
+            return report
+        }
+        e_note_id.push(note_id)
+        e_revision.push("1")
+        e_file.push(fname)
+        e_state.push("active")
+        e_folder.push(d_folder[i])
+        e_tags_json.push(d_tags_json[i])
+        e_pinned.push(d_pinned[i])
+        e_seq.push(d_seq[i])
+        e_legacy_id.push(d_legacy[i])
+    }
+
+    // 5. 损坏报告（AC-03：损坏项列入报告并保留原文件——原件只被备份读取）
+    if report.corrupted.len() > 0 {
+        var cdc bool = fs.create_dir(corrupted_dir())
+        if cdc {
+            var rpath str = corrupted_dir() + "/report-r1.json"
+            var rtext str = json.encode(report)
+            fs.write_text(rpath, rtext)
+        }
+    }
+
+    // 6. manifest 提交点
+    var saved bool = save_manifest_to_disk()
+    report.saved = saved
+    if saved == false {
+        report.err = "storage_unwritable"
+    }
+    return report
+}
+
+
+
+
+
+
+// ═══════════════════════════════════════════════════════════
+// 打开与写者锁（T-03 的锁策略在此落地）
+// ═══════════════════════════════════════════════════════════
+
+/// 打开仓储：建目录 → 写者锁 → 载入或迁移/新建 manifest（幂等，可重复调用）。
+/// 返回 err_code："" 成功；second_writer / corrupt / storage_unwritable。
+/// 打开错误码 → 结构化错误文本（0=无）
+fn open_err_str() str {
+    if m_open_err_code == 1 {
+        return "second_writer"
+    }
+    if m_open_err_code == 2 {
+        return "corrupt"
+    }
+    if m_open_err_code == 3 {
+        return "storage_unwritable"
+    }
+    return ""
+}
+
+pub fn open_repository() str {
+    if m_loaded {
+        return ""
+    }
+    if m_open_err_code != 0 {
+        return open_err_str()
+    }
+    var c1 bool = fs.create_dir(notes_dir())
+    var c2 bool = fs.create_dir(receipts_dir())
+    var c3 bool = fs.create_dir(journal_dir())
+    var c4 bool = fs.create_dir(backup_dir())
+    var c5 bool = fs.create_dir(corrupted_dir())
+    if c1 == false {
+        m_open_err_code = 3
+        return open_err_str()
+    }
+    var lock str = writer_lock_file()
+    var has_lock bool = fs.exists(lock)
+    var force str = env.get("NOTES_FORCE_LOCK")
+    if has_lock {
+        if force != "1" {
+            m_open_err_code = 1
+            return open_err_str()
+        }
+    }
+    var token str = "boot-" + json.encode(m_counter)
+    fs.write_text(lock, token)
+
+    if manifest_exists() {
+        var ok bool = load_manifest_from_disk()
+        if ok == false {
+            m_open_err_code = 2
+        }
+        if m_open_err_code == 0 {
+            m_loaded = true
+        }
+        return open_err_str()
+    }
+
+    // 首次打开：迁移旧档（NOTES_LEGACY_FILE 覆盖测试样本；默认数据目录内
+    // notes.json），没有旧档则新建空库——绝不注入演示数据（AC-05）。
+    var legacy str = env.get("NOTES_LEGACY_FILE")
+    if legacy == "" {
+        legacy = data_dir() + "/notes.json"
+    }
+    var rep = migrate_legacy_at(legacy)
+    if rep.skipped_existing {
+        var ok2 bool = load_manifest_from_disk()
+        if ok2 == false {
+            m_open_err_code = 2
+        }
+        if m_open_err_code == 0 {
+            m_loaded = true
+        }
+        return open_err_str()
+    }
+    if rep.attempted {
+        if rep.saved == false {
+            m_open_err_code = 3
+            return open_err_str()
+        }
+        m_loaded = true
+        return ""
+    }
+    // 全新数据目录：空库（AC-05：无冒充用户数据的演示笔记）
+    m_counter = 1
+    e_note_id = List<str>.new([])
+    e_revision = List<str>.new([])
+    e_file = List<str>.new([])
+    e_state = List<str>.new([])
+    e_folder = List<str>.new([])
+    e_tags_json = List<str>.new([])
+    e_pinned = List<bool>.new([])
+    e_seq = List<str>.new([])
+    e_legacy_id = List<str>.new([])
+    var saved2 bool = save_manifest_to_disk()
+    if saved2 == false {
+        m_open_err_code = 3
+        return open_err_str()
+    }
+    m_loaded = true
+    return ""
+}
+
+pub fn empty_result() RepoResult {
+    var r RepoResult = RepoResult {
+        ok: false,
+        err_code: "",
+        err_detail: "",
+        doc: NoteDocument {
+            schema_version: 1,
+            note_id: "",
+            revision: 0,
+            title: "",
+            blocks: [],
+            tags: [],
+            color: "",
+            pinned: false,
+            state: "active",
+            folder: "",
+            created_at: "",
+            updated_at: "",
+            legacy_id: -1,
+            seq: 0,
+        },
+        receipt: CaptureReceipt {
+            schema_version: 1,
+            request_id: "",
+            note_id: "",
+            revision: 0,
+            status: "",
+        },
+    }
+    return r
+}
+/// 故障注入点（AC-02 验证钩子）：NOTES_FAULT=after_journal|after_entity|
+/// after_manifest 让下一次提交在对应阶段中止并返回 fault_injected——
+/// 磁盘上留下的正是崩溃后的半成品状态；消费一次后失效。
+fn fault_point(stage str) bool {
+    var f str = env.get("NOTES_FAULT")
+    if f == stage {
+        env.set("NOTES_FAULT", "")
+        return true
+    }
+    return false
+}
+
+fn journal_intent(seq int, request_id str, note_id str, rev int) bool {
+    var path str = journal_dir() + "/intent-" + json.encode(seq) + ".json"
+    var text str = "{\"schema_version\":1,\"seq\":" + json.encode(seq)
+    text = text + ",\"request_id\":" + json.encode(request_id)
+    text = text + ",\"note_id\":" + json.encode(note_id)
+    text = text + ",\"revision\":" + json.encode(rev) + "}"
+    var w bool = fs.write_text(path, text)
+    return w
+}
+
+fn write_receipt(r CaptureReceipt) bool {
+    var path str = receipts_dir() + "/" + r.request_id + ".json"
+    var text str = json.encode(r)
+    var w bool = fs.write_text(path, text)
+    return w
+}
+
+/// 已提交收据查询（幂等重放用）；不存在/损坏返回 status="" 的空收据。
+pub fn read_receipt(request_id str) CaptureReceipt {
+    var empty CaptureReceipt = CaptureReceipt {
+        schema_version: 1,
+        request_id: "",
+        note_id: "",
+        revision: 0,
+        status: "",
+    }
+    if request_id == "" {
+        return empty
+    }
+    var path str = receipts_dir() + "/" + request_id + ".json"
+    var ex bool = fs.exists(path)
+    if ex == false {
+        return empty
+    }
+    var raw str = fs.read_text(path)
+    var ok bool = json.is_valid(raw)
+    if ok == false {
+        return empty
+    }
+    var v = json.parse(raw)
+    var r_req str = json.get_str(v, "request_id")
+    var r_nid str = json.get_str(v, "note_id")
+    var r_rev_v = json.get(v, "revision")
+    var r_rev int = json.as_int(r_rev_v)
+    var r_status str = json.get_str(v, "status")
+    var rc CaptureReceipt = CaptureReceipt {
+        schema_version: 1,
+        request_id: r_req,
+        note_id: r_nid,
+        revision: r_rev,
+        status: r_status,
+    }
+    return rc
+}
+
+fn doc_file_path(note_id str, rev int) str {
+    return notes_dir() + "/" + note_id + ".r" + json.encode(rev) + ".json"
+}
+
+/// Value → NoteDocument（防御性读：字段缺失按零值收敛）。
+fn doc_from_value(obj_text str) NoteDocument {
+    var v = json.parse(obj_text)
+    var d_note_id str = json.get_str(v, "note_id")
+    var d_rev_v = json.get(v, "revision")
+    var d_rev int = json.as_int(d_rev_v)
+    var d_title str = json.get_str(v, "title")
+    var d_color str = json.get_str(v, "color")
+    var d_pin_v = json.get(v, "pinned")
+    var d_pin bool = json.as_bool(d_pin_v)
+    var d_state str = json.get_str(v, "state")
+    var d_folder str = json.get_str(v, "folder")
+    var d_created str = json.get_str(v, "created_at")
+    var d_updated str = json.get_str(v, "updated_at")
+    var d_leg_v = json.get(v, "legacy_id")
+    var d_leg int = json.as_int(d_leg_v)
+    var d_seq_v = json.get(v, "seq")
+    var d_seq int = json.as_int(d_seq_v)
+    var d NoteDocument = NoteDocument {
+        schema_version: 1,
+        note_id: d_note_id,
+        revision: d_rev,
+        title: d_title,
+        blocks: [],
+        tags: [],
+        color: d_color,
+        pinned: d_pin,
+        state: d_state,
+        folder: d_folder,
+        created_at: d_created,
+        updated_at: d_updated,
+        legacy_id: d_leg,
+        seq: d_seq,
+    }
+    if d.state == "" {
+        d.state = "active"
+    }
+    var blocks_v = json.get(v, "blocks")
+        var isnull_blocks_v str = json.encode(blocks_v)
+        if isnull_blocks_v != "null" {
+            var bn int = 0
+            var bn_guard int = 0
+            while bn_guard < 1000000 {
+                bn_guard = bn_guard + 1
+                var bn_probe = json.get_at(blocks_v, bn)
+                var bn_t str = json.encode(bn_probe)
+                if bn_t == "null" {
+                    break
+                }
+                bn = bn + 1
+            }
+        for k in 0..bn {
+            var bv = json.get_at(blocks_v, k)
+            var ck_v = json.get(bv, "checked")
+            var ck bool = json.as_bool(ck_v)
+            var nb NoteBlock = NoteBlock {
+                kind: json.get_str(bv, "kind"),
+                text: json.get_str(bv, "text"),
+                checked: ck,
+            }
+            d.blocks.push(nb)
+        }
+    }
+    var tags_v = json.get(v, "tags")
+        var isnull_tags_v str = json.encode(tags_v)
+        if isnull_tags_v != "null" {
+            var tn int = 0
+            var tn_guard int = 0
+            while tn_guard < 1000000 {
+                tn_guard = tn_guard + 1
+                var tn_probe = json.get_at(tags_v, tn)
+                var tn_t str = json.encode(tn_probe)
+                if tn_t == "null" {
+                    break
+                }
+                tn = tn + 1
+            }
+        for k in 0..tn {
+            var tv = json.get_at(tags_v, k)
+            d.tags.push(json.as_string(tv))
+        }
+    }
+    return d
+}
+
+/// 实体文件 → NoteDocument；缺失/损坏/not_found 返回 ok=false + err_code。
+/// manifest 为权威：state/pinned/revision 以 manifest 为准（软删只改 manifest）。
+fn load_doc(note_id str) RepoResult {
+    var r RepoResult = empty_result()
+    var i int = entry_index(note_id)
+    if i < 0 {
+        r.err_code = "not_found"
+        return r
+    }
+    var p str = notes_dir() + "/" + e_file[i]
+    var raw str = fs.read_text(p)
+    var valid bool = json.is_valid(raw)
+    if valid == false {
+        r.err_code = "corrupt"
+        r.err_detail = p
+        return r
+    }
+    var d = doc_from_value(raw)
+    d.state = e_state[i]
+    d.pinned = e_pinned[i]
+        d.revision = parse_int(e_revision[i].as_str())
+    d.folder = e_folder[i]
+    d.tags = tags_of(i)
+    r.ok = true
+    r.doc = d
+    return r
+}
+
+fn tags_of(i int) []str {
+    var out List<str> = List<str>.new([])
+    var tj str = e_tags_json[i]
+    var valid bool = json.is_valid(tj)
+    if valid == false {
+        return out
+    }
+    var tv = json.parse(tj)
+    var n int = 0
+    var n_guard int = 0
+    while n_guard < 1000000 {
+        n_guard = n_guard + 1
+        var n_probe = json.get_at(tv, n)
+        var n_t str = json.encode(n_probe)
+        if n_t == "null" {
+            break
+        }
+        n = n + 1
+    }
+    for k in 0..n {
+        var x = json.get_at(tv, k)
+        out.push(json.as_string(x))
+    }
+    return out
+}
+
+// ═══════════════════════════════════════════════════════════
+// 仓储操作（T-02）：全部经 manifest 提交点，第二写者不可绕开
+// ═══════════════════════════════════════════════════════════
+
+/// 幂等创建：同 request_id 已有 committed 收据 ⇒ 直接返回原对象（AC-02）。
+/// handle（稳定整数 ID）取自计数器且不复用；note_id = "n-<handle>"。
+pub fn repo_create(title str, body str, folder str, tags []str, request_id str) RepoResult {
+    var f_title str = title.to_string()
+    var f_folder str = folder.to_string()
+    var f_req str = request_id.to_string()
+    var f_tags List<str> = List<str>.new([])
+    var tn int = tags.len()
+    for k in 0..tn {
+        f_tags.push(tags[k])
+    }
+    var oerr str = open_repository()
+    if oerr != "" {
+        var e = empty_result()
+        e.err_code = oerr
+        return e
+    }
+    var prior = read_receipt(f_req)
+    if prior.status == "committed" {
+        var prior_nid str = prior.note_id
+        var g = load_doc(prior_nid.as_str())
+        if g.ok {
+            g.receipt = prior
+            return g
+        }
+    }
+
+    var handle int = m_counter
+    var note_id str = "n-" + json.encode(handle)
+    var note_id_copy str = note_id + ""
+    var seq int = handle
+    var tj str = json.encode(f_tags)
+    var d NoteDocument = NoteDocument {
+        schema_version: 1,
+        note_id: note_id_copy,
+        revision: 1,
+        title: f_title + "",
+        blocks: [],
+        tags: f_tags,
+        color: "",
+        pinned: false,
+        state: "active",
+        folder: f_folder + "",
+        created_at: "",
+        updated_at: "",
+        legacy_id: handle,
+        seq: seq,
+    }
+    var f_body str = body.to_string()
+    var blk NoteBlock = NoteBlock { kind: "text", text: f_body, checked: false }
+    d.blocks.push(blk)
+
+    // ① journal intent
+    var j bool = journal_intent(seq, f_req, note_id, 1)
+    if j == false {
+        var e2 = empty_result()
+        e2.err_code = "storage_unwritable"
+        return e2
+    }
+    if fault_point("after_journal") {
+        var e3 = empty_result()
+        e3.err_code = "fault_injected"
+        e3.err_detail = "after_journal"
+        return e3
+    }
+    // ② 实体文件（新文件，天然完整）
+    var fpath str = doc_file_path(note_id.as_str(), 1)
+    var w bool = fs.write_text(fpath, json.encode(d))
+    if w == false {
+        var e4 = empty_result()
+        e4.err_code = "storage_unwritable"
+        return e4
+    }
+    if fault_point("after_entity") {
+        var e5 = empty_result()
+        e5.err_code = "fault_injected"
+        e5.err_detail = "after_entity"
+        return e5
+    }
+    // ③ manifest 提交点
+    var fname str = note_id + ".r1.json"
+    e_note_id.push(note_id)
+    e_revision.push("1")
+    e_file.push(fname)
+    e_state.push("active")
+    e_folder.push(f_folder)
+    e_tags_json.push(tj)
+    e_pinned.push(false)
+    e_seq.push(json.encode(seq))
+    e_legacy_id.push(json.encode(handle))
+    m_counter = handle + 1
+    var saved bool = save_manifest_to_disk()
+    if saved == false {
+        // 回滚内存（磁盘 manifest 未变）
+        var n int = e_note_id.len()
+        var keep_id List<str> = List<str>.new([])
+        var keep_rev List<str> = List<str>.new([])
+        var keep_file List<str> = List<str>.new([])
+        var keep_state List<str> = List<str>.new([])
+        var keep_folder List<str> = List<str>.new([])
+        var keep_tags List<str> = List<str>.new([])
+        var keep_pin List<bool> = List<bool>.new([])
+        var keep_seq List<str> = List<str>.new([])
+        var keep_leg List<str> = List<str>.new([])
+        for i in 0..n {
+            if e_note_id[i] != note_id {
+                keep_id.push(e_note_id[i])
+                keep_rev.push(e_revision[i])
+                keep_file.push(e_file[i])
+                keep_state.push(e_state[i])
+                keep_folder.push(e_folder[i])
+                keep_tags.push(e_tags_json[i])
+                keep_pin.push(e_pinned[i])
+                keep_seq.push(e_seq[i])
+                keep_leg.push(e_legacy_id[i])
+            }
+        }
+        e_note_id = keep_id
+        e_revision = keep_rev
+        e_file = keep_file
+        e_state = keep_state
+        e_folder = keep_folder
+        e_tags_json = keep_tags
+        e_pinned = keep_pin
+        e_seq = keep_seq
+        e_legacy_id = keep_leg
+        m_counter = handle
+        var e6 = empty_result()
+        e6.err_code = "storage_unwritable"
+        return e6
+    }
+    if fault_point("after_manifest") {
+        var e7 = empty_result()
+        e7.err_code = "fault_injected"
+        e7.err_detail = "after_manifest"
+        return e7
+    }
+    // ④ 收据（提交点之后；收据存在 ⇒ 已提交，AC-02）
+    var note_id_copy2 str = note_id + ""
+    var rc CaptureReceipt = CaptureReceipt {
+        schema_version: 1,
+        request_id: f_req,
+        note_id: note_id_copy2,
+        revision: 1,
+        status: "committed",
+    }
+    var rw bool = write_receipt(rc)
+    if rw == false {
+        var e8 = empty_result()
+        e8.err_code = "storage_unwritable"
+        return e8
+    }
+    var okr = load_doc(note_id)
+    okr.receipt = rc
+    return okr
+}
+
+/// 内容更新：expected_revision 不符 ⇒ revision_conflict（当前文档仍可读，
+/// AC-04）；成功则新实体文件 + manifest revision 前进 + 收据 + 旧文件清理。
+pub fn repo_update(note_id str, expected_revision int, title str, body str, request_id str) RepoResult {
+    var oerr str = open_repository()
+    if oerr != "" {
+        var e = empty_result()
+        e.err_code = oerr
+        return e
+    }
+    var cur = load_doc(note_id)
+    if cur.ok == false {
+        return cur
+    }
+    if cur.doc.revision != expected_revision {
+        var e2 = empty_result()
+        e2.err_code = "revision_conflict"
+        e2.err_detail = json.encode(cur.doc.revision)
+        e2.doc = cur.doc
+        return e2
+    }
+    var i int = entry_index(note_id)
+    var new_rev int = expected_revision + 1
+    var seq int = m_counter
+    m_counter = seq + 1
+
+    var f_title str = title.to_string()
+    var f_body str = body.to_string()
+    var f_req str = request_id.to_string()
+    var d NoteDocument = cur.doc
+    d.title = f_title
+    d.blocks = []
+    var blk NoteBlock = NoteBlock { kind: "text", text: f_body, checked: false }
+    d.blocks.push(blk)
+    d.revision = new_rev
+
+    var j bool = journal_intent(seq, f_req.as_str(), note_id.as_str(), new_rev)
+    if j == false {
+        m_counter = seq
+        var e3 = empty_result()
+        e3.err_code = "storage_unwritable"
+        return e3
+    }
+    if fault_point("after_journal") {
+        m_counter = seq
+        var e4 = empty_result()
+        e4.err_code = "fault_injected"
+        e4.err_detail = "after_journal"
+        return e4
+    }
+    var fpath str = doc_file_path(note_id, new_rev)
+    var w bool = fs.write_text(fpath, json.encode(d))
+    if w == false {
+        m_counter = seq
+        var e5 = empty_result()
+        e5.err_code = "storage_unwritable"
+        return e5
+    }
+    if fault_point("after_entity") {
+        m_counter = seq
+        var e6 = empty_result()
+        e6.err_code = "fault_injected"
+        e6.err_detail = "after_entity"
+        return e6
+    }
+    // manifest：revision 前进 + 实体指针切换（旧文件随后清理，读路径已不看它）
+    var newfile str = note_id + ".r" + json.encode(new_rev) + ".json"
+    var oldfile str = e_file[i]
+    e_revision[i] = json.encode(new_rev)
+    e_file[i] = newfile
+    var saved bool = save_manifest_to_disk()
+    if saved == false {
+        e_revision[i] = json.encode(expected_revision)
+        e_file[i] = oldfile
+        m_counter = seq
+        var e7 = empty_result()
+        e7.err_code = "storage_unwritable"
+        return e7
+    }
+    if fault_point("after_manifest") {
+        var e8 = empty_result()
+        e8.err_code = "fault_injected"
+        e8.err_detail = "after_manifest"
+        return e8
+    }
+    // 旧版本文件清理（尽力而为；失败只留垃圾文件，读路径不受影响）
+    var oldcopy str = notes_dir() + "/" + oldfile
+    fs.delete(oldcopy)
+
+    var u_nid str = note_id.to_string()
+    var rc CaptureReceipt = CaptureReceipt {
+        schema_version: 1,
+        request_id: f_req,
+        note_id: u_nid,
+        revision: new_rev,
+        status: "committed",
+    }
+    write_receipt(rc)
+    var out = load_doc(note_id)
+    out.receipt = rc
+    return out
+}
+
+/// 元数据变更（state/pinned/tags/folder）：只动 manifest（权威源），
+/// 实体文件在下次内容提交时自然同步。revision 不变（内容未变）。
+fn repo_set_meta(note_id str, new_state str, pin int, tags List<str>, set_tags bool, folder str, set_folder bool) RepoResult {
+    var oerr str = open_repository()
+    if oerr != "" {
+        var e = empty_result()
+        e.err_code = oerr
+        return e
+    }
+    var i int = entry_index(note_id)
+    if i < 0 {
+        var e2 = empty_result()
+        e2.err_code = "not_found"
+        return e2
+    }
+    var old_state str = e_state[i]
+    var old_pin bool = e_pinned[i]
+    var old_tags str = e_tags_json[i]
+    var old_folder str = e_folder[i]
+    var ns str = new_state.to_string()
+    if ns != "" {
+        e_state[i] = ns
+    }
+    if pin >= 0 {
+        if pin == 1 {
+            e_pinned[i] = true
+        } else {
+            e_pinned[i] = false
+        }
+    }
+    if set_tags {
+        e_tags_json[i] = json.encode(tags)
+    }
+    if set_folder {
+        e_folder[i] = folder.to_string()
+    }
+    var saved bool = save_manifest_to_disk()
+    if saved == false {
+        e_state[i] = old_state
+        e_pinned[i] = old_pin
+        e_tags_json[i] = old_tags
+        e_folder[i] = old_folder
+        var e3 = empty_result()
+        e3.err_code = "storage_unwritable"
+        return e3
+    }
+    var out = load_doc(note_id)
+    return out
+}
+
+/// 软删除 → 回收站（现有 CRUD 的 DELETE 语义，AC-05 可恢复）。
+pub fn repo_trash(note_id str) RepoResult {
+    return repo_set_meta(note_id, "trashed", -1, empty_tags(), false, "", false)
+}
+
+pub fn repo_archive(note_id str) RepoResult {
+    return repo_set_meta(note_id, "archived", -1, empty_tags(), false, "", false)
+}
+
+pub fn repo_restore(note_id str) RepoResult {
+    return repo_set_meta(note_id, "active", -1, empty_tags(), false, "", false)
+}
+
+pub fn repo_set_pinned(note_id str, pinned bool) RepoResult {
+    var v int = 0
+    if pinned {
+        v = 1
+    }
+    return repo_set_meta(note_id, "", v, empty_tags(), false, "", false)
+}
+
+pub fn repo_set_tags(note_id str, tags []str) RepoResult {
+    var tl List<str> = List<str>.new([])
+    var tn2 int = tags.len()
+    for k in 0..tn2 {
+        tl.push(tags[k])
+    }
+    return repo_set_meta(note_id, "", -1, tl, true, "", false)
+}
+
+pub fn repo_move(note_id str, folder str) RepoResult {
+    return repo_set_meta(note_id, "", -1, [], false, folder, true)
+}
+
+/// 读取单个文档（含 trashed；上层按需过滤）。
+pub fn repo_get(note_id str) RepoResult {
+    var oerr str = open_repository()
+    if oerr != "" {
+        var e = empty_result()
+        e.err_code = oerr
+        return e
+    }
+    return load_doc(note_id)
+}
+
+/// 列出 active 文档，seq 降序（新在前，对齐旧 UI 的 Recent 语义）。
+/// 条目按创建序追加 ⇒ 逆序遍历即可，无需排序器。
+pub fn repo_list_active() []NoteDocument {
+    var out List<NoteDocument> = List<NoteDocument>.new([])
+    var oerr str = open_repository()
+    if oerr != "" {
+        return out
+    }
+    var n int = e_note_id.len()
+    var i int = n - 1
+    while i >= 0 {
+        if e_state[i] == "active" {
+            var g = load_doc(e_note_id[i].as_str())
+            if g.ok {
+                out.push(g.doc)
+            }
+        }
+        i = i - 1
+    }
+    return out
+}
+
+/// 搜索：title 或正文（首块文本）子串命中，大小写不敏感（对齐旧 search_notes）。
+pub fn repo_search(query str) []NoteDocument {
+    var out List<NoteDocument> = List<NoteDocument>.new([])
+    var oerr str = open_repository()
+    if oerr != "" {
+        return out
+    }
+    var q str = query.lower()
+    var all = repo_list_active()
+    for d in all {
+        var body str = ""
+        if d.blocks.len() > 0 {
+            body = d.blocks[0].text
+        }
+        var t str = d.title.lower()
+        var b str = body.lower()
+        if t.contains(q) {
+            out.push(d)
+        } else {
+            if b.contains(q) {
+                out.push(d)
+            }
+        }
+    }
+    return out
+}

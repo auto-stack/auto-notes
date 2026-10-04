@@ -104,6 +104,15 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
 
 - work 记录 1：stage=work | plan_id=NOTES-001 | plan_revision=2 | outcome=pass(T-00) | code_commit=c764364 | task_ids=T-00 | evidence=tests/probe/CAPABILITY-REPORT.md, tests/probe/evidence/ | blockers=无 | next=T-01（NoteDocument v1 契约与迁移打捞）
 
+- work 记录 2：stage=work | plan_id=NOTES-001 | plan_revision=2 | outcome=blocked（环境故障） | code_commit=未提交（工作区未审状态） | task_ids=T-01/T-02（代码主体已写，编译未通过） | evidence=src/back/repository.at、src/back/api.at（v1 契约类型）、src/back/db.at（临时 use repository 接线） | blockers=本机 git-bash 环境故障：shell 报 "Top-level not found: D:\soft\Git\bin"，所有命令（含 pwd/echo）无法执行，无法编译/运行/提交；auto CLI 与 cargo 均依赖 shell | next=环境恢复后：继续编译收敛 repository.at（详见下方未完清单）
+
+  T-01/T-02 未完清单（环境恢复后续做）：
+  1. 编译收敛剩余约 12 个错误：E0382（migrate 内 conv 字段/repo_create 的 note_id 多次跨移动边界，已加局部拷贝待验证）；E0308（repo_update/repo_set_meta 参数 to_string 化的收尾）。
+  2. 已证实的 a2r 工程约束（全部已按此写码）：契约类型必须放 api.at（types.rs 路径才有 Vec/serde）；数组变量一律 `List<T>.new([])`（`[]T` 声明转译成 `&[T]`）；`json.get` 结果先落局部再喂 as_int/as_string/as_bool（get 返回 &Value，内联嵌套会双借用）；`json.get_owned/encode_pretty/str.find` 无路由不可用；`fs.delete` 参数按值移动；`char_at` 是字符索引、`sub` 是字节切片不可混用（扫描器用 char_at+自累计字节偏移）；`to_uint` 路由发射损坏（自实现 parse_int）；模块 str 状态字面量初始化会成 `Mutex<&str>`（错误状态已改 int 码）；`return 结构体字面量` 会报 undefined variable（必须 var 中转）；List<int> 读取被发射为 i32（int 并行数组已改 List<str> 存编码值）。
+  3. 编译通过后：T-01 证据 = 四个 fixture 的迁移报告（valid 全迁/corrupt 打捞+报告/bad-types 拒绝/empty 空库）+ 幂等重跑；经 db.at 加临时 v1 端点采证（注意：api.at 端点必须在 db.at 有同名函数）。
+  4. T-02 证据 = repo_create/update/trash/restore/search 的 v1 端点行为 + NOTES_FAULT 注入三阶段（after_journal/after_entity/after_manifest）的无收据恢复。
+  5. 结束前移除 db.at 的临时 `use repository` 接线改为真实 adapter（T-04）。
+
 [整体roadmap](../roadmap-v0.6.md) · [agent执行说明](../README.md)
 
 ## 10. 待澄清事项

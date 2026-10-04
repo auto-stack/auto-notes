@@ -3,6 +3,9 @@
 
 use api: Note
 
+// TEMP：仓储模块接线（T-02 将把 db.at 变为仓储 adapter；编译检查用）
+use repository
+
 // Folder type (also defined in api.at for frontend; duplicated here to
 // avoid circular import issues with collect_module_imports).
 type Folder {
