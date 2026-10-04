@@ -1,7 +1,7 @@
 ---
 plan_id: NOTES-001
 title: "可靠 Inbox、稳定标识与恢复"
-status: executing
+status: execution_done
 feature_name: "可靠 Inbox、稳定标识与恢复"
 author: [Codex]
 created_at: 2026-10-04T00:00:00Z
@@ -95,6 +95,15 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
 新需求不得在执行中无限追加；发现必要遗漏先更新计划并讨论，不直接删验收项。知识系统/安装服务/AI等未交付依赖必须写明接口级与真实集成的差别。
 
 ## 9. 复审记录
+
+- work 记录 5（收尾）：T-04 完成 + SD-01 spec 沉淀（docs/specs/notes/durable-inbox.md）。
+  冒烟 13/13 绿（seeded 隔离目录）；v1 电池 S1-S9 全绿；AC-01..AC-05 证据齐备
+  （evidence/v1/）。E2E 链：create(中文/emoji/多行)→update rev2→trash→crash(kill)→
+  restart→state=trashed 恢复→restore→legacy list 正确。挂死根因修复见 work 记录 4。
+  依赖：AutoLang plan-742（D1/D2/D4/D5/D6 + borrow 泛化）**未合 master**，
+  合入前 Notes 须以 lang-742 工具链构建（或 742 先行合入）。
+  遗留：D-742-1 跨模块类型解析缺陷（绕开）；掉电窗口（manifest 非原子）。
+  next：独立复审（/auto-plan:review）→ merge（含 742 合入顺序决策）。
 
 - 实际起点HEAD/工作目录/工具版本：v0.6-dev@7ecfa5d（计划文档提交）；工具 auto CLI 0.1.0+v0.4.2-2564-g168b56923。工作目录按修订2调整：最初在 `D:/autostack/.wt/auto-notes-20261004-01/auto-notes`（分支 codex/auto-notes-20261004-01，T-00 提交 8078502），用户修订2后移植到本检出 v0.6-dev（cherry-pick 为 c764364）。原 worktree 保留未清理（wt-guard.sh 缺失，仓规禁止递归清理；后续任务不再使用）。
 - T0能力与阻塞报告：已完成，见 `tests/probe/CAPABILITY-REPORT.md`（含跨仓缺口登记：a2r facade 缺 time 再导出、fs.rename/read_dir 无 a2r 面、db.at 风格 `[]T` 字段转译缺陷）。无阻塞；协议设计按「journal 先行 + manifest 提交点 + 收据后置」修订，时间戳字段以持久化单调计数替代并显式 null。
