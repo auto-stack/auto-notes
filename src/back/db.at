@@ -59,6 +59,22 @@ pub fn v1_list_notes() []NoteDocument {
     return repository.repo_list_active()
 }
 
+pub fn v1_test_open() str {
+    return repository.open_repository()
+}
+
+pub fn v1_test_loadmanifest() str {
+    var ok bool = repository.test_load_manifest()
+    if ok {
+        return "loaded"
+    }
+    return "load-failed"
+}
+
+pub fn v1_test_listloop() int {
+    return repository.test_list_once()
+}
+
 pub fn v1_test_fault(stage str) str {
     if stage == "off" {
         env.set("NOTES_FAULT", "")

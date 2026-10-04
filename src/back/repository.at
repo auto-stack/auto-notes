@@ -218,13 +218,16 @@ fn load_manifest_from_disk() bool {
                     tags_json = json.encode(tags_v)
             }
             var rev_v = json.get(it, "revision")
-            var rev int = json.as_int(rev_v)
+            var rev_s str = json.as_string(rev_v)
+            var rev int = parse_int(rev_s)
             var pin_v = json.get(it, "pinned")
             var pin bool = json.as_bool(pin_v)
             var seq_v = json.get(it, "seq")
-            var seq int = json.as_int(seq_v)
+            var seq_s str = json.as_string(seq_v)
+            var seq int = parse_int(seq_s)
             var leg_v = json.get(it, "legacy_id")
-            var leg int = json.as_int(leg_v)
+            var leg_s str = json.as_string(leg_v)
+            var leg int = parse_int(leg_s)
             e_note_id.push(nid)
             e_revision.push(json.encode(rev))
             e_file.push(json.get_str(it, "file"))
@@ -1510,7 +1513,10 @@ pub fn repo_list_active() []NoteDocument {
     var i int = n - 1
     while i >= 0 {
         if e_state[i] == "active" {
-            var g = load_doc(e_note_id[i].as_str())
+            // 先拷贝到局部：参数表达式会持有 E_NOTE_ID 的锁直到语句结束，
+            // 而 load_doc→entry_index 需再次锁同一 Mutex（自死锁）
+            var nid str = e_note_id[i]
+            var g = load_doc(nid.as_str())
             if g.ok {
                 out.push(g.doc)
             }
@@ -1561,4 +1567,30 @@ pub fn test_reset() {
     e_pinned = List<bool>.new([])
     e_seq = List<str>.new([])
     e_legacy_id = List<str>.new([])
+}
+
+// ── TEMP 分步测试钩子（定位 GET list 挂死；T-04 收尾移除）──────────
+pub fn test_load_manifest() bool {
+    return load_manifest_from_disk()
+}
+
+pub fn test_manifest_len() int {
+    return e_note_id.len()
+}
+
+pub fn test_list_once() int {
+    var out List<NoteDocument> = List<NoteDocument>.new([])
+    var n int = e_note_id.len()
+    var i int = n - 1
+    while i >= 0 {
+        if e_state[i] == "active" {
+            var nid str = e_note_id[i]
+            var g = load_doc(nid.as_str())
+            if g.ok {
+                out.push(g.doc)
+            }
+        }
+        i = i - 1
+    }
+    return out.len()
 }

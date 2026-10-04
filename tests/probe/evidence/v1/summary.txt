@@ -1,21 +1,24 @@
-== NOTES-001 v1 battery 2026-10-04T16:25:27+08:00 base=http://localhost:17819 work=D:/autostack/auto-os/apps/015-notes/tests/probe/evidence/v1/wk
-[S1 valid] setup: 
+== NOTES-001 v1 battery 2026-10-04T20:29:46+08:00 base=http://localhost:17819 work=D:/autostack/auto-os/apps/015-notes/tests/probe/evidence/v1/wk
+[S1 valid] setup: "ok"
 [S1 migrate] migrated=3 corrupted=[]
 [S1] 3 migrated, 0 corrupted, saved ✓
 [S1] repeat migrate → skipped_existing ✓
-[S2 corrupt] setup: 
+[S2 corrupt] setup: "ok"
 [S2] migrated=2 corrupted=1 backup=D:/autostack/auto-os/apps/015-notes/tests/probe/evidence/v1/wk/t01-corrupt/data/backup/notes.json.bak ✓
 [S2] original untouched ✓
-[S2 reopen] setup: 
-[S3 badtypes] setup: 
+[S2 reopen] setup: "ok"
+[S3 badtypes] setup: "ok"
 [S3] corrupted[0] id not an integer
-[S4 empty] setup: 
+[S4 empty] setup: "ok"
 [S4] empty legacy → 0 notes ✓
-[S5 fresh] setup: 
+[S5 fresh] setup: "ok"
 [S5] fresh dir → empty store, no demo seed ✓ (AC-05)
-[S6 idem] setup: 
+[S6 idem] setup: "ok"
 [S6] idempotent create: same note_id=n-1 ✓ (AC-02)
-[S9 fault] setup: 
+[S7] stale revision rejected; user content intact ✓ (AC-04)
+[S8] trash→hidden→restore ✓ (AC-05)
+[S9 fault] setup: "ok"
+[S9] fault leaves no success receipt; retry lands cleanly ✓ (AC-02)
 [S10 crash] 请由外部驱动：kill 后端进程 → 重启 auto run → POST /api/v1/test/setup 同目录 → GET /api/v1/notes
 == battery done ==
 battery finished; artifacts in tests/probe/evidence/v1

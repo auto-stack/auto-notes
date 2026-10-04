@@ -157,6 +157,24 @@ pub fn v1_test_fault(stage str) str {
     return db.v1_test_fault(stage)
 }
 
+/// [TEMP 二分] 只做 open_repository（锁 + manifest 载入）
+#[api(method = "GET", path = "/api/v1/test/open")]
+pub fn v1_test_open() str {
+    return db.v1_test_open()
+}
+
+/// [TEMP 二分] 只做 load_manifest_from_disk
+#[api(method = "GET", path = "/api/v1/test/loadmanifest")]
+pub fn v1_test_loadmanifest() str {
+    return db.v1_test_loadmanifest()
+}
+
+/// [TEMP 二分] 只做 list 循环（不含 open）
+#[api(method = "GET", path = "/api/v1/test/listloop")]
+pub fn v1_test_listloop() int {
+    return db.v1_test_listloop()
+}
+
 /// List all notes (most recently created first)
 /// GET /api/notes
 #[api(method = "GET", path = "/api/notes")]
