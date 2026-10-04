@@ -1,0 +1,23 @@
+[
+  {
+    "id": 0,
+    "title": "Keep me",
+    "body": "This entry is valid and must survive migration.",
+    "time": "Just now",
+    "pinned": false,
+    "tags": []
+  },
+  {
+    "id": 1,
+    "title": "Broken entry: truncated below",
+    "body": "This object is deliberately cut off mid-field,
+  },
+  {
+    "id": 2,
+    "title": "After the corruption",
+    "body": "Valid entry placed after a corrupt one; scanner must skip and continue.",
+    "time": "Later",
+    "pinned": false,
+    "tags": ["recovery"]
+  }
+]

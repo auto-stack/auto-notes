@@ -1,0 +1,27 @@
+[
+  {
+    "id": 0,
+    "title": "Welcome",
+    "body": "This is your notes app. Click on any note to view it.",
+    "time": "Just now",
+    "pinned": true,
+    "tags": ["intro"]
+  },
+  {
+    "id": 1,
+    "title": "中文笔记：多行与 emoji 🎉",
+    "body": "第一行\n第二行：带 emoji ✅ 与中文标点。\n第三行",
+    "time": "2026-01-02",
+    "pinned": false,
+    "tags": ["中文标签", "multi"]
+  },
+  {
+    "id": 2,
+    "title": "Shopping List",
+    "body": "Milk, Eggs, Bread, Cheese",
+    "time": "2 hours ago",
+    "pinned": false,
+    "tags": ["home"],
+    "folder": "personal"
+  }
+]

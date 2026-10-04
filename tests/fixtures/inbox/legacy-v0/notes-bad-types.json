@@ -1,0 +1,17 @@
+[
+  {
+    "id": "7",
+    "title": "ID is a string here",
+    "body": "Legacy writers must have integer ids; this one is a string.",
+    "time": "Just now",
+    "pinned": false,
+    "tags": "not-an-array"
+  },
+  {
+    "id": 8,
+    "title": "Missing body field",
+    "time": "Later",
+    "pinned": false,
+    "tags": []
+  }
+]

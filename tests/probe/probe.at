@@ -1,0 +1,170 @@
+// probe.at — NOTES-001 T-00 持久化能力探针 v3（借用修正版）。
+//
+// v1 结论（14 个编译错误）：use auto.file/path/time/process 不可用（E0432）；
+// env.local_data_dir/home_dir、fs.temp_dir/rename/read_dir 无路由（E0423）；
+// `type X { f []T }` 转译成 &[T]（E0106）。
+// v2 结论：fs.*/env.get/json.* 全部成功绑定；E0308 表明「内联调用结果直接传
+// str 参数」不自动借用——所有调用结果先落局部变量再使用（本版写法）。
+// v2 probe_t2 结论：时钟三连败——use auto.time E0432、time.now_ms() E0433
+// （路由发 a2r_std::time，facade 无该模块）、裸名 now_ms() E0425。
+// 端点一律返回 str（手工拼 JSON，字段值经 json.encode 转义）。
+// 探针目录：TEMP\auto-notes-t00-probe（与用户数据、仓库隔离）。
+
+use auto.env
+use auto.fs
+use auto.json
+
+// ── 端点全部返回 str（手工 JSON），规避 []T 结构体字段缺陷 ──────────
+
+fn probe_dir() str {
+    var base str = env.get("TEMP")
+    if base == "" {
+        base = env.get("TMP")
+    }
+    if base == "" {
+        base = "."
+    }
+    return base + "\\auto-notes-t00-probe"
+}
+
+// 一步结果的 JSON 对象（json.encode 负责转义）
+fn step_json(name str, ok bool, detail str) str {
+    var s str = "{\"name\":"
+    s = s + json.encode(name)
+    s = s + ",\"ok\":"
+    if ok {
+        s = s + "true"
+    } else {
+        s = s + "false"
+    }
+    s = s + ",\"detail\":"
+    s = s + json.encode(detail)
+    s = s + "}"
+    return s
+}
+
+// 用逗号连接两段已编码 JSON（供多步拼接）
+fn join_steps(a str, b str) str {
+    if a == "" {
+        return b
+    }
+    return a + "," + b
+}
+
+// 共享能力电池：env、目录创建、写读回环、file_size、append、copy/exists/delete、
+// walk 枚举、跨重启标记、字符串拼接。
+// 注：#[api] 端点只能声明在 api.at（api_gen 仅扫描该文件），这里只放实现体。
+pub fn probe_cap_body() str {
+    var acc str = ""
+
+    // 1. env 可见性（app-data 解析候选）
+    var appdata str = env.get("APPDATA")
+    acc = join_steps(acc, step_json("env.APPDATA", appdata != "", appdata))
+    var userprofile str = env.get("USERPROFILE")
+    acc = join_steps(acc, step_json("env.USERPROFILE", userprofile != "", userprofile))
+    var home str = env.get("HOME")
+    acc = join_steps(acc, step_json("env.HOME", home != "", home))
+    var tmpv str = env.get("TEMP")
+    acc = join_steps(acc, step_json("env.TEMP", tmpv != "", tmpv))
+
+    // 2. 目录创建（bool 面）
+    var dir str = probe_dir()
+    var cr bool = fs.create_dir(dir)
+    acc = join_steps(acc, step_json("fs.create_dir", cr, dir))
+
+    // 3. 写读回环
+    var f1 str = dir + "\\probe.txt"
+    var payload str = "t00-probe-payload-20261004"
+    var w bool = fs.write_text(f1, payload)
+    var rd str = fs.read_text(f1)
+    var rt_ok bool = false
+    if w {
+        if rd == payload {
+            rt_ok = true
+        }
+    }
+    acc = join_steps(acc, step_json("fs.write_read_roundtrip", rt_ok, rd))
+
+    // 4. file_size（i64 面）
+    var sz int = fs.file_size(f1)
+    var sz_text str = json.encode(sz)
+    acc = join_steps(acc, step_json("fs.file_size", sz > 0, sz_text))
+
+    // 5. append（无返回值）
+    var fa str = dir + "\\append.txt"
+    fs.append_text(fa, "A")
+    fs.append_text(fa, "B")
+    var ab str = fs.read_text(fa)
+    acc = join_steps(acc, step_json("fs.append_text", ab == "AB", ab))
+
+    // 6. copy_recursive → exists → delete 链（两份路径局部量避免值移动）
+    var f2 str = dir + "\\probe-copy.txt"
+    var f2copy str = dir + "\\probe-copy.txt"
+    var cp bool = fs.copy_recursive(f1, f2copy)
+    var ex1 bool = fs.exists(f2)
+    var f2del str = dir + "\\probe-copy.txt"
+    var del bool = fs.delete(f2del)
+    var ex2 bool = fs.exists(f2)
+    var cp_ok bool = false
+    if cp {
+        if ex1 {
+            if del {
+                if ex2 == false {
+                    cp_ok = true
+                }
+            }
+        }
+    }
+    acc = join_steps(acc, step_json("fs.copy_exists_delete", cp_ok, f2))
+
+    // 7. walk 枚举（String JSON 面）
+    var listing str = fs.walk(dir)
+    acc = join_steps(acc, step_json("fs.walk", listing != "", listing))
+
+    // 8. 字符串拼接（仓储路径拼装依赖）
+    var joined str = dir + "\\x" + "\\" + "y"
+    var expect str = dir + "\\x\\y"
+    acc = join_steps(acc, step_json("str.concat", joined == expect, joined))
+
+    // 9. 跨重启标记：读旧值（若在）→ 写新值；进程重启后再调本端点即得证据
+    var mk str = dir + "\\marker.txt"
+    var had bool = fs.exists(mk)
+    if had {
+        var prev str = fs.read_text(mk)
+        acc = join_steps(acc, step_json("restart.marker.previous", prev != "", prev))
+    } else {
+        acc = join_steps(acc, step_json("restart.marker.absent", true, "first-call"))
+    }
+    var wmk bool = fs.write_text(mk, payload)
+    acc = join_steps(acc, step_json("restart.marker.write", wmk, payload))
+
+    return "[" + acc + "]"
+}
+
+// json 模块面：encode 转义、is_valid 良构判定、parse→Value 形状
+pub fn probe_json_body() str {
+    var acc str = ""
+
+    var enc str = json.encode("中文\"引号\"🎉")
+    acc = join_steps(acc, step_json("json.encode.str", enc != "", enc))
+
+    var good str = "{\"a\":1,\"b\":[\"x\",\"中文\"]}"
+    var good_valid bool = json.is_valid(good)
+    acc = join_steps(acc, step_json("json.is_valid.good", good_valid, good))
+
+    var bad str = "{\"a\":1,"
+    var bad_valid bool = json.is_valid(bad)
+    acc = join_steps(acc, step_json("json.is_valid.corrupt", bad_valid == false, bad))
+
+    var pv = json.parse(good)
+    var pv_text str = json.encode(pv)
+    acc = join_steps(acc, step_json("json.parse.good.shape", pv_text != "", pv_text))
+
+    var pb = json.parse(bad)
+    var pb_text str = json.encode(pb)
+    acc = join_steps(acc, step_json("json.parse.corrupt.shape", true, pb_text))
+
+    return "[" + acc + "]"
+}
+
+// 崩溃模拟由测试进程外部 kill（a2r 面无 process.exit）——见探针报告。

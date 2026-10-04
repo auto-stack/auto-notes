@@ -2,6 +2,8 @@
 # Independent app generated/runtime artifacts
 .am/
 am.at
+.auto/
+deps/
 gen/
 node_modules/
 target/
