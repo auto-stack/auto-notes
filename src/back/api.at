@@ -91,6 +91,7 @@ pub type RepoResult = {
 // ═══════════════════════════════════════════════════════════
 
 use db
+use repository
 
 // ═══════════════════════════════════════════════════════════
 // NOTES-001 v1 端点（T-01/T-02 采证面；测试端点在 T-04 收尾时评估保留）
@@ -179,21 +180,81 @@ pub fn v1_test_listloop() int {
 /// GET /api/notes
 #[api(method = "GET", path = "/api/notes")]
 pub fn list_notes() []Note {
-    return db.all_notes()
+    var docs []NoteDocument = repository.repo_list_active()
+    var out List<Note> = List<Note>.new([])
+    for d in docs {
+        var body str = ""
+        if d.blocks.len() > 0 {
+            body = d.blocks[0].text
+        }
+        var t str = d.updated_at
+        if t == "" {
+            t = "Just now"
+        }
+        out.push(Note {
+            id: d.legacy_id,
+            title: d.title,
+            body: body,
+            time: t,
+            pinned: d.pinned,
+            tags: d.tags,
+            folder: d.folder,
+        })
+    }
+    return out
 }
 
 /// Get a single note by ID
 /// GET /api/notes/:id
 #[api(method = "GET", path = "/api/notes/:id")]
 pub fn get_note(id int) ?Note {
-    return db.find_note(id)
+    var r = repository.repo_get(repository.nid_of(id))
+    if r.ok {
+        var body str = ""
+        if r.doc.blocks.len() > 0 {
+            body = r.doc.blocks[0].text
+        }
+        var t str = r.doc.updated_at
+        if t == "" {
+            t = "Just now"
+        }
+        var n Note = Note {
+            id: r.doc.legacy_id,
+            title: r.doc.title,
+            body: body,
+            time: t,
+            pinned: r.doc.pinned,
+            tags: r.doc.tags,
+            folder: r.doc.folder,
+        }
+        return Some(n)
+    }
+    return None
 }
 
 /// Create a new note
 /// POST /api/notes
 #[api(method = "POST", path = "/api/notes")]
 pub fn create_note(title str, body str, folder str) Note {
-    let note = db.create_note(title, body, folder)
+    var tags List<str> = List<str>.new([])
+    var r = repository.repo_create(title, body, folder, tags, "")
+    var body str = ""
+    if r.doc.blocks.len() > 0 {
+        body = r.doc.blocks[0].text
+    }
+    var t str = r.doc.updated_at
+    if t == "" {
+        t = "Just now"
+    }
+    var note Note = Note {
+        id: r.doc.legacy_id,
+        title: r.doc.title,
+        body: body,
+        time: t,
+        pinned: r.doc.pinned,
+        tags: r.doc.tags,
+        folder: r.doc.folder,
+    }
     return note
 }
 
@@ -201,33 +262,126 @@ pub fn create_note(title str, body str, folder str) Note {
 /// PUT /api/notes/:id
 #[api(method = "PUT", path = "/api/notes/:id")]
 pub fn update_note(id int, title str, body str) ?Note {
-    return db.update_note(id, title, body)
+    var nid str = repository.nid_of(id)
+    var cur = repository.repo_get(nid.as_str())
+    if cur.ok == false {
+        return None
+    }
+    var r = repository.repo_update(nid.as_str(), cur.doc.revision, title, body, "")
+    if r.ok {
+    var body str = ""
+    if r.doc.blocks.len() > 0 {
+        body = r.doc.blocks[0].text
+    }
+    var t str = r.doc.updated_at
+    if t == "" {
+        t = "Just now"
+    }
+    return Note {
+        id: r.doc.legacy_id,
+        title: r.doc.title,
+        body: body,
+        time: t,
+        pinned: r.doc.pinned,
+        tags: r.doc.tags,
+        folder: r.doc.folder,
+    }
+    }
+    return None
 }
 
 /// Delete a note by ID
 /// DELETE /api/notes/:id
 #[api(method = "DELETE", path = "/api/notes/:id")]
 pub fn delete_note(id int) bool {
-    return db.delete_note(id)
+    var r = repository.repo_trash(repository.nid_of(id))
+    return r.ok
 }
 
 /// Toggle pin status
 /// PATCH /api/notes/:id/pin
 #[api(method = "PATCH", path = "/api/notes/:id/pin")]
 pub fn toggle_pin(id int) ?Note {
-    return db.toggle_pin(id)
+    var nid str = repository.nid_of(id)
+    var cur = repository.repo_get(nid.as_str())
+    if cur.ok == false {
+        return None
+    }
+    var want bool = cur.doc.pinned == false
+    var r = repository.repo_set_pinned(nid.as_str(), want)
+    if r.ok {
+    var body str = ""
+    if r.doc.blocks.len() > 0 {
+        body = r.doc.blocks[0].text
+    }
+    var t str = r.doc.updated_at
+    if t == "" {
+        t = "Just now"
+    }
+    return Note {
+        id: r.doc.legacy_id,
+        title: r.doc.title,
+        body: body,
+        time: t,
+        pinned: r.doc.pinned,
+        tags: r.doc.tags,
+        folder: r.doc.folder,
+    }
+    }
+    return None
 }
 
 /// Update tags for a note
 /// PUT /api/notes/:id/tags
 #[api(method = "PUT", path = "/api/notes/:id/tags")]
 pub fn update_tags(id int, tags []str) ?Note {
-    return db.update_tags(id, tags)
+    var r = repository.repo_set_tags(repository.nid_of(id), tags)
+    if r.ok {
+    var body str = ""
+    if r.doc.blocks.len() > 0 {
+        body = r.doc.blocks[0].text
+    }
+    var t str = r.doc.updated_at
+    if t == "" {
+        t = "Just now"
+    }
+    return Note {
+        id: r.doc.legacy_id,
+        title: r.doc.title,
+        body: body,
+        time: t,
+        pinned: r.doc.pinned,
+        tags: r.doc.tags,
+        folder: r.doc.folder,
+    }
+    }
+    return None
 }
 
 /// Search notes by title + body
 /// GET /api/notes/search?q=...
 #[api(method = "GET", path = "/api/notes/search")]
 pub fn search_notes(query str) []Note {
-    return db.search_notes(query)
+    var docs []NoteDocument = repository.repo_search(query)
+    var out List<Note> = List<Note>.new([])
+    for d in docs {
+        var body str = ""
+        if d.blocks.len() > 0 {
+            body = d.blocks[0].text
+        }
+        var t str = d.updated_at
+        if t == "" {
+            t = "Just now"
+        }
+        out.push(Note {
+            id: d.legacy_id,
+            title: d.title,
+            body: body,
+            time: t,
+            pinned: d.pinned,
+            tags: d.tags,
+            folder: d.folder,
+        })
+    }
+    return out
 }

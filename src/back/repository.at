@@ -900,9 +900,10 @@ pub fn open_repository() str {
     }
     m_loaded = true
     // 显式 seed 模式（NOTES_SEED=1）：仅全新目录写入示例笔记（tag "seed"
-    // 标记，非用户数据）；默认绝不注入（AC-05）
+    // 标记，非用户数据）；默认绝不注入（AC-05）。Welcome 置顶复刻旧种子数据。
     if env.get("NOTES_SEED") == "1" {
         var s1 = repo_create("Welcome", "This is your notes app. Click on any note to view it.", "", seed_tags("intro"), "seed-1")
+        var p1 = repo_set_pinned(s1.doc.note_id.as_str(), true)
         var s2 = repo_create("Quick Ideas", "Build a markdown editor with live preview.", "", seed_tags("ideas"), "seed-2")
         var s3 = repo_create("Shopping List", "Milk, Eggs, Bread, Cheese", "personal", seed_tags("home"), "seed-3")
         var s4 = repo_create("Recipe: Pasta", "200g flour, 2 eggs, pinch of salt.", "personal", seed_tags("home"), "seed-4")
@@ -1324,6 +1325,10 @@ pub fn repo_create(title str, body str, folder str, tags List<str>, request_id s
 /// 内容更新：expected_revision 不符 ⇒ revision_conflict（当前文档仍可读，
 /// AC-04）；成功则新实体文件 + manifest revision 前进 + 收据 + 旧文件清理。
 pub fn repo_update(note_id str, expected_revision int, title str, body str, request_id str) RepoResult {
+    var rid2 str = request_id
+    if rid2 == "" {
+        rid2 = ui_request_id("auto-upd")
+    }
     var oerr str = open_repository()
     if oerr != "" {
         var e = empty_result()
@@ -1412,7 +1417,7 @@ pub fn repo_update(note_id str, expected_revision int, title str, body str, requ
     var u_nid str = note_id.to_string()
     var rc CaptureReceipt = CaptureReceipt {
         schema_version: 1,
-        request_id: f_req,
+        request_id: rid2,
         note_id: u_nid,
         revision: new_rev,
         status: "committed",
