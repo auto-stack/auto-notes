@@ -22,3 +22,16 @@ __pycache__/
 
 # a2r 中间产物（生成器交换格式，不入库）
 src/back/*.a2r.rs
+# NOTES-001 运行时产物（电池工作树/实例数据/失败计数）不入库
+tests/probe/evidence/**/wk/
+tests/probe/evidence/seeded-r3*/
+tests/probe/evidence/**/*.db
+tests/probe/evidence/**/*.db-wal
+tests/probe/evidence/**/*.db-shm
+tests/probe/evidence/**/.fails
+tests/probe/evidence/v1/wk/
+tests/probe/evidence/v1/seeded-review/
+tests/probe/evidence/v1/direct/
+tests/probe/evidence/v1/*.db
+tests/probe/evidence/v1/*.db-wal
+tests/probe/evidence/v1/*.db-shm

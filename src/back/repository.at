@@ -98,7 +98,20 @@ fn empty_result_json() str {
 }
 
 pub fn ui_request_id(prefix str) str {
-    return prefix + "-" + json.encode(next_counter())
+    return prefix + "-" + json.encode(next_req_seq())
+}
+
+/// 自动 request_id 的专用单调序列。绝不可复用笔记 seq 计数器：update 不推进
+/// 笔记计数器，两次连续 update 会拿到同一 rid，第二次命中 requests 表回放
+/// 直接返回旧信封（ok=true 但不写入——已在冒烟中实证）。req_seq 每取一次自增。
+fn next_req_seq() int {
+    var db SqliteDb = sqlite.open(db_path())
+    var up int = db.exec("UPDATE meta SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT) WHERE k='req_seq'")
+    if up == 0 {
+        db.exec("INSERT INTO meta(k, v) VALUES('req_seq', '1')")
+    }
+    var v str = meta_get_on(db, "req_seq")
+    return parse_int(v)
 }
 
 pub fn nid_of(id int) str {
@@ -159,6 +172,45 @@ fn ensure_schema(db SqliteDb) {
     db.exec("CREATE TABLE IF NOT EXISTS notes(note_id TEXT PRIMARY KEY, legacy_id INTEGER UNIQUE, revision INTEGER NOT NULL DEFAULT 1, title TEXT NOT NULL DEFAULT '', body TEXT NOT NULL DEFAULT '', tags_json TEXT NOT NULL DEFAULT '[]', color TEXT NOT NULL DEFAULT '', pinned INTEGER NOT NULL DEFAULT 0, state TEXT NOT NULL DEFAULT 'active', folder TEXT NOT NULL DEFAULT '', seq INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')")
     db.exec("CREATE TABLE IF NOT EXISTS requests(request_id TEXT PRIMARY KEY, note_id TEXT NOT NULL, kind TEXT NOT NULL)")
     db.exec("CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT NOT NULL)")
+    seed_if_requested(db)
+}
+
+// 显式 seed 模式（NOTES_SEED=1，T-03）：仅全新目录写入示例笔记（tag "seed"
+// 标记，非用户数据）；默认绝不注入（AC-05）。meta.seeded 快速跳过；
+// seed-N request_id 保证幂等。
+fn seed_if_requested(db SqliteDb) {
+    if env.get("NOTES_SEED") != "1" {
+        return
+    }
+    if meta_get_on(db, "seeded") == "1" {
+        return
+    }
+    // 先占位再播种：repo_create 内部会再走 ensure_schema→seed_if_requested，
+    // 不先写标记就是无限递归（STATUS_STACK_OVERFLOW 已实证）。
+    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('seeded','1')")
+    var t1 str = json.encode(seed_tags("intro"))
+    var s1 = repo_create("Welcome", "This is your notes app. Click on any note to view it.", "", t1, "seed-1")
+    var t2 str = json.encode(seed_tags("ideas"))
+    var s2 = repo_create("Quick Ideas", "Build a markdown editor with live preview.", "", t2, "seed-2")
+    var t3 str = json.encode(seed_tags("home"))
+    var s3 = repo_create("Shopping List", "Milk, Eggs, Bread, Cheese", "personal", t3, "seed-3")
+    var t4 str = json.encode(seed_tags("home"))
+    var s4 = repo_create("Recipe: Pasta", "200g flour, 2 eggs, pinch of salt.", "personal", t4, "seed-4")
+    var t5 str = json.encode(seed_tags("work"))
+    var s5 = repo_create("Meeting Notes", "Q3 roadmap discussion.", "work", t5, "seed-5")
+    var t6 str = json.encode(seed_tags("work"))
+    var s6 = repo_create("Sprint Planning", "Sprint 12 planning notes.", "work", t6, "seed-6")
+    var it1 = json.parse(s1)
+    var note_v = json.get(it1, "note")
+    var nid_v = json.get(note_v, "note_id")
+    var p1 = repo_set_pinned(json.as_string(nid_v), true)
+}
+
+fn seed_tags(tag str) List<str> {
+    var t List<str> = List<str>.new([])
+    t.push(tag)
+    t.push("seed")
+    return t
 }
 
 fn meta_get_on(db SqliteDb, k str) str {
@@ -183,7 +235,12 @@ fn row_to_doc_json(row List<str>) str {
     s = s + ",\"body\":" + json.encode(row[4])
     s = s + ",\"tags\":" + row[5]
     s = s + ",\"color\":" + json.encode(row[6])
-    s = s + ",\"pinned\":" + row[7]
+    // SQLite 存 0/1 整数——文档契约是 JSON boolean（as_bool 对数字恒 false）
+    var pin_txt str = "false"
+    if row[7] == "1" {
+        pin_txt = "true"
+    }
+    s = s + ",\"pinned\":" + pin_txt
     s = s + ",\"state\":" + json.encode(row[8])
     s = s + ",\"folder\":" + json.encode(row[9])
     s = s + ",\"seq\":" + row[10]

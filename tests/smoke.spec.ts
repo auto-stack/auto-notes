@@ -207,8 +207,9 @@ test('T6: New note 新建并自动选中空笔记', async ({ page }) => {
 })
 
 test('T7: 删除需两步确认且真删', async ({ page }) => {
+  // r3 契约：create 带 request_id（幂等键；缺省会 auto-gen，但显式更稳）
   await page.request.post('/api/notes', {
-    data: { title: 'T7-temp-delete', body: 'temp', folder: '' },
+    data: { title: 'T7-temp-delete', body: 'temp', folder: '', request_id: `t7-${Date.now()}` },
   })
   await page.goto('/')
   await page.getByRole('button', { name: 'New note' }).waitFor({ timeout: 10000 })

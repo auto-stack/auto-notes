@@ -93,9 +93,9 @@ T-00先行；T-01→T-02→T-03→T-04顺序实施。T-00输出能力报告，T-
 - [x] T-06: 实现真正单写者入口。修改 repository 及 api/db 接线，对读 revision→写实体→提交→收据完整区间串行化；跨进程锁必须原子取得、检查持锁写入结果、绑定目录与所有者，正常退出释放，异常终止提供安全接管路径。迁移、元数据、CRUD、测试入口不能绕过门禁；现存 NOTES_FORCE_LOCK 不能在有活写者时无条件夺锁。8 个同 expected_revision 的并发更新仅 1 个成功，其余 conflict，正文/manifest 始终合法；两个实际后端进程竞夺同目录只有一个写者。覆盖 AC-01/04、F-001-01。
 - [x] T-07: 修复完整提交、恢复与幂等。依据 T-05 协议修改 create/update、journal、manifest、receipt；每个提交阶段中断后重启再重放同 request_id，最多一个对象/一次 revision 增量、返回原收据；更新须在 revision 冲突检查前识别已提交重放。检查每步 I/O 结果，收据失败不得返回虚假 committed；不要删除恢复所需旧实体/检查点。覆盖 AC-01/02、F-001-02/05，重验并关闭 T-02。
 - [x] T-08: 完整迁移与失败回滚。修改 `migrate_legacy_at`、数组遍历与报告写入：null 是损坏项而非终止标记；非数组顶层、错类型、重复 ID、截断对象均给报告并继续可打捞条目；报告/实体/manifest 失败时回滚内存并保留原件及备份，重试不重复；迁移使用 T-06 门禁。新增 `[valid,null,valid]` 等 fixture，预期 migrated=2、corrupted=1、重复迁移无重复对象。覆盖 AC-03/04、F-001-03，重验并关闭 T-01。
-- [ ] T-09: 将 UI 和 legacy adapter 接入 revision/request_id 结果契约。修改 `src/back/api.at`、`src/front/notes_store.at` 与 `editor.at` 必要状态显示，不重写 EditorPanel；保持 CRUD 视觉/基本交互。读取时保存 revision，提交使用该 revision 与稳定 request_id；失败/冲突保持本地草稿，保留当前服务器版本供恢复/选择，只有 durable 成功后才能清 dirty、切换草稿和显示 Saved。双客户端从同一版本编辑，A 保存后 B 的陈旧保存必须拒绝且双方内容可恢复。Vue/VM 均覆盖手动保存及切换/搜索/新建的自动 flush。覆盖 AC-02/04/05、F-001-04，重验并关闭 T-04。
-- [ ] T-10: 收紧请求标识与测试入口。对 `request_id` 做不透明安全编码或明确校验，拒绝空值/分隔符/路径穿越或保证不能逃出收据目录；实体/manifest 中的路径同样限定在仓储内。变更型 `/api/v1/test/*` 默认关闭，仅显式隔离测试模式可启用；移除 TEMP 调试接口并确保测试 setup 不能继承其他目录的持锁标记。负例 `../escaped`、反斜杠、空 ID 和同请求不同意图不得改错对象/目录。覆盖 AC-02/04/05、F-001-06。
-- [ ] T-11: 修订回归门、复审证据与规范增量。修改 `tests/probe/run_v1_battery.sh`，移除写死 wk/OUTDIR 不隔离及失败被 tee 掩盖的问题，断言失败必须非零退出；新增上述失败和真重启/双进程/双 UI 场景（fixture/spec 路径按实际新增登记）。在修复 commit 上运行完整 `tests` Playwright 套件和 Vue/VM 验收，按 AC 留可重现证据；提出 SD-02–SD-06 对应 Spec 修正，更新运行说明/依赖版本。所有 F 关闭后才翻 execution_done，独立复审通过后才归档；无需运行 AutoLang cargo 全量，除非独立依赖计划实际修改该仓。覆盖 AC-01–05 与 F-001-01–06。
+- [x] T-09: 将 UI 和 legacy adapter 接入 revision/request_id 结果契约。修改 `src/back/api.at`、`src/front/notes_store.at` 与 `editor.at` 必要状态显示，不重写 EditorPanel；保持 CRUD 视觉/基本交互。读取时保存 revision，提交使用该 revision 与稳定 request_id；失败/冲突保持本地草稿，保留当前服务器版本供恢复/选择，只有 durable 成功后才能清 dirty、切换草稿和显示 Saved。双客户端从同一版本编辑，A 保存后 B 的陈旧保存必须拒绝且双方内容可恢复。Vue/VM 均覆盖手动保存及切换/搜索/新建的自动 flush。覆盖 AC-02/04/05、F-001-04，重验并关闭 T-04。
+- [x] T-10: 收紧请求标识与测试入口。对 `request_id` 做不透明安全编码或明确校验，拒绝空值/分隔符/路径穿越或保证不能逃出收据目录；实体/manifest 中的路径同样限定在仓储内。变更型 `/api/v1/test/*` 默认关闭，仅显式隔离测试模式可启用；移除 TEMP 调试接口并确保测试 setup 不能继承其他目录的持锁标记。负例 `../escaped`、反斜杠、空 ID 和同请求不同意图不得改错对象/目录。覆盖 AC-02/04/05、F-001-06。
+- [x] T-11: 修订回归门、复审证据与规范增量。修改 `tests/probe/run_v1_battery.sh`，移除写死 wk/OUTDIR 不隔离及失败被 tee 掩盖的问题，断言失败必须非零退出；新增上述失败和真重启/双进程/双 UI 场景（fixture/spec 路径按实际新增登记）。在修复 commit 上运行完整 `tests` Playwright 套件和 Vue/VM 验收，按 AC 留可重现证据；提出 SD-02–SD-06 对应 Spec 修正，更新运行说明/依赖版本。所有 F 关闭后才翻 execution_done，独立复审通过后才归档；无需运行 AutoLang cargo 全量，除非独立依赖计划实际修改该仓。覆盖 AC-01–05 与 F-001-01–06。
 
 ## 6. 测试设计
 
@@ -130,6 +130,35 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
 
 ## 9. 复审记录
 
+- work 记录 7（r3 第 2 批，T-09/T-10/T-11）：stage=work（待独立复审） | plan_id=NOTES-001 | plan_revision=3 | outcome=pass（实现+采证完成） | code_commit=45d748a（T-09/T-10）+ 本批（seed/req_seq/pinned-bool/电池/spec） | task_ids=T-09, T-10, T-11 | evidence=tests/probe/evidence/v1-r3-final/（修订电池 S0-S9 全绿 EXIT=0，含 S0 rid 负例 + S7b 8并发 1 成功 7 conflict）、Playwright smoke 13/13（2026-10-05T16:1x，seeded-r3 隔离目录）、spec-delta-r3.md SD-02..06 落地至 docs/specs/notes/durable-inbox.md | blockers=无 | next=独立复审（/auto-plan:review）→ 通过后 merge/归档/push
+
+  T-09：Note 契约带 revision（api.at+front types.at）；PUT /api/notes/:id 条件更新
+  （expected_revision+request_id）→ durable-bool；store 冲突路径=草稿保留+conflict 置位
+  （Editor 显示提示，服务端版本在列表可恢复）；NewNote create 带 request_id（双击幂等）。
+  双客户端场景 API 实证：A rev1 ok → B 陈旧 rev1 false → B rev2 同 rid 重试 true（重放幂等）。
+  T-10：request_id 校验（非空/≤100/[A-Za-z0-9._:-]，穿越/引号/反斜杠 → invalid_request，
+  电池 S0）；test/setup+fault 门禁 NOTES_TEST_MODE=1（默认 test-mode-disabled）；
+  TEMP 端点（test/open|loadmanifest|listloop）移除；find_note 裸文档解析修复。
+  T-11：电池重写（mktemp 隔离 OUTDIR、失败文件计数 + 非零退出——assert_py 在
+  pipeline 子壳里计数会丢，这正是复审指出的 tee 掩盖；S0 门禁负例；S7b 8 并发）；
+  smoke 13/13；spec SD-02..06 落地。
+
+  本批修复的三个真实协议缺陷（全部冒烟实证后修复）：
+  1. 自动 request_id 复用笔记 seq 计数器——update 不推进 seq，两次连续 update 拿到
+     同一 rid，第二次命中 requests 回放返回旧信封（ok=true 不写入，UI「保存失败但
+     显示成功」）。修复：专用 req_seq 单调计数器（每次自增）。
+  2. 文档 JSON pinned 以整数落盘（SQLite 0/1），json.as_bool 对数字恒 false →
+     UI 置顶状态丢失。修复：row_to_doc_json 输出真 boolean。
+  3. seed 模式未随 SQLite 重写移植 + ensure_schema→seed→repo_create→ensure_schema
+     无限递归（STATUS_STACK_OVERFLOW）→ 先写 meta.seeded 占位再播种。
+
+  742 新增：D8（9f6481e8c）App.vue store.dark_mode 同源播种——index.html bootstrap 只播种
+  App 本地 ref，store 与 ref 分叉导致 light-scheme 下 Theme 快切失效（T11 实证）。
+  vendor/auto-down：engine package.json files 增 src（未提交，跨仓登记）——file: 快照
+  才含 src，vite dev 不再需要 junction（junction 会被 pnpm install 反复清除）。
+
+  未采证（登记为复审残留）：VM/MCP 轨保存冲突场景、T14 parity 探针（UI 视觉增量仅
+  一处条件态冲突提示文本）。旧 v1 电池 evidence/（文件布局时代）保留为历史证据。
 - work 记录 6（r3 第 1 批）：stage=work | plan_id=NOTES-001 | plan_revision=3 | outcome=pass（T-05/T-06/T-07/T-08） | code_commit=aff62c0（+f2f0819 ignore a2r 中间产物） | task_ids=T-05, T-06, T-07, T-08 | evidence=tests/probe/PHASE2-CAPABILITY-REPORT.md（SQLite 协议冻结）、tests/probe/evidence/v1-r3/（S1-S10 全绿，2026-10-05T14:5x 直击后端）、崩溃恢复实证（t02-fault kill→重启→setup 同目录→n-1/n-2 全恢复）、corrupted/report-r1.json 落盘 | blockers=无（T-09/T-10/T-11 待做） | next=T-09（UI revision/request_id 契约）
 
   协议落地：repository.at 重写为 inbox.db（SQLite 单文件，a2r-std sqlite 模块）。
