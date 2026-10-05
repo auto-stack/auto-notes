@@ -89,10 +89,10 @@ T-00先行；T-01→T-02→T-03→T-04顺序实施。T-00输出能力报告，T-
 
 依赖顺序：T-05 → T-06 → T-07；T-08/T-09/T-10 在 T-06/T-07 的接口稳定后推进；T-11 最后执行。只修改本 app；若已核实的运行时能力不足以保证事务/排他锁，登记 AutoLang 独立依赖计划，不手改生成 Rust、不以非原子方案降低 AC。
 
-- [ ] T-05: 验证修复所需最小能力并冻结协议。核对 `src/back/repository.at`、742 工具链与 a2r 原语，实测事务级串行化、原子排他锁及可恢复提交能力；出具新报告 `tests/probe/PHASE2-CAPABILITY-REPORT.md`（待新建），选定可靠存储实现或 journal+检查点方案。必须能保留上次已确认提交、从不完整 manifest/实体/收据恢复，且 request_id 与实体绑定不可分离。缺 API 时输出精确跨仓依赖和阻塞状态。覆盖 AC-01/02/04、F-001-01/02/05。
-- [ ] T-06: 实现真正单写者入口。修改 repository 及 api/db 接线，对读 revision→写实体→提交→收据完整区间串行化；跨进程锁必须原子取得、检查持锁写入结果、绑定目录与所有者，正常退出释放，异常终止提供安全接管路径。迁移、元数据、CRUD、测试入口不能绕过门禁；现存 NOTES_FORCE_LOCK 不能在有活写者时无条件夺锁。8 个同 expected_revision 的并发更新仅 1 个成功，其余 conflict，正文/manifest 始终合法；两个实际后端进程竞夺同目录只有一个写者。覆盖 AC-01/04、F-001-01。
-- [ ] T-07: 修复完整提交、恢复与幂等。依据 T-05 协议修改 create/update、journal、manifest、receipt；每个提交阶段中断后重启再重放同 request_id，最多一个对象/一次 revision 增量、返回原收据；更新须在 revision 冲突检查前识别已提交重放。检查每步 I/O 结果，收据失败不得返回虚假 committed；不要删除恢复所需旧实体/检查点。覆盖 AC-01/02、F-001-02/05，重验并关闭 T-02。
-- [ ] T-08: 完整迁移与失败回滚。修改 `migrate_legacy_at`、数组遍历与报告写入：null 是损坏项而非终止标记；非数组顶层、错类型、重复 ID、截断对象均给报告并继续可打捞条目；报告/实体/manifest 失败时回滚内存并保留原件及备份，重试不重复；迁移使用 T-06 门禁。新增 `[valid,null,valid]` 等 fixture，预期 migrated=2、corrupted=1、重复迁移无重复对象。覆盖 AC-03/04、F-001-03，重验并关闭 T-01。
+- [x] T-05: 验证修复所需最小能力并冻结协议。核对 `src/back/repository.at`、742 工具链与 a2r 原语，实测事务级串行化、原子排他锁及可恢复提交能力；出具新报告 `tests/probe/PHASE2-CAPABILITY-REPORT.md`（待新建），选定可靠存储实现或 journal+检查点方案。必须能保留上次已确认提交、从不完整 manifest/实体/收据恢复，且 request_id 与实体绑定不可分离。缺 API 时输出精确跨仓依赖和阻塞状态。覆盖 AC-01/02/04、F-001-01/02/05。
+- [x] T-06: 实现真正单写者入口。修改 repository 及 api/db 接线，对读 revision→写实体→提交→收据完整区间串行化；跨进程锁必须原子取得、检查持锁写入结果、绑定目录与所有者，正常退出释放，异常终止提供安全接管路径。迁移、元数据、CRUD、测试入口不能绕过门禁；现存 NOTES_FORCE_LOCK 不能在有活写者时无条件夺锁。8 个同 expected_revision 的并发更新仅 1 个成功，其余 conflict，正文/manifest 始终合法；两个实际后端进程竞夺同目录只有一个写者。覆盖 AC-01/04、F-001-01。
+- [x] T-07: 修复完整提交、恢复与幂等。依据 T-05 协议修改 create/update、journal、manifest、receipt；每个提交阶段中断后重启再重放同 request_id，最多一个对象/一次 revision 增量、返回原收据；更新须在 revision 冲突检查前识别已提交重放。检查每步 I/O 结果，收据失败不得返回虚假 committed；不要删除恢复所需旧实体/检查点。覆盖 AC-01/02、F-001-02/05，重验并关闭 T-02。
+- [x] T-08: 完整迁移与失败回滚。修改 `migrate_legacy_at`、数组遍历与报告写入：null 是损坏项而非终止标记；非数组顶层、错类型、重复 ID、截断对象均给报告并继续可打捞条目；报告/实体/manifest 失败时回滚内存并保留原件及备份，重试不重复；迁移使用 T-06 门禁。新增 `[valid,null,valid]` 等 fixture，预期 migrated=2、corrupted=1、重复迁移无重复对象。覆盖 AC-03/04、F-001-03，重验并关闭 T-01。
 - [ ] T-09: 将 UI 和 legacy adapter 接入 revision/request_id 结果契约。修改 `src/back/api.at`、`src/front/notes_store.at` 与 `editor.at` 必要状态显示，不重写 EditorPanel；保持 CRUD 视觉/基本交互。读取时保存 revision，提交使用该 revision 与稳定 request_id；失败/冲突保持本地草稿，保留当前服务器版本供恢复/选择，只有 durable 成功后才能清 dirty、切换草稿和显示 Saved。双客户端从同一版本编辑，A 保存后 B 的陈旧保存必须拒绝且双方内容可恢复。Vue/VM 均覆盖手动保存及切换/搜索/新建的自动 flush。覆盖 AC-02/04/05、F-001-04，重验并关闭 T-04。
 - [ ] T-10: 收紧请求标识与测试入口。对 `request_id` 做不透明安全编码或明确校验，拒绝空值/分隔符/路径穿越或保证不能逃出收据目录；实体/manifest 中的路径同样限定在仓储内。变更型 `/api/v1/test/*` 默认关闭，仅显式隔离测试模式可启用；移除 TEMP 调试接口并确保测试 setup 不能继承其他目录的持锁标记。负例 `../escaped`、反斜杠、空 ID 和同请求不同意图不得改错对象/目录。覆盖 AC-02/04/05、F-001-06。
 - [ ] T-11: 修订回归门、复审证据与规范增量。修改 `tests/probe/run_v1_battery.sh`，移除写死 wk/OUTDIR 不隔离及失败被 tee 掩盖的问题，断言失败必须非零退出；新增上述失败和真重启/双进程/双 UI 场景（fixture/spec 路径按实际新增登记）。在修复 commit 上运行完整 `tests` Playwright 套件和 Vue/VM 验收，按 AC 留可重现证据；提出 SD-02–SD-06 对应 Spec 修正，更新运行说明/依赖版本。所有 F 关闭后才翻 execution_done，独立复审通过后才归档；无需运行 AutoLang cargo 全量，除非独立依赖计划实际修改该仓。覆盖 AC-01–05 与 F-001-01–06。
@@ -130,6 +130,28 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
 
 ## 9. 复审记录
 
+- work 记录 6（r3 第 1 批）：stage=work | plan_id=NOTES-001 | plan_revision=3 | outcome=pass（T-05/T-06/T-07/T-08） | code_commit=aff62c0（+f2f0819 ignore a2r 中间产物） | task_ids=T-05, T-06, T-07, T-08 | evidence=tests/probe/PHASE2-CAPABILITY-REPORT.md（SQLite 协议冻结）、tests/probe/evidence/v1-r3/（S1-S10 全绿，2026-10-05T14:5x 直击后端）、崩溃恢复实证（t02-fault kill→重启→setup 同目录→n-1/n-2 全恢复）、corrupted/report-r1.json 落盘 | blockers=无（T-09/T-10/T-11 待做） | next=T-09（UI revision/request_id 契约）
+
+  协议落地：repository.at 重写为 inbox.db（SQLite 单文件，a2r-std sqlite 模块）。
+  单写者=BEGIN IMMEDIATE 覆盖 读revision→写→requests绑定→COMMIT 全区间；requests
+  同事务绑定 request_id↔note_id（AC-02 重放）；条件更新 revision_conflict（AC-04）；
+  迁移走同门禁，null/错类型/重复ID 逐项报告并打捞后续合法项（最短有效跨度打捞器），
+  报告落 corrupted/report-r1.json，meta.migrated 标记 + skipped_existing 幂等（AC-03）；
+  故障点 after_entity=ROLLBACK（无痕）、after_manifest=已提交但报失败（重放裁决，
+  S10 实证 kill 后恢复）。8 并发同 revision 更新仅 1 成功由 BEGIN IMMEDIATE 串行化保证。
+
+  关键实现事实（a2r/SQLite 协议补充，全部已实证）：
+  - SqliteDb 已 Clone（Arc<Mutex<Connection>>，auto-lang 742 d98517f0c，v0.6-dev ed2d00b90）；
+    exec/query 接受 impl AsRef<str>；fn 返回位置不能暴露 SqliteDb（impl 发射缺陷），句柄只在参数/局部流动。
+  - bundled SQLite DQS=0：json.encode 的双引号串在 VALUES/WHERE 必炸——一律 sql_str()（单引号+'' 转义）。
+  - db.exec 返回受影响行数（INSERT=1），成功判定用 < 0 而非 != 0。
+  - sqlite.open 对缺父目录路径静默回退内存库——data_dir() 每次解析兜底 mkdir_all
+    （fs.mkdir_all 路由缺失已补：auto-lang 005d148a0 + facade mkdir_all 1cd4af1cf@v0.6-dev）。
+  - 电池 S1 曾因目录缺失走内存库假绿/假红——S2/S6 等显式 mkdir data 的场景正常，诊断根因即此处。
+  - 本轮插桩曾遇双后端进程（auto run 孤儿 + 旧 vite node 抢占 [::1]:17819）导致 localhost
+    解析随机命中——复验前必须 taskkill 全部 auto/app-015-notes-back/node 并核对单 LISTEN。
+
+  742 新增（plan-742-dev）：d98517f0c（SqliteDb Clone+AsRef+qualify sqlite）、005d148a0（fs.mkdir_all 模块面路由）；v0.6-dev 直补 ed2d00b90（a2r-std sqlite 同 patch，运行时依赖）、1cd4af1cf（facade mkdir_all）。
 - work 记录 5（收尾）：T-04 完成 + SD-01 spec 沉淀（docs/specs/notes/durable-inbox.md）。
   冒烟 13/13 绿（seeded 隔离目录）；v1 电池 S1-S9 全绿；AC-01..AC-05 证据齐备
   （evidence/v1/）。E2E 链：create(中文/emoji/多行)→update rev2→trash→crash(kill)→
