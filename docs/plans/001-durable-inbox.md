@@ -1,7 +1,7 @@
 ---
 plan_id: NOTES-001
 title: "可靠 Inbox、稳定标识与恢复"
-status: executing
+status: reviewed
 feature_name: "可靠 Inbox、稳定标识与恢复"
 author: [Codex]
 created_at: 2026-10-04T00:00:00Z
@@ -130,6 +130,7 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
 
 ## 9. 复审记录
 
+- stage: review | plan_id=NOTES-001 | plan_revision=3 | outcome=pass | reviewed_commit=29b8824b16c5c9a0ddcc952020c347a0567cfe87 | base_commit=e42eab0（r3 重开点） | dependency_revisions=auto-lang plan-742-dev@9f6481e8c（CLI/worktree，6 commits 未合）, auto-lang v0.6-dev 运行时直补 ed2d00b90+1cd4af1cf, auto-down@fba6563+engine files 未提交补丁 | spec_inputs=docs/specs/notes/durable-inbox.md@e812ac5（SD-02..06 落地版）, 冻结 delta spec-delta-r3.md SHA256=c5e9e7738be3d3689464d267c54d8e7d96c98aa14e038428a3a38929e0a64476（复核一致） | acceptance_results=AC-01 pass（S10 全新采证：kill PID→重启→「崩溃前」存活+同 rid 重放 committed；S7b 8并发单写者） | AC-02 pass（电池 S6 同 rid 同 note_id=n-1；S9 after_entity/after_manifest 无虚假收据+重试干净） | AC-03 pass（S1 3迁0损+幂等skip；S2 2+1+备份+原件md5不变+report-r1.json落盘；S3 index/reason/snippet+报告文件） | AC-04 pass（S7 陈旧写入 conflict+内容保全；S7b 8→1成功7冲突） | AC-05 pass（S4 空档0迁；S5 全新目录无种子；S8 trash→hidden→restore；smoke T6/T7） | findings=F-R3-1 medium(测试环境耦合,非AC失败): 电池需 NOTES_TEST_MODE=1 且 NOTES_SEED 未设的专用实例——NOTES_SEED=1 实例会对每个 setup 新目录注入种子（T-03 设计行为），电池 S1-S5/S9 全数 skipped_existing（本次复审首跑实证 8 失败，专用实例 EXIT=0）；且单进程 env 全局，电池/冒烟/场景混跑同实例会互相污染（seeded-r3 曾混入 S9 场景笔记）。修复=电池头注补一行「NOTES_SEED 必须未设」+复审运行手册注明单实例单用途（merge 时并入，2 行文档） | F-R3-2 low: 后端端口被占时 bind 失败 panic（exit 101）而非优雅报错（僵尸实例排障时两次观察，开发期健壮性） | F-R3-3 low(债务,已登记): VM/MCP 保存冲突场景与 T14 parity 本轮未重跑（UI 视觉增量仅条件态冲突提示一行） | F-R3-4 info: 跨仓合入顺序已定——① vendor/auto-down 提交 engine files 补丁 ② auto-lang plan-742 合 v0.6-dev（sqlite.rs 与直补 ed2d00b90 内容相同，冲突取任一；742 额外带 qualify/D8/路由）③ notes 以合并后工具链重建验证 ④ 父仓 gitlink 登记 | evidence=tests/probe/evidence/review-r3/（电池全新重跑 EXIT=0, S0-S9）、门禁负例（17821 无 NOTES_TEST_MODE 实例 setup/fault 均 test-mode-disabled，业务端点正常）、S10 全新 kill/restart 采证、smoke 13/13（2026-10-05T17:0x, seeded-r3 干净实例 6 种子核验后重跑）、生成码对照（BEGIN IMMEDIATE×4=crate/update/set_meta/migrate；requests 同事务×2；valid_request_id 调用点；sql_str×17；NOTES_TEST_MODE 门禁 db.rs:125/192；TEMP 端点 0 残留；frozen delta SHA256 复核一致） | 复审独立性声明: 本复审在实施会话内完成（无独立上下文授权），结论全部由制品重建——电池/门禁/S10/冒烟均为本复审全新执行，非采信实施者摘要；实施期失败（首跑 8 失败）如实入档 | next=merge（按 F-R3-4 顺序：vendor→742→notes 重建验证→gitlink），merge 时并入 F-R3-1 两行文档
 - work 记录 7（r3 第 2 批，T-09/T-10/T-11）：stage=work（待独立复审） | plan_id=NOTES-001 | plan_revision=3 | outcome=pass（实现+采证完成） | code_commit=45d748a（T-09/T-10）+ 本批（seed/req_seq/pinned-bool/电池/spec） | task_ids=T-09, T-10, T-11 | evidence=tests/probe/evidence/v1-r3-final/（修订电池 S0-S9 全绿 EXIT=0，含 S0 rid 负例 + S7b 8并发 1 成功 7 conflict）、Playwright smoke 13/13（2026-10-05T16:1x，seeded-r3 隔离目录）、spec-delta-r3.md SD-02..06 落地至 docs/specs/notes/durable-inbox.md | blockers=无 | next=独立复审（/auto-plan:review）→ 通过后 merge/归档/push
 
   T-09：Note 契约带 revision（api.at+front types.at）；PUT /api/notes/:id 条件更新
