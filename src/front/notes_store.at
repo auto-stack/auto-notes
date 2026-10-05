@@ -25,7 +25,7 @@
 //    所以只在 Vue 侧暴露）。纯同步小工具（ApplyFilter / LoadDraft / SelectFirstVisible /
 //    SeedVocab）仍可自由复用。
 
-use back.api: list_notes, create_note, update_note, delete_note, toggle_pin, update_tags, search_notes
+use back.api: list_notes, create_note, update_note, delete_note, toggle_pin, update_tags, search_notes, next_request_id
 
 store NotesStore {
     model {
@@ -50,11 +50,17 @@ store NotesStore {
 
         // 草稿（见文件头 ④）
         var draft_id int = 0
+        var draft_revision int = 0
         var draft_title str = ""
         var draft_body str = ""
         var draft_time str = ""
         var draft_folder str = ""
         var draft_pinned bool = false
+        // SD-05 结果契约：草稿会话的稳定 request_id（首次编辑时取，durable 后清；
+        // 失败/冲突保留 → 重试同一 request_id 幂等）。conflict=true 表示上次保存
+        // 被服务端拒绝（revision 陈旧），此时草稿与服务端版本都还在，可恢复/选择。
+        var draft_request_id str = ""
+        var conflict bool = false
         // 标签单独镜像一份：视图里 `for t in .store.draft_tags` 比遍历
         // `.store.notes[.store.active_id].tags` 这种「下标 + 点路径」更可靠。
         var draft_tags []str = []
@@ -165,6 +171,7 @@ store NotesStore {
         .LoadDraft -> {
             if .notes.len() > 0 {
                 .draft_id = .notes[.active_id].id
+                .draft_revision = .notes[.active_id].revision
                 .draft_title = .notes[.active_id].title
                 .draft_body = .notes[.active_id].body
                 .draft_time = .notes[.active_id].time
@@ -176,6 +183,7 @@ store NotesStore {
                 // 注意不要写 `.draft_tags = []`——空数组字面量赋值会撞 VM codegen
                 // 的 "Assignment to complex LHS" panic（见文件头 ②）。
                 .draft_id = 0
+                .draft_revision = 0
                 .draft_title = ""
                 .draft_body = ""
                 .draft_time = ""
@@ -183,6 +191,8 @@ store NotesStore {
                 .draft_pinned = false
             }
             .dirty = false
+            .conflict = false
+            .draft_request_id = ""
             .confirm_delete = false
         }
 
@@ -200,16 +210,26 @@ store NotesStore {
 
         .SelectNote(i) -> {
             if .dirty {
-                update_note(.draft_id, .draft_title, .draft_body)
-                if .search == "" {
-                    .notes = list_notes()
+                if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                    .dirty = false
+                    .conflict = false
+                    .draft_request_id = ""
+                    if .search == "" {
+                        .notes = list_notes()
+                    } else {
+                        .notes = search_notes(.search)
+                    }
                 } else {
-                    .notes = search_notes(.search)
+                    // 冲突/失败：草稿保留（dirty 不清），服务端版本仍在 .notes；
+                    // 不切换选中项，避免草稿被 LoadDraft 冲掉。
+                    .conflict = true
                 }
             }
-            .dirty = false
-            .active_id = i
-            .LoadDraft()
+            if .conflict == false {
+                .dirty = false
+                .active_id = i
+                .LoadDraft()
+            }
         }
 
         .EditTitle(v) -> {
@@ -224,41 +244,57 @@ store NotesStore {
 
         .SaveDraft -> {
             if .dirty {
-                update_note(.draft_id, .draft_title, .draft_body)
-                if .search == "" {
-                    .notes = list_notes()
+                if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                    .dirty = false
+                    .conflict = false
+                    .draft_request_id = ""
+                    if .search == "" {
+                        .notes = list_notes()
+                    } else {
+                        .notes = search_notes(.search)
+                    }
+                    .LoadDraft()
+                    .ApplyFilter()
                 } else {
-                    .notes = search_notes(.search)
+                    .conflict = true
                 }
+            } else {
+                .conflict = false
             }
-            .dirty = false
-            .LoadDraft()
-            .ApplyFilter()
         }
 
         .NewNote -> {
             if .dirty {
-                update_note(.draft_id, .draft_title, .draft_body)
-                if .search == "" {
-                    .notes = list_notes()
+                if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                    .dirty = false
+                    .conflict = false
+                    .draft_request_id = ""
+                    if .search == "" {
+                        .notes = list_notes()
+                    } else {
+                        .notes = search_notes(.search)
+                    }
                 } else {
-                    .notes = search_notes(.search)
+                    .conflict = true
                 }
             }
-            .dirty = false
-            // 清掉搜索：新笔记标题为空，在有搜索词时不会命中，会导致「新建了却看不见」。
-            .search = ""
-            var f str = ""
-            if .active_folder != "all" {
-                if .active_folder != "pinned" {
-                    f = .active_folder
+            if .conflict == false {
+                .dirty = false
+                // 清掉搜索：新笔记标题为空，在有搜索词时不会命中，会导致「新建了却看不见」。
+                .search = ""
+                var f str = ""
+                if .active_folder != "all" {
+                    if .active_folder != "pinned" {
+                        f = .active_folder
+                    }
                 }
+                var rid str = next_request_id("ui-new")
+                create_note("", "", f, rid)
+                .notes = list_notes()
+                .active_id = 0
+                .LoadDraft()
+                .ApplyFilter()
             }
-            create_note("", "", f)
-            .notes = list_notes()
-            .active_id = 0
-            .LoadDraft()
-            .ApplyFilter()
         }
 
         // 删除改为两步：先武装确认，再确认才真删。
@@ -301,17 +337,24 @@ store NotesStore {
         .TogglePinActive -> {
             if .notes.len() > 0 {
                 if .dirty {
-                    update_note(.draft_id, .draft_title, .draft_body)
-                    .dirty = false
+                    if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                        .dirty = false
+                        .conflict = false
+                        .draft_request_id = ""
+                    } else {
+                        .conflict = true
+                    }
                 }
-                toggle_pin(.notes[.active_id].id)
-                if .search == "" {
-                    .notes = list_notes()
-                } else {
-                    .notes = search_notes(.search)
+                if .conflict == false {
+                        toggle_pin(.notes[.active_id].id)
+                    if .search == "" {
+                        .notes = list_notes()
+                    } else {
+                        .notes = search_notes(.search)
+                    }
+                    .LoadDraft()
+                    .ApplyFilter()
                 }
-                .LoadDraft()
-                .ApplyFilter()
             }
         }
 
@@ -319,70 +362,78 @@ store NotesStore {
         // 程序化输入不回填绑定状态，实证见 PLAN-616 T-05 执行记录）。
         .SetSearch(q) -> {
             if .dirty {
-                update_note(.draft_id, .draft_title, .draft_body)
+                if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                    .dirty = false
+                    .conflict = false
+                    .draft_request_id = ""
+                } else {
+                    .conflict = true
+                }
+            }
+            if .conflict == false {
+                .search = q
                 if .search == "" {
                     .notes = list_notes()
                 } else {
                     .notes = search_notes(.search)
                 }
-                .dirty = false
+                .active_id = 0
+                .LoadDraft()
+                .ApplyFilter()
             }
-            .search = q
-            if .search == "" {
-                .notes = list_notes()
-            } else {
-                .notes = search_notes(.search)
-            }
-            .active_id = 0
-            .LoadDraft()
-            .ApplyFilter()
         }
 
         .SelectFolder(f) -> {
             if .dirty {
-                update_note(.draft_id, .draft_title, .draft_body)
-                if .search == "" {
-                    .notes = list_notes()
+                if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                    .dirty = false
+                    .conflict = false
+                    .draft_request_id = ""
                 } else {
-                    .notes = search_notes(.search)
+                    .conflict = true
                 }
-                .dirty = false
             }
-            .active_folder = f
-            .active_tag = ""
-            .ApplyFilter()
-            .SelectFirstVisible()
+            if .conflict == false {
+                .active_folder = f
+                .active_tag = ""
+                .ApplyFilter()
+                .SelectFirstVisible()
+            }
         }
 
         .SelectTag(t) -> {
             if .dirty {
-                update_note(.draft_id, .draft_title, .draft_body)
-                if .search == "" {
-                    .notes = list_notes()
+                if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                    .dirty = false
+                    .conflict = false
+                    .draft_request_id = ""
                 } else {
-                    .notes = search_notes(.search)
+                    .conflict = true
                 }
-                .dirty = false
             }
-            .active_tag = t
-            .active_folder = "all"
-            .ApplyFilter()
-            .SelectFirstVisible()
+            if .conflict == false {
+                .active_tag = t
+                .active_folder = "all"
+                .ApplyFilter()
+                .SelectFirstVisible()
+            }
         }
 
         .ClearTag -> {
             if .dirty {
-                update_note(.draft_id, .draft_title, .draft_body)
-                if .search == "" {
-                    .notes = list_notes()
+                if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                    .dirty = false
+                    .conflict = false
+                    .draft_request_id = ""
                 } else {
-                    .notes = search_notes(.search)
+                    .conflict = true
                 }
-                .dirty = false
             }
-            .active_tag = ""
-            .ApplyFilter()
-            .SelectFirstVisible()
+            if .conflict == false {
+                .active_tag = ""
+                .ApplyFilter()
+                .SelectFirstVisible()
+            }
         }
 
         .TagAdded(t) -> {

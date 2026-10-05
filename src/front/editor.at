@@ -62,6 +62,11 @@ widget EditorPanel() {
                             icon (name: "check", size: 13)
                             text "Save" { style: "text-xs font-medium" }
                         }
+                        if .store.conflict {
+                            // SD-05：冲突可恢复——草稿未丢，点 Save 以当前草稿重试
+                            // 仍会失败，需切走再切回载入服务端版本后重新编辑。
+                            text "Conflict: server has a newer version" { style: "text-xs text-destructive" }
+                        }
                     } else {
                         text "Saved" { style: "text-xs text-muted-foreground/70" }
                     }

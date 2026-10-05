@@ -105,6 +105,54 @@ pub fn nid_of(id int) str {
     return "n-" + json.encode(id)
 }
 
+/// request_id 校验（F-001-06/SD-06）：非空、≤100 字符、仅 [A-Za-z0-9._:-]。
+/// SQLite 时代 request_id 是表键不是路径（穿越类已结构性消除），校验仍拒绝
+/// 引号/斜杠/控制字符，保证键的语义与日志/导出安全。
+fn valid_request_id(rid str) bool {
+    if rid == "" {
+        return false
+    }
+    if rid.len() > 100 {
+        return false
+    }
+    var n int = rid.len()
+    for i in 0..n {
+        var c int = rid.char_at(i)
+        var ok bool = false
+        if c >= 48 {
+            if c <= 57 {
+                ok = true
+            }
+        }
+        if c >= 65 {
+            if c <= 90 {
+                ok = true
+            }
+        }
+        if c >= 97 {
+            if c <= 122 {
+                ok = true
+            }
+        }
+        if c == 45 {
+            ok = true
+        }
+        if c == 95 {
+            ok = true
+        }
+        if c == 46 {
+            ok = true
+        }
+        if c == 58 {
+            ok = true
+        }
+        if ok == false {
+            return false
+        }
+    }
+    return true
+}
+
 fn ensure_schema(db SqliteDb) {
     db.exec("PRAGMA busy_timeout=3000")
     db.exec("PRAGMA journal_mode=WAL")
@@ -194,6 +242,9 @@ pub fn repo_create(title str, body str, folder str, tags_json str, request_id st
     if rid == "" {
         rid = ui_request_id("auto")
     }
+    if valid_request_id(rid) == false {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\"}"
+    }
     var db SqliteDb = sqlite.open(db_path())
     var begin int = db.exec("BEGIN IMMEDIATE")
     if begin < 0 {
@@ -248,6 +299,9 @@ pub fn repo_update(note_id str, expected_revision int, title str, body str, requ
     var rid str = request_id
     if rid == "" {
         rid = ui_request_id("auto-upd")
+    }
+    if valid_request_id(rid) == false {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\"}"
     }
     var db SqliteDb = sqlite.open(db_path())
     var begin int = db.exec("BEGIN IMMEDIATE")

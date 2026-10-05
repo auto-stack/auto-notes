@@ -5,9 +5,10 @@
 // Types (shared between frontend and backend)
 // ═══════════════════════════════════════════════════════════
 
-/// Note data model
+/// Note data model（r3：revision 随读保存、随写提交——SD-05 结果契约）
 pub type Note = {
     id: int
+    revision: int
     title: str
     body: str
     time: str
@@ -98,7 +99,7 @@ pub fn v1_status() str {
 }
 
 /// 测试控制：切换隔离数据目录与旧档样本并复位进程内状态。
-/// 返回 "ok" 或存储错误码。
+/// 仅 NOTES_TEST_MODE=1（显式隔离模式）可用，默认返回 "test-mode-disabled"。
 #[api(method = "POST", path = "/api/v1/test/setup")]
 pub fn v1_test_setup(data_dir str, legacy_file str) str {
     return db.v1_test_setup(data_dir, legacy_file)
@@ -152,24 +153,6 @@ pub fn v1_test_fault(stage str) str {
     return db.v1_test_fault(stage)
 }
 
-/// [TEMP 二分] 只做 open_repository（锁 + manifest 载入）
-#[api(method = "GET", path = "/api/v1/test/open")]
-pub fn v1_test_open() str {
-    return db.v1_test_open()
-}
-
-/// [TEMP 二分] 只做 load_manifest_from_disk
-#[api(method = "GET", path = "/api/v1/test/loadmanifest")]
-pub fn v1_test_loadmanifest() str {
-    return db.v1_test_loadmanifest()
-}
-
-/// [TEMP 二分] 只做 list 循环（不含 open）
-#[api(method = "GET", path = "/api/v1/test/listloop")]
-pub fn v1_test_listloop() int {
-    return db.v1_test_listloop()
-}
-
 /// List all notes (most recently created first)
 /// GET /api/notes
 #[api(method = "GET", path = "/api/notes")]
@@ -184,18 +167,26 @@ pub fn get_note(id int) ?Note {
     return db.find_note(id)
 }
 
-/// Create a new note
+/// Create a new note（request_id 幂等：双击/重试只建一条）
 /// POST /api/notes
 #[api(method = "POST", path = "/api/notes")]
-pub fn create_note(title str, body str, folder str) Note {
-    return db.create_note(title, body, folder)
+pub fn create_note(title str, body str, folder str, request_id str) Note {
+    return db.create_note(title, body, folder, request_id)
 }
 
-/// Update an existing note
+/// Update an existing note（条件更新：expected_revision 不符 → false，
+/// 服务端版本保全；request_id 由 UI 每个草稿会话稳定持有，重试幂等）
 /// PUT /api/notes/:id
 #[api(method = "PUT", path = "/api/notes/:id")]
-pub fn update_note(id int, title str, body str) ?Note {
-    return db.update_note(id, title, body)
+pub fn update_note(id int, expected_revision int, title str, body str, request_id str) bool {
+    return db.update_note(id, expected_revision, title, body, request_id)
+}
+
+/// UI 每个草稿会话取一次稳定 request_id（重试同意图复用同一 id）
+/// GET /api/request-id
+#[api(method = "GET", path = "/api/request-id")]
+pub fn next_request_id(prefix str) str {
+    return db.next_request_id(prefix)
 }
 
 /// Delete a note by ID

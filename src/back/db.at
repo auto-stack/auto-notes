@@ -173,7 +173,12 @@ pub fn v1_status() str {
     return repository.repo_status()
 }
 
+/// 测试入口门禁（SD-06）：默认关闭，仅 NOTES_TEST_MODE=1 的显式隔离模式可用
 pub fn v1_test_setup(data_dir str, legacy_file str) str {
+    var mode str = env.get("NOTES_TEST_MODE")
+    if mode != "1" {
+        return "test-mode-disabled"
+    }
     env.set("NOTES_DATA_DIR", data_dir)
     env.set("NOTES_LEGACY_FILE", legacy_file)
     repository.test_reset()
@@ -236,23 +241,11 @@ pub fn v1_list_notes() []NoteDocument {
     return out
 }
 
-pub fn v1_test_open() str {
-    return repository.open_repository()
-}
-
-pub fn v1_test_loadmanifest() str {
-    var ok bool = repository.test_load_manifest()
-    if ok {
-        return "loaded"
-    }
-    return "load-failed"
-}
-
-pub fn v1_test_listloop() int {
-    return repository.test_list_once()
-}
-
 pub fn v1_test_fault(stage str) str {
+    var mode str = env.get("NOTES_TEST_MODE")
+    if mode != "1" {
+        return "test-mode-disabled"
+    }
     if stage == "off" {
         env.set("NOTES_FAULT", "")
         return "off"
@@ -298,6 +291,8 @@ fn note_from_json_str(doc_json str) Note {
     var it = json.parse(doc_json)
     var v_legacy = json.get(it, "legacy_id")
     var n_id int = json.as_int(v_legacy)
+    var v_rev = json.get(it, "revision")
+    var n_rev int = json.as_int(v_rev)
     var v_title = json.get(it, "title")
     var n_title str = json.as_string(v_title)
     var v_body = json.get(it, "body")
@@ -316,6 +311,7 @@ fn note_from_json_str(doc_json str) Note {
     var n_folder str = json.as_string(v_folder)
     var n Note = Note {
         id: n_id,
+        revision: n_rev,
         title: n_title,
         body: n_body,
         time: t,
@@ -359,13 +355,18 @@ pub fn find_note(id int) ?Note {
     if js == "" {
         return None
     }
-    return note_of_result(js)
+    // repo_get 返回裸文档 JSON（非信封）——直接映射 Note 视图
+    var n Note = note_from_json_str(js)
+    return Some(n)
 }
 
-pub fn create_note(title str, body str, folder str) Note {
+pub fn create_note(title str, body str, folder str, request_id str) Note {
     var tags List<str> = List<str>.new([])
     var tj str = json.encode(tags)
-    var rid str = repository.ui_request_id("ui")
+    var rid str = request_id
+    if rid == "" {
+        rid = repository.ui_request_id("ui")
+    }
     var js str = repository.repo_create(title, body, folder, tj, rid)
     var it = json.parse(js)
     var v_doc = json.get(it, "note")
@@ -373,18 +374,23 @@ pub fn create_note(title str, body str, folder str) Note {
     return note_from_json_str(docjs)
 }
 
-pub fn update_note(id int, title str, body str) ?Note {
+/// UI 每个草稿会话取一次稳定 request_id（重试同意图复用同一 id）
+pub fn next_request_id(prefix str) str {
+    return repository.ui_request_id(prefix)
+}
+
+/// 条件更新（SD-05）：expected_revision 不符 → false（服务端版本保全）；
+/// request_id 由 UI 草稿会话稳定持有，重试幂等。
+pub fn update_note(id int, expected_revision int, title str, body str, request_id str) bool {
     var nid str = repository.nid_of(id)
-    var cur_js str = repository.repo_get(nid)
-    if cur_js == "" {
-        return None
+    var rid str = request_id
+    if rid == "" {
+        rid = repository.ui_request_id("ui-upd")
     }
-    var cur = json.parse(cur_js)
-    var v_rev = json.get(cur, "revision")
-    var rev int = json.as_int(v_rev)
-    var rid str = repository.ui_request_id("ui-upd")
-    var js str = repository.repo_update(nid, rev, title, body, rid)
-    return note_of_result(js)
+    var js str = repository.repo_update(nid, expected_revision, title, body, rid)
+    var it = json.parse(js)
+    var v_ok = json.get(it, "ok")
+    return json.as_bool(v_ok)
 }
 
 pub fn delete_note(id int) bool {

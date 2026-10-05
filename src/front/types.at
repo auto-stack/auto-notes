@@ -1,5 +1,6 @@
 type Note {
     id int
+    revision int
     title str
     body str
     time str
