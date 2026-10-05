@@ -1,4 +1,4 @@
-== NOTES-001 v1 battery 2026-10-04T20:29:46+08:00 base=http://localhost:17819 work=D:/autostack/auto-os/apps/015-notes/tests/probe/evidence/v1/wk
+== NOTES-001 v1 battery 2026-10-05T10:00:18+08:00 base=http://localhost:17819 work=D:/autostack/auto-os/apps/015-notes/tests/probe/evidence/v1/wk
 [S1 valid] setup: "ok"
 [S1 migrate] migrated=3 corrupted=[]
 [S1] 3 migrated, 0 corrupted, saved ✓
