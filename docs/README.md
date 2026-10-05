@@ -9,13 +9,13 @@
 
 ## 首批计划
 
-1. [NOTES-001：可靠 Inbox、稳定标识与恢复](plans/001-durable-inbox.md) — 修订3，executing；2026-10-05重新复审needs_fix，Phase 2修复方案待执行。
+1. [NOTES-001：可靠 Inbox、稳定标识与恢复](plans/001-durable-inbox.md) — 修订4，executing；2026-10-05再次复审needs_fix，Phase 3修复方案待执行，见[独立复现证据](plans/evidence/001-r3-recheck-20261005/README.md)。
 2. [NOTES-002：快速卡片、多媒体收存与剪贴板接收](plans/002-quick-card-assets.md)
 3. [NOTES-003：Launcher、小组件与知识交接适配](plans/003-entry-and-knowledge-adapters.md)
 
 ## 给执行agent
 
-先读仓根README、SOURCE-IMPORT.json、对应计划和产品设计，再核对当前git状态及源码。计划001当前为executing，接续Phase 2的T-05；计划002/003仍为drafting。按对应计划的授权与现有auto-plan规则执行、留证据，经复审后才宣告完成。不要执行全部roadmap，不要以写过文档为验收。
+先读仓根README、SOURCE-IMPORT.json、对应计划和产品设计，再核对当前git状态及源码。计划001当前为executing，接续Phase 3的T-12/T-13/T-14，随后T-15/T-16；计划002/003仍为drafting。按对应计划的授权与现有auto-plan规则执行、留证据，经复审后才宣告完成。不要执行全部roadmap，不要以写过文档为验收。
 
 本轮在各独立应用仓内从001–003编号，plan_id带应用前缀；核对本仓活动/归档计划为空后独占创建，不占用AutoLang/AutoOS的.next-id，也不与主力机739/740共用编号。新建后续计划按本仓取号机制检查活动及归档目录；本批不重新分配已存在ID。工作位置按2026-10-04用户约定，统一为D:/autostack/auto-os/apps/015-notes；在该检出的v0.6-dev编写计划和实施，不使用外部临时clone作为工作入口。不同app可并行，同app保持一个写入者，禁止junction/symlink。
 

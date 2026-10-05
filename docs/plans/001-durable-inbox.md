@@ -1,14 +1,14 @@
 ---
 plan_id: NOTES-001
 title: "可靠 Inbox、稳定标识与恢复"
-status: archived
+status: executing
 feature_name: "可靠 Inbox、稳定标识与恢复"
 author: [Codex]
 created_at: 2026-10-04T00:00:00Z
-updated_at: 2026-10-05T10:30:00+08:00
-plan_revision: 3
-current_step: 2
-total_steps: 12
+updated_at: 2026-10-05T22:45:00+08:00
+plan_revision: 4
+current_step: 4
+total_steps: 17
 created: 2026-10-04
 base_branch: v0.6-dev
 base_commit: 28d5157b7ed8d4f49e55f835bf8a365d2f97a89a
@@ -22,7 +22,7 @@ touched_goals: ["auto-notes/first-real-release"]
 
 ## 0. 变更摘要
 
-Phase 1 的可靠 Inbox 实现已提交并曾归档。2026-10-05 用户要求重新复审，发现事务并发、幂等提交、迁移完整性与 UI 条件写入存在阻塞缺陷；按用户“有问题请激活计划001、把修复方案更新到新的 phase”的明确授权，将本计划从归档目录移回活动目录，状态恢复 executing，修订升为 3，新增 Phase 2。本轮交付复审与修复方案，尚未实施 Phase 2。
+Phase 1 与 Phase 2 实现均已提交并曾归档。2026-10-05 用户要求再次检查修复，独立复现确认仍有旧存储升级不可见、迁移损坏报告缺失/Unicode panic、请求重放错误和 UI 冲突草稿丢失。沿用用户此前“有问题请激活计划001、把修复方案更新到新的 phase”的授权，重新激活 NOTES-001，修订4新增 Phase 3；目标与 AC-01–AC-05 不变。本轮仅复审与更新修复合同，未实施 Phase 3。
 
 ## 1. 目标
 
@@ -41,6 +41,8 @@ Phase 1 的可靠 Inbox 实现已提交并曾归档。2026-10-05 用户要求重
 AutoLang/AutoUI `.at`、既有Vue/VM宿主；后端纯.at。协议使用版本化数据，原生能力经adapter接入，不手改生成Rust。
 
 ## 4. 需求分析与背景调查
+
+修订4授权/复审起点：用户在本会话说“计划001修复了；请再次检查”，此前条件授权继续有效，本次只处理原 AC 未满足的修复，不新增产品需求。当前 Notes `f8dc027ce50ffad4676f574edb5d226a8d8cbf9a`（实现基线 `29b8824b16c5c9a0ddcc952020c347a0567cfe87` 后代），Phase 2 diff base `e42eab06bc3621b5e4b18492559ef39db70abd33`；工作位置仍为本 app 检出/v0.6-dev。实现代码已提交；复审前 vendor gitlink 已脏：HEAD 固定 AutoDown `fba6563ed2148ce85e68208863159b4ccccac710`，实际检出 `96f095bfc41a8686331c5ccd3ce17b685147fcc1`，保留不纳入本次提交。AutoLang 主检出 `7b9c6948c1465e87a6f60404510c30c712e1c7bc`、742 worktree `9f6481e8c78e2633395c2cefc653e120b28a5e8f`。本次新证据见 [r3再次复审](evidence/001-r3-recheck-20261005/README.md)，Spec 输入 blob `8f05b8ddb617d5d64e937e55027e782a2b0c0f85`；此前各起点/结论均保留为历史。
 
 修订3授权：用户于2026-10-05明确要求复审已提交的计划001，并在发现问题时重新激活原计划、追加修复 phase。因此本次沿用 NOTES-001，而非分配新计划号；这是用户对归档终态规则的明确例外。原目标、AC-01–AC-05、仓库范围与纯.at约束不变；原归档/通过记录保留为历史，受影响的通过结论作废。修订2以下背景是当时记录，不代表当前尚未实施。
 
@@ -85,17 +87,39 @@ T-00先行；T-01→T-02→T-03→T-04顺序实施。T-00输出能力报告，T-
 - [ ] T-04: 将现有 Notes CRUD 适配到新仓储，保留原 UI；把实现的 API/格式记录到文档和测试。
   [✅ 已完成 2026-10-04] api.at legacy 端点直调 repository（内联 Note 视图映射）；db.at 缩为 v1 层+名字匹配存根；冒烟 13/13 绿（seeded 隔离目录，NOTES_SEED=1）。依赖 AutoLang 742 修复（api.rs 体发射 D1/D2/D4/D5/D6）。API/格式记录：docs/specs/notes/durable-inbox.md（本次沉淀）。
 
-### Phase 2：复审修复（当前 phase，尚未执行）
+### Phase 2：SQLite 修复已提交，以下为再次复审后的状态
 
 依赖顺序：T-05 → T-06 → T-07；T-08/T-09/T-10 在 T-06/T-07 的接口稳定后推进；T-11 最后执行。只修改本 app；若已核实的运行时能力不足以保证事务/排他锁，登记 AutoLang 独立依赖计划，不手改生成 Rust、不以非原子方案降低 AC。
 
 - [x] T-05: 验证修复所需最小能力并冻结协议。核对 `src/back/repository.at`、742 工具链与 a2r 原语，实测事务级串行化、原子排他锁及可恢复提交能力；出具新报告 `tests/probe/PHASE2-CAPABILITY-REPORT.md`（待新建），选定可靠存储实现或 journal+检查点方案。必须能保留上次已确认提交、从不完整 manifest/实体/收据恢复，且 request_id 与实体绑定不可分离。缺 API 时输出精确跨仓依赖和阻塞状态。覆盖 AC-01/02/04、F-001-01/02/05。
 - [x] T-06: 实现真正单写者入口。修改 repository 及 api/db 接线，对读 revision→写实体→提交→收据完整区间串行化；跨进程锁必须原子取得、检查持锁写入结果、绑定目录与所有者，正常退出释放，异常终止提供安全接管路径。迁移、元数据、CRUD、测试入口不能绕过门禁；现存 NOTES_FORCE_LOCK 不能在有活写者时无条件夺锁。8 个同 expected_revision 的并发更新仅 1 个成功，其余 conflict，正文/manifest 始终合法；两个实际后端进程竞夺同目录只有一个写者。覆盖 AC-01/04、F-001-01。
-- [x] T-07: 修复完整提交、恢复与幂等。依据 T-05 协议修改 create/update、journal、manifest、receipt；每个提交阶段中断后重启再重放同 request_id，最多一个对象/一次 revision 增量、返回原收据；更新须在 revision 冲突检查前识别已提交重放。检查每步 I/O 结果，收据失败不得返回虚假 committed；不要删除恢复所需旧实体/检查点。覆盖 AC-01/02、F-001-02/05，重验并关闭 T-02。
-- [x] T-08: 完整迁移与失败回滚。修改 `migrate_legacy_at`、数组遍历与报告写入：null 是损坏项而非终止标记；非数组顶层、错类型、重复 ID、截断对象均给报告并继续可打捞条目；报告/实体/manifest 失败时回滚内存并保留原件及备份，重试不重复；迁移使用 T-06 门禁。新增 `[valid,null,valid]` 等 fixture，预期 migrated=2、corrupted=1、重复迁移无重复对象。覆盖 AC-03/04、F-001-03，重验并关闭 T-01。
-- [x] T-09: 将 UI 和 legacy adapter 接入 revision/request_id 结果契约。修改 `src/back/api.at`、`src/front/notes_store.at` 与 `editor.at` 必要状态显示，不重写 EditorPanel；保持 CRUD 视觉/基本交互。读取时保存 revision，提交使用该 revision 与稳定 request_id；失败/冲突保持本地草稿，保留当前服务器版本供恢复/选择，只有 durable 成功后才能清 dirty、切换草稿和显示 Saved。双客户端从同一版本编辑，A 保存后 B 的陈旧保存必须拒绝且双方内容可恢复。Vue/VM 均覆盖手动保存及切换/搜索/新建的自动 flush。覆盖 AC-02/04/05、F-001-04，重验并关闭 T-04。
-- [x] T-10: 收紧请求标识与测试入口。对 `request_id` 做不透明安全编码或明确校验，拒绝空值/分隔符/路径穿越或保证不能逃出收据目录；实体/manifest 中的路径同样限定在仓储内。变更型 `/api/v1/test/*` 默认关闭，仅显式隔离测试模式可启用；移除 TEMP 调试接口并确保测试 setup 不能继承其他目录的持锁标记。负例 `../escaped`、反斜杠、空 ID 和同请求不同意图不得改错对象/目录。覆盖 AC-02/04/05、F-001-06。
-- [x] T-11: 修订回归门、复审证据与规范增量。修改 `tests/probe/run_v1_battery.sh`，移除写死 wk/OUTDIR 不隔离及失败被 tee 掩盖的问题，断言失败必须非零退出；新增上述失败和真重启/双进程/双 UI 场景（fixture/spec 路径按实际新增登记）。在修复 commit 上运行完整 `tests` Playwright 套件和 Vue/VM 验收，按 AC 留可重现证据；提出 SD-02–SD-06 对应 Spec 修正，更新运行说明/依赖版本。所有 F 关闭后才翻 execution_done，独立复审通过后才归档；无需运行 AutoLang cargo 全量，除非独立依赖计划实际修改该仓。覆盖 AC-01–05 与 F-001-01–06。
+- [ ] T-07: 修复完整提交、恢复与幂等。依据 T-05 协议修改 create/update、journal、manifest、receipt；每个提交阶段中断后重启再重放同 request_id，最多一个对象/一次 revision 增量、返回原收据；更新须在 revision 冲突检查前识别已提交重放。检查每步 I/O 结果，收据失败不得返回虚假 committed；不要删除恢复所需旧实体/检查点。覆盖 AC-01/02、F-001-02/05，重验并关闭 T-02。
+- [ ] T-08: 完整迁移与失败回滚。修改 `migrate_legacy_at`、数组遍历与报告写入：null 是损坏项而非终止标记；非数组顶层、错类型、重复 ID、截断对象均给报告并继续可打捞条目；报告/实体/manifest 失败时回滚内存并保留原件及备份，重试不重复；迁移使用 T-06 门禁。新增 `[valid,null,valid]` 等 fixture，预期 migrated=2、corrupted=1、重复迁移无重复对象。覆盖 AC-03/04、F-001-03，重验并关闭 T-01。
+- [ ] T-09: 将 UI 和 legacy adapter 接入 revision/request_id 结果契约。修改 `src/back/api.at`、`src/front/notes_store.at` 与 `editor.at` 必要状态显示，不重写 EditorPanel；保持 CRUD 视觉/基本交互。读取时保存 revision，提交使用该 revision 与稳定 request_id；失败/冲突保持本地草稿，保留当前服务器版本供恢复/选择，只有 durable 成功后才能清 dirty、切换草稿和显示 Saved。双客户端从同一版本编辑，A 保存后 B 的陈旧保存必须拒绝且双方内容可恢复。Vue/VM 均覆盖手动保存及切换/搜索/新建的自动 flush。覆盖 AC-02/04/05、F-001-04，重验并关闭 T-04。
+- [ ] T-10: 收紧请求标识与测试入口。对 `request_id` 做不透明安全编码或明确校验，拒绝空值/分隔符/路径穿越或保证不能逃出收据目录；实体/manifest 中的路径同样限定在仓储内。变更型 `/api/v1/test/*` 默认关闭，仅显式隔离测试模式可启用；移除 TEMP 调试接口并确保测试 setup 不能继承其他目录的持锁标记。负例 `../escaped`、反斜杠、空 ID 和同请求不同意图不得改错对象/目录。覆盖 AC-02/04/05、F-001-06。
+- [ ] T-11: 修订回归门、复审证据与规范增量。修改 `tests/probe/run_v1_battery.sh`，移除写死 wk/OUTDIR 不隔离及失败被 tee 掩盖的问题，断言失败必须非零退出；新增上述失败和真重启/双进程/双 UI 场景（fixture/spec 路径按实际新增登记）。在修复 commit 上运行完整 `tests` Playwright 套件和 Vue/VM 验收，按 AC 留可重现证据；提出 SD-02–SD-06 对应 Spec 修正，更新运行说明/依赖版本。所有 F 关闭后才翻 execution_done，独立复审通过后才归档；无需运行 AutoLang cargo 全量，除非独立依赖计划实际修改该仓。覆盖 AC-01–05 与 F-001-01–06。
+
+### Phase 3：剩余验收修复（当前 phase，尚未执行）
+
+上次通过/归档结论被当前 `needs_fix` 替代；T-07/T-08/T-09/T-10/T-11 重新打开。T-00/T-03/T-05/T-06 保留完成，事务排他、正常新库持久化和门禁修复的实际改善不回滚。历史 T-01/T-02/T-04 仍未闭合，分别由本 phase 对应修复重新验收后关闭。当前进度 4/17，不以“已归档”或测试全绿覆盖失败负例。
+
+补充规范增量（冻结于 [spec-delta-r4.md](evidence/001-r3-recheck-20261005/spec-delta-r4.md)；本次不修改 canonical Spec）：
+
+| delta_id | operation | docs/specs target | before → after rule | 理由 / AC |
+|---|---|---|---|---|
+| SD-07 | modify | docs/specs/notes/durable-inbox.md | Phase 1 JSON 布局无升级迁移、启动为空库 → 确认过的旧笔记/元数据/稳定ID/收据完整迁入 SQLite，失败保留原件且不冒充空启动成功 | F-R4-01，AC-01/03 |
+| SD-08 | modify | docs/specs/notes/durable-inbox.md | null 不进报告、字节截断、COMMIT后报告失败被忽略 → 每个坏项报告、UTF-8安全、报告可靠保存后才确认迁移成功，失败可重试且完整 | F-R4-02，AC-03 |
+| SD-09 | modify | docs/specs/notes/durable-inbox.md | requests 只存 note_id/kind、重放用当前 revision → 持久请求意图/目标/原收据，完全相同意图重放原收据，换目标/操作/内容明确拒绝 | F-R4-03，AC-02/04 |
+| SD-10 | modify | docs/specs/notes/durable-inbox.md | 草稿request_id恒空、标签刷新清草稿、冲突无法安全退出 → 编辑意图稳定非空id、所有动作保护草稿、可恢复双方版本、成功刷新版本和列表 | F-R4-04，AC-02/04/05 |
+| SD-11 | modify | docs/specs/notes/durable-inbox.md | VM验收未做作为债务、实际依赖与gitlink不一致 → 所需双端/失败路径在明确提交与固定依赖上复验，未验证不能声明通过/归档 | F-R4-05，AC-01–05 |
+
+依赖：T-12/T-13/T-14 可独立修复仓储；T-15 依赖 T-14 的稳定收据契约；T-16 最后整体验证。保持 app 仓与纯.at范围；框架修改只能另立依赖计划。
+
+- [ ] T-12: 补齐 Phase 1→SQLite 安全升级。核对 `repository.at:open_repository`、旧 manifest/notes/*.json/receipts 布局与本仓冻结旧证据；实现事务化导入并保留旧副本，完整保留正文（旧blocks→body）、标签、状态、置顶、folder、note_id、revision、legacy_id 和请求映射。探测到旧已保存数据时不能静默创建空库；失败给结构化错误并保留原件，重启/重试不重复。验证：隔离复制旧提交的 wedge-snapshot，升级后 n-1 rev2/body two 可读，元数据/收据一致，再正常重启/硬杀读回；新增中文、多行、trash和损坏实体样本。覆盖 AC-01/03、F-R4-01，重验 T-02/T-07；不得再以“旧数据仅测试”为由缩减契约。
+- [ ] T-13: 完整迁移损坏报告及 Unicode 安全。修正 `migrate_legacy_at` 中 null 记录分支、snippet/salvage 中 char_at 与字节sub混用、报告COMMIT后写且忽略结果的问题。优先将损坏记录作为迁移事务内的可靠数据保存，外部报告输出按已验证协议保证可重试，不能先标 migrated 再丢掉报告；严格校验顶层数组及整数/标题/标签等类型。验证 `[valid,null,valid]`→migrated=2/corrupted=1、长中文/emoji坏项不panic且后项可迁、报告路径预建目录→失败/可恢复重试而非saved=true、原件hash不变；报告成功后重跑幂等。覆盖 AC-03、F-R4-02，重验 T-01/T-08。
+- [ ] T-14: 持久请求意图与原收据。修改 requests schema（含已有SQLite的版本迁移）、`replay_in_txn`、create/update及返回结果：存实际目标/操作/规范化意图与提交revision/收据；完全相同请求返回原收据，后续文档变更不能改写历史receipt；同rid用于另一笔记/操作/内容明确失败，不能以ok=true为未执行的新操作确认。补 update 的COMMIT前/后注入与真重启；修改id序列时确保原子分配和错误可见。验证 update-1 rev2→update-2 rev3→重放update-1仍receipt.rev2；rid从createA复用于updateB拒绝、B不变；幂等重试无重复。覆盖 AC-02/04、F-R4-03，重验 T-02/T-07/T-10。
+- [ ] T-15: 草稿意图、冲突恢复与动作保护。修改 `notes_store.at`/`editor.at` 及adapter必要结果契约：编辑意图分配并保存非空rid，响应丢失后相同意图重试复用；变更内容需明确新意图。所有标签、置顶、筛选、切换、新建动作不得在失败/冲突下清draft/dirty；保留本地与最新服务器内容并提供实际可用的恢复/选择路径，不能只提示冲突却阻止切换且用Tag清掉草稿。成功flush后刷新notes/revision再LoadDraft。Vue/VM验证：双客户端A成功B冲突→B加/删标签后草稿仍可恢复；COMMIT后丢HTTP响应→同rid重试成功；文件夹flush后重选显示已保存正文；失败创建/元数据错误不冒充成功。覆盖 AC-02/04/05、F-R4-04，重验 T-04/T-09。
+- [ ] T-16: 回归门与提交/依赖证据。保留现有18项Vue成功回归，新增上列真实负例与升级/长Unicode/原收据/双UI/响应丢失的断言；battery显式UTF-8，覆盖update故障、null报告与同fault request_id重放，不能只测不同request_id。按原T-11完成 `auto run` 与 `auto run -r vm` 的保存冲突/恢复实际验收；修订Spec增量，固定AutoDown gitlink和AutoLang工具链提交，使用合并后的可复现工具链重建；保留他人WIP不混入提交。全部AC与delta通过后才复审并归档，更新current_step和checkbox。覆盖 AC-01–05/F-R4-05，重验 T-11。
 
 ## 6. 测试设计
 
@@ -117,12 +141,12 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
 - [ ] AC-04: 旧 revision 写入被拒绝且用户修改内容仍可恢复；第二写者不能绕开仓储覆盖。
 - [x] AC-05: 从全新数据目录启动没有冒充用户数据的演示笔记；现有 CRUD 可用，软删可恢复。
 
-2026-10-05 本次复审：AC-01 partial；AC-02/03/04 fail；AC-05 pass（当前提交的基本行为）。Phase 2 改动后 AC-05 同样必须重新回归，当前勾选不覆盖后续提交。
+2026-10-05 修订2历史复审：AC-01 partial；AC-02/03/04 fail；AC-05 pass。修订3再次复审（当前 f8dc027）：AC-01 fail（旧确认数据升级不可见，新SQLite硬杀恢复pass）；AC-02 fail（原收据/意图重放及UIrid）；AC-03 fail（null/报告I/O/Unicode）；AC-04 fail（双客户端冲突后Tag丢草稿，事务并发部分pass）；AC-05 pass（当前基本CRUD/空启动/soft-delete）。后续改动所有AC须重新验，不继承本勾选为新commit的通过证据。
 
 
 ## 8. 执行步骤与交接
 
-当前交接：Phase 2、NOTES-001:r3、executing、next=work(T-05)。current_step=2/12 仅统计 T-00/T-03；重新打开 T-01/T-02/T-04，保留历史证据而不计为本轮通过。后续执行仍在本 app 的 v0.6-dev，框架缺口另行登记，不使用停留旧提交的外部 Notes worktree。原 Phase 1 归档收据与 pass 不再授权最终归档；本次不实施代码修复、不改 canonical Spec。
+当前交接：Phase 3、NOTES-001:r4、executing、next=work(T-12/T-13/T-14)。current_step=4/17（T-00/T-03/T-05/T-06）；重开T-07–T-11，原T-01/T-02/T-04仍需由对应修复闭合。仅在剩余原AC失败与验证门关闭后允许execution_done/reviewed/archived；本次不实施代码修复、不修改canonical Spec。此前Phase 1/2的归档与pass均保留为历史，其“next=merge”不能覆盖本次needs_fix。
 
 第二计划接入附件事务，扩展中断测试；当前阶段先对纯文本提交给出可复现证据。
 
@@ -239,11 +263,17 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
 
 - stage: new | plan_id=NOTES-001 | plan_revision=3 | outcome=pass（修复方案就绪，非实现通过） | changed_tasks=T-01/T-02/T-04重开,T-05–T-11新增 | acceptance_ids=AC-01–AC-05原文保留 | spec_delta=SD-02–SD-06冻结于spec-delta-r3.md,SHA256=c5e9e7738be3d3689464d267c54d8e7d96c98aa14e038428a3a38929e0a64476 | next=work(T-05)，仅在全部阻塞问题关闭并重新复审后允许execution_done/reviewed/archived。以上原记录均为历史。
 
+- stage: review | plan_id=NOTES-001 | plan_revision=3 | outcome=needs_fix | reviewed_commit=f8dc027ce50ffad4676f574edb5d226a8d8cbf9a | implementation_commit=29b8824b16c5c9a0ddcc952020c347a0567cfe87 | base_commit=e42eab06bc3621b5e4b18492559ef39db70abd33 | dependency_revisions=auto-lang-main@7b9c6948c1465e87a6f60404510c30c712e1c7bc, auto-lang742@9f6481e8c78e2633395c2cefc653e120b28a5e8f, auto-down固定gitlink@fba6563ed2148ce85e68208863159b4ccccac710/实际检出@96f095bfc41a8686331c5ccd3ce17b685147fcc1（既有差异保留） | spec_inputs=docs/specs/notes/durable-inbox.md@blob8f05b8ddb617d5d64e937e55027e782a2b0c0f85, spec-delta-reviewed-r3.md@SHA256=c5e9e7738be3d3689464d267c54d8e7d96c98aa14e038428a3a38929e0a64476 | acceptance_results=AC-01 fail（新SQLite硬杀恢复pass，旧JSON升级不可见）, AC-02 fail（原收据漂移/跨目标错重放/UIrid空/update故障未执行）, AC-03 fail（null漏报告/报告I/O伪成功/中文panic）, AC-04 fail（事务并发pass，冲突后Tag丢草稿）, AC-05 pass（基本CRUD/空启动/软删恢复） | findings=F-R4-01(P1旧已确认数据升级),F-R4-02(P1迁移报告及Unicode),F-R4-03(P1请求意图/原收据),F-R4-04(P1草稿保护/稳定rid),F-R4-05(P2双端/依赖验证门) | evidence=[完整复审与复现脚本](evidence/001-r3-recheck-20261005/README.md), baseline.json/源及证据SHA256, results.json/extra-results.json/ui-results.json/dual-process.json, playwright.log（18/18）, battery.log（UTF-8后EXIT=0）, migration-unicode.log（实际panic） | spec_delta_validation=SD-02事务边界当前通过、SD-03/04/05仍失败、SD-06路径/默认门禁通过但不同请求意图负例未关闭，canonical Spec未修改 | next=work(Phase3,T-12/T-13/T-14)，本记录覆盖历史next=merge。
+
+  独立性与限制：此上下文参与前次复审，未参与本次修复；不采信实施摘要，所有运行证据来自新的隔离目录、HTTP与浏览器。用现存生成后端/Vue，二进制SHA256=b9d6b50d0e12c419d74945b8fe1b7be332a19fe7e358a235dd5f057f53cfb5ac；缺陷逐项核对HEAD源码。未fresh build/VM，不签发双端或重建通过。首次battery因GBK解码失败4项，设置PYTHONUTF8=1后全绿；原失败日志保留且不算产品回归。没有改实现、依赖或推进父仓gitlink。
+
+- stage: new | plan_id=NOTES-001 | plan_revision=4 | outcome=pass（修复方案就绪，非实现通过） | changed_tasks=T-07–T-11重开,T-12–T-16新增,T-01/T-02/T-04保持未闭合 | acceptance_ids=AC-01–AC-05原文不变 | spec_delta=SD-07–SD-11冻结于[spec-delta-r4.md](evidence/001-r3-recheck-20261005/spec-delta-r4.md), SHA256=e233f227cf89e406a212859738b255f345582f3aa4a1b43e681a51ad598621cd | progress=4/17 | next=work(T-12/T-13/T-14)，随后T-15/T-16，关闭原AC失败并重新复审后才归档。按同会话用户原条件授权重新激活，不扩大产品范围。
+
 [整体roadmap](../roadmap-v0.6.md) · [agent执行说明](../README.md)
 
 ## 10. 待澄清事项
 
-Phase 2 当前无须用户重新批准原范围；第一项执行任务负责验证事务/锁/恢复原语。若必须修改 AutoLang，列出单独依赖计划及最小 API，不越仓直接修复。当前既有工具链742未合入主线的要求须重新验证，不能把缓存二进制采证当作标准构建通过。复审前已有未跟踪 `review-s10-recovery.json`、`seeded-review/` 以及 vendor 下 package-lock，保留未纳入本次证据/改动。当前沙箱把 submodule Git 元数据置为只读，`git fetch` 因 FETCH_HEAD Permission denied 未完成；不改 git 配置/不重置他人文件。
+Phase 3 无须用户重新批准原范围；T-12–T-16负责关闭上述原AC失败和验证门。若必须修改 AutoLang，列出单独依赖计划及最小 API，不越仓直接修复。当前工具链742与main合入关系须由执行者核实并固定构建依赖，不能把缓存二进制采证当作标准构建通过。当前预存未跟踪 `tests/probe/evidence/review-r3/`、`review-s10-recovery.json` 以及 vendor 下 package-lock，保留未纳入本次证据/改动。AutoDown gitlink与实际检出不同，T-16负责固定后重建。此前沙箱把 submodule Git 元数据置为只读，`git fetch` 因 FETCH_HEAD Permission denied 未完成；不改git配置、不重置他人文件，文档/证据与代码验收状态分别记录。
 
 T-00需核实实际平台/运行时能力，负责者为本计划执行agent；输出具体API、可复现实验与独立阻塞提案。不存在先执行全局重构的隐含前置。核心验收变更须明确提出，不能用mock替换真实结果。
 

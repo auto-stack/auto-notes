@@ -29,4 +29,4 @@ AutoOS 通过 [`apps/015-notes`](https://github.com/auto-stack/auto-os/tree/v0.6
 
 [需求与设计、首版 roadmap、业界调研及前三个实施计划](docs/README.md)。
 
-计划001已提交首阶段实现；2026-10-05重新复审发现问题，已激活[Phase 2修复方案](docs/plans/001-durable-inbox.md)。其他计划与验收状态以各计划证据为准。
+计划001的Phase 2修复已提交；2026-10-05再次复审仍为needs_fix，已重新激活[修订4/Phase 3修复方案](docs/plans/001-durable-inbox.md)，复现证据见[复审记录](docs/plans/evidence/001-r3-recheck-20261005/README.md)。其他计划与验收状态以各计划证据为准。

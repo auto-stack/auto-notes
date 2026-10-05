@@ -1,0 +1,2 @@
+# Keep the review logs with their revision-bound evidence.
+!*.log

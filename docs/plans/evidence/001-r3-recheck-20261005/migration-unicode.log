@@ -1,0 +1,6 @@
+Server running on http://127.0.0.1:13275
+CORS enabled for all origins
+
+thread 'tokio-rt-worker' (38000) panicked at 015-notes-back\src\repository.rs:582:32:
+end byte index 160 is not a char boundary; it is inside '中' (bytes 159..162 of string)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

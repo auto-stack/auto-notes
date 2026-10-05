@@ -1,0 +1,1205 @@
+{
+  "reviewed_commit": "f8dc027ce50ffad4676f574edb5d226a8d8cbf9a",
+  "binary": "D:\\autostack\\auto-os\\apps\\015-notes\\rust-workspace\\target\\debug\\app-015-notes-back.exe",
+  "binary_sha256": "b9d6b50d0e12c419d74945b8fe1b7be332a19fe7e358a235dd5f057f53cfb5ac",
+  "runtime_note": "Existing generated binary, no fresh build. Source findings cross-checked against current HEAD.",
+  "run_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\notes-r3-recheck-1791210975526273400",
+  "results": {
+    "idempotency": {
+      "first": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 1,
+            "title": "中文🎉",
+            "body": "第一行\n第二行",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "create-1",
+            "note_id": "n-1",
+            "revision": 1,
+            "status": "committed"
+          }
+        }
+      },
+      "replay": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 1,
+            "title": "中文🎉",
+            "body": "第一行\n第二行",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "create-1",
+            "note_id": "n-1",
+            "revision": 1,
+            "status": "committed"
+          }
+        }
+      },
+      "update_first": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "更新一",
+            "body": "更新一",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "update-1",
+            "note_id": "n-1",
+            "revision": 2,
+            "status": "committed"
+          }
+        }
+      },
+      "update_immediate": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "更新一",
+            "body": "更新一",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "update-1",
+            "note_id": "n-1",
+            "revision": 2,
+            "status": "committed"
+          }
+        }
+      },
+      "update_second": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 3,
+            "title": "更新二",
+            "body": "更新二",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "update-2",
+            "note_id": "n-1",
+            "revision": 3,
+            "status": "committed"
+          }
+        }
+      },
+      "update_late_replay": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 3,
+            "title": "更新二",
+            "body": "更新二",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "update-1",
+            "note_id": "n-1",
+            "revision": 3,
+            "status": "committed"
+          }
+        }
+      },
+      "cross_note_update": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 3,
+            "title": "更新二",
+            "body": "更新二",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "create-1",
+            "note_id": "n-1",
+            "revision": 3,
+            "status": "committed"
+          }
+        }
+      },
+      "after_cross": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-2",
+            "revision": 1,
+            "title": "第二笔记",
+            "body": "B",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 2,
+            "seq": 2
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "",
+            "note_id": "",
+            "revision": 0,
+            "status": ""
+          }
+        }
+      }
+    },
+    "before_crash": {
+      "http": 200,
+      "value": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 3,
+          "title": "更新二",
+          "body": "更新二",
+          "tags": [
+            "中文标签",
+            "🎉"
+          ],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "work",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    },
+    "after_crash": {
+      "http": 200,
+      "value": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 3,
+          "title": "更新二",
+          "body": "更新二",
+          "tags": [
+            "中文标签",
+            "🎉"
+          ],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "work",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    },
+    "post_restart_replay": {
+      "http": 200,
+      "value": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 3,
+          "title": "更新二",
+          "body": "更新二",
+          "tags": [
+            "中文标签",
+            "🎉"
+          ],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "work",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "update-1",
+          "note_id": "n-1",
+          "revision": 3,
+          "status": "committed"
+        }
+      }
+    },
+    "after_entity": {
+      "fault": {
+        "http": 200,
+        "value": {
+          "ok": false,
+          "err_code": "fault_injected",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "",
+            "revision": 0,
+            "title": "",
+            "body": "",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 0,
+            "seq": 0
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "",
+            "note_id": "",
+            "revision": 0,
+            "status": ""
+          }
+        }
+      },
+      "retry": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 1,
+            "title": "中文🎉",
+            "body": "第一行\n第二行",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "fault-after_entity",
+            "note_id": "n-1",
+            "revision": 1,
+            "status": "committed"
+          }
+        }
+      }
+    },
+    "after_manifest": {
+      "fault": {
+        "http": 200,
+        "value": {
+          "ok": false,
+          "err_code": "fault_injected",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "",
+            "revision": 0,
+            "title": "",
+            "body": "",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 0,
+            "seq": 0
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "",
+            "note_id": "",
+            "revision": 0,
+            "status": ""
+          }
+        }
+      },
+      "retry": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-2",
+            "revision": 1,
+            "title": "中文🎉",
+            "body": "第一行\n第二行",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 2,
+            "seq": 2
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "fault-after_manifest",
+            "note_id": "n-2",
+            "revision": 1,
+            "status": "committed"
+          }
+        }
+      }
+    },
+    "fault_final_list": {
+      "http": 200,
+      "value": [
+        {
+          "schema_version": 1,
+          "note_id": "n-2",
+          "revision": 1,
+          "title": "中文🎉",
+          "body": "第一行\n第二行",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "work",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 2,
+          "seq": 2
+        },
+        {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "中文🎉",
+          "body": "第一行\n第二行",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "work",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        }
+      ]
+    },
+    "concurrent_updates": {
+      "calls": [
+        {
+          "http": 200,
+          "value": {
+            "ok": true,
+            "err_code": "",
+            "err_detail": "",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "n-1",
+              "revision": 2,
+              "title": "writer-0",
+              "body": "writer-0",
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "active",
+              "folder": "work",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": 1,
+              "seq": 1
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "concurrent-0",
+              "note_id": "n-1",
+              "revision": 2,
+              "status": "committed"
+            }
+          }
+        },
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "revision_conflict",
+            "err_detail": "",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "",
+              "revision": 0,
+              "title": "",
+              "body": "",
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "",
+              "folder": "",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": 0,
+              "seq": 0
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "",
+              "note_id": "",
+              "revision": 0,
+              "status": ""
+            }
+          }
+        },
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "revision_conflict",
+            "err_detail": "",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "",
+              "revision": 0,
+              "title": "",
+              "body": "",
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "",
+              "folder": "",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": 0,
+              "seq": 0
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "",
+              "note_id": "",
+              "revision": 0,
+              "status": ""
+            }
+          }
+        },
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "revision_conflict",
+            "err_detail": "",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "",
+              "revision": 0,
+              "title": "",
+              "body": "",
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "",
+              "folder": "",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": 0,
+              "seq": 0
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "",
+              "note_id": "",
+              "revision": 0,
+              "status": ""
+            }
+          }
+        },
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "revision_conflict",
+            "err_detail": "",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "",
+              "revision": 0,
+              "title": "",
+              "body": "",
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "",
+              "folder": "",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": 0,
+              "seq": 0
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "",
+              "note_id": "",
+              "revision": 0,
+              "status": ""
+            }
+          }
+        },
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "revision_conflict",
+            "err_detail": "",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "",
+              "revision": 0,
+              "title": "",
+              "body": "",
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "",
+              "folder": "",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": 0,
+              "seq": 0
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "",
+              "note_id": "",
+              "revision": 0,
+              "status": ""
+            }
+          }
+        },
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "revision_conflict",
+            "err_detail": "",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "",
+              "revision": 0,
+              "title": "",
+              "body": "",
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "",
+              "folder": "",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": 0,
+              "seq": 0
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "",
+              "note_id": "",
+              "revision": 0,
+              "status": ""
+            }
+          }
+        },
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "revision_conflict",
+            "err_detail": "",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "",
+              "revision": 0,
+              "title": "",
+              "body": "",
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "",
+              "folder": "",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": 0,
+              "seq": 0
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "",
+              "note_id": "",
+              "revision": 0,
+              "status": ""
+            }
+          }
+        }
+      ],
+      "final": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "writer-0",
+            "body": "writer-0",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "",
+            "note_id": "",
+            "revision": 0,
+            "status": ""
+          }
+        }
+      }
+    },
+    "concurrent_request_ids": {
+      "calls": [
+        {
+          "http": 200,
+          "value": "bulk-2"
+        },
+        {
+          "http": 200,
+          "value": "bulk-11"
+        },
+        {
+          "http": 200,
+          "value": "bulk-3"
+        },
+        {
+          "http": 200,
+          "value": "bulk-4"
+        },
+        {
+          "http": 200,
+          "value": "bulk-5"
+        },
+        {
+          "http": 200,
+          "value": "bulk-33"
+        },
+        {
+          "http": 200,
+          "value": "bulk-13"
+        },
+        {
+          "http": 200,
+          "value": "bulk-6"
+        },
+        {
+          "http": 200,
+          "value": "bulk-31"
+        },
+        {
+          "http": 200,
+          "value": "bulk-7"
+        },
+        {
+          "http": 200,
+          "value": "bulk-8"
+        },
+        {
+          "http": 200,
+          "value": "bulk-17"
+        },
+        {
+          "http": 200,
+          "value": "bulk-14"
+        },
+        {
+          "http": 200,
+          "value": "bulk-9"
+        },
+        {
+          "http": 200,
+          "value": "bulk-10"
+        },
+        {
+          "http": 200,
+          "value": "bulk-25"
+        },
+        {
+          "http": 200,
+          "value": "bulk-22"
+        },
+        {
+          "http": 200,
+          "value": "bulk-12"
+        },
+        {
+          "http": 200,
+          "value": "bulk-15"
+        },
+        {
+          "http": 200,
+          "value": "bulk-21"
+        },
+        {
+          "http": 200,
+          "value": "bulk-29"
+        },
+        {
+          "http": 200,
+          "value": "bulk-16"
+        },
+        {
+          "http": 200,
+          "value": "bulk-18"
+        },
+        {
+          "http": 200,
+          "value": "bulk-19"
+        },
+        {
+          "http": 200,
+          "value": "bulk-20"
+        },
+        {
+          "http": 200,
+          "value": "bulk-23"
+        },
+        {
+          "http": 200,
+          "value": "bulk-24"
+        },
+        {
+          "http": 200,
+          "value": "bulk-30"
+        },
+        {
+          "http": 200,
+          "value": "bulk-26"
+        },
+        {
+          "http": 200,
+          "value": "bulk-27"
+        },
+        {
+          "http": 200,
+          "value": "bulk-28"
+        },
+        {
+          "http": 200,
+          "value": "bulk-32"
+        }
+      ],
+      "count": 32,
+      "unique_count": 32
+    },
+    "migration_null": {
+      "report": {
+        "http": 200,
+        "value": {
+          "attempted": true,
+          "migrated": 2,
+          "skipped_existing": false,
+          "saved": true,
+          "err": "",
+          "backup_file": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\notes-r3-recheck-1791210975526273400\\migration-null/backup/notes.json.bak",
+          "corrupted": []
+        }
+      },
+      "notes": {
+        "http": 200,
+        "value": [
+          {
+            "schema_version": 1,
+            "note_id": "n-11",
+            "revision": 1,
+            "title": "后项",
+            "body": "B",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 11,
+            "seq": 11
+          },
+          {
+            "schema_version": 1,
+            "note_id": "n-10",
+            "revision": 1,
+            "title": "前项",
+            "body": "A",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 10,
+            "seq": 1
+          }
+        ]
+      },
+      "report_exists": false
+    },
+    "migration_report_failure": {
+      "first": {
+        "http": 200,
+        "value": {
+          "attempted": true,
+          "migrated": 1,
+          "skipped_existing": false,
+          "saved": true,
+          "err": "",
+          "backup_file": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\notes-r3-recheck-1791210975526273400\\migration-report-failure/backup/notes.json.bak",
+          "corrupted": [
+            {
+              "index": 1,
+              "reason": "id not an integer",
+              "snippet": "{\"id\":\"bad\",\"title\":\"invalid\"}"
+            }
+          ]
+        }
+      },
+      "retry": {
+        "http": 200,
+        "value": {
+          "attempted": true,
+          "migrated": 0,
+          "skipped_existing": true,
+          "saved": false,
+          "err": "",
+          "backup_file": "",
+          "corrupted": []
+        }
+      },
+      "report_is_directory": true
+    },
+    "migration_unicode": {
+      "error": "Remote end closed connection without response"
+    },
+    "phase1_upgrade": {
+      "old_manifest": {
+        "schema_version": 1,
+        "counter": 3,
+        "entries": [
+          {
+            "note_id": "n-1",
+            "revision": "2",
+            "file": "n-1.r2.json",
+            "state": "active",
+            "folder": "",
+            "tags": [],
+            "pinned": false,
+            "seq": "1",
+            "legacy_id": "1"
+          }
+        ]
+      },
+      "old_confirmed_receipt": {
+        "schema_version": 1,
+        "request_id": "d-1",
+        "note_id": "n-1",
+        "revision": 1,
+        "status": "committed"
+      },
+      "get": {
+        "http": 200,
+        "value": {
+          "ok": false,
+          "err_code": "not_found",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "",
+            "revision": 0,
+            "title": "",
+            "body": "",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 0,
+            "seq": 0
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "",
+            "note_id": "",
+            "revision": 0,
+            "status": ""
+          }
+        }
+      },
+      "list": {
+        "http": 200,
+        "value": []
+      }
+    },
+    "test_gates": {
+      "setup": {
+        "http": 200,
+        "value": "test-mode-disabled"
+      },
+      "fault": {
+        "http": 200,
+        "value": "test-mode-disabled"
+      },
+      "traversal": {
+        "http": 200,
+        "value": {
+          "ok": false,
+          "err_code": "invalid_request",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "",
+            "revision": 0,
+            "title": "",
+            "body": "",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 0,
+            "seq": 0
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "",
+            "note_id": "",
+            "revision": 0,
+            "status": ""
+          }
+        }
+      },
+      "empty": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 1,
+            "title": "中文🎉",
+            "body": "第一行\n第二行",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "auto-1",
+            "note_id": "n-1",
+            "revision": 1,
+            "status": "committed"
+          }
+        }
+      }
+    },
+    "sqlite_open_failure": {
+      "setup": {
+        "http": 200,
+        "value": "ok"
+      },
+      "create": {
+        "http": 200,
+        "value": {
+          "ok": false,
+          "err_code": "storage_unwritable",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "",
+            "revision": 0,
+            "title": "",
+            "body": "",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 0,
+            "seq": 0
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "",
+            "note_id": "",
+            "revision": 0,
+            "status": ""
+          }
+        }
+      },
+      "notes": {
+        "http": 200,
+        "value": []
+      }
+    }
+  }
+}

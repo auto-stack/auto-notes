@@ -1,0 +1,51 @@
+{
+  "reviewed_commit": "f8dc027ce50ffad4676f574edb5d226a8d8cbf9a",
+  "implementation_commit": "29b8824b16c5c9a0ddcc952020c347a0567cfe87",
+  "base_commit": "e42eab06bc3621b5e4b18492559ef39db70abd33",
+  "reviewed_plan_revision": 3,
+  "repair_plan_revision": 4,
+  "outcome": "needs_fix",
+  "dependencies": {
+    "auto_lang_main": "7b9c6948c1465e87a6f60404510c30c712e1c7bc",
+    "auto_lang_742": "9f6481e8c78e2633395c2cefc653e120b28a5e8f",
+    "auto_down_gitlink": "fba6563ed2148ce85e68208863159b4ccccac710",
+    "auto_down_actual_checkout": "96f095bfc41a8686331c5ccd3ce17b685147fcc1"
+  },
+  "spec_input_blob": "8f05b8ddb617d5d64e937e55027e782a2b0c0f85",
+  "runtime": {
+    "binary_sha256": "b9d6b50d0e12c419d74945b8fe1b7be332a19fe7e358a235dd5f057f53cfb5ac",
+    "fresh_build": false,
+    "vm_executed": false
+  },
+  "source_sha256": {
+    "src/back/api.at": "c089347a42dcd50b6195d9bfda226c482a4106555f6aed4c1a70831ca653493a",
+    "src/back/db.at": "fce8c58d8aba512079f9fb4d2cbd7919dcd227e97ee44fa53845a82ac4c76eea",
+    "src/back/repository.at": "0bdbbdd32f70ad83eb993dbeb4a6ae979e512eed435c4ef9ca8394807734d291",
+    "src/front/notes_store.at": "673adf7a03be774d0e5307a91067caa700245dac14dfcb3fecd96451b8391fb2",
+    "src/front/editor.at": "bf991f20810ecf9280b034d203ecf531cefb50cf733afd837f15a7ec2a00f93a",
+    "src/front/types.at": "54d1d399f68bb223bb8d1993cced995e3e675d42b253928bac37a5b3c5dfe348",
+    "tests/probe/run_v1_battery.sh": "6facb1b77e647a32eb57ea23d4c16f2ec38113791608bd8806f9f71184154046",
+    "docs/specs/notes/durable-inbox.md": "a8eef409a129bef31ce8f8c5ab7bfba9ebfd46273ea96d2b57786472f6d79001"
+  },
+  "evidence_sha256": {
+    ".gitignore": "602d51386d66783170d031e466401ad1d72bfbcd71ff155e776cb001c47017b2",
+    "battery-default-encoding.log": "9c3d2cca040000037ae6c38bd0e9d631885141d4515205130e71e86326fea635",
+    "battery-summary.txt": "08e145bb4107101b61cb09eecab363d9ee0372930d534c09f776b408b11eb971",
+    "battery.log": "08e145bb4107101b61cb09eecab363d9ee0372930d534c09f776b408b11eb971",
+    "dual-process.json": "7d4abed6fdb2c522200275d65eef25806f37dc57e87322aaa7275352d143103d",
+    "extra-results.json": "5141d017056ca0d2f90b33bb09e9cbe618036c6b96a3740aa8fdf3c4ee3ea549",
+    "migration-unicode.log": "0992e0371c901262784f2db0cd32af39594c53194f4c4809154637870646f643",
+    "playwright.log": "f696e98de3f92dd500ec14b8cee978428d36fabbeeeea3e48b7d9dd765056d3b",
+    "README.md": "ca0a5140d568f4740364a3a4082d996fc68f6736fa24e3ea89337f7ea0e185ea",
+    "reproduce.py": "ad7815a57dc5ad515a1c5fe4a8b54315b9d0f08d461e51523e4abc67b1f9bac2",
+    "results.json": "54d5ebdd6df7acdcce77c4a65789a255287eb48ffb6b8a3d6d16f15c0303ba37",
+    "run-battery.py": "e60ff05b0211212db24bdfad47930aca755200e6996e8875bbe5b0a858db11b1",
+    "run-playwright.py": "2fae260b94ec9cddb478d6feec6cbd1575757e5d03465ea7a2d69b8d3c84bc51",
+    "spec-delta-r4.md": "e233f227cf89e406a212859738b255f345582f3aa4a1b43e681a51ad598621cd",
+    "spec-delta-reviewed-r3.md": "c5e9e7738be3d3689464d267c54d8e7d96c98aa14e038428a3a38929e0a64476",
+    "ui-after-tag.png": "6544c6855a126697b75f277fee3507c441c1e343236700ab0855bafae6886338",
+    "ui-reproduce.cjs": "147db8b0cf91fa3b277478c7f3984efb581b642a9d43710ace3289d64bda1dcd",
+    "ui-results.json": "7baa5c8f52f819509919dff6b0a614fb83a90abd5521aa4f281f72526966bf5d",
+    "ui.log": "c763f6abde3789850466b473e7683470cabde07f1fdd124954b9cb6435e4acc4"
+  }
+}

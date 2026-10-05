@@ -1,0 +1,80 @@
+== NOTES-001 r3 battery 2026-10-05T22:41:32+08:00 base=http://127.0.0.1:1870 out=D:/autostack/auto-os/apps/015-notes/.auto/notes-r3-recheck-1791211292414458300/battery
+[GATE] test mode active: "ok"
+[S0] traversal/quote request_id -> invalid_request ✓
+[S1 valid] setup: "ok"
+[S1] 3 migrated, 0 corrupted, saved ✓
+[S1] repeat migrate → skipped_existing ✓
+[S2] migrated=2 corrupted=1 backup=D:/autostack/auto-os/apps/015-notes/.auto/notes-r3-recheck-1791211292414458300/battery/wk/t01-corrupt/data/backup/notes.json.bak ✓
+[S2] original untouched ✓
+[S2] corrupted report persisted ✓
+[S3] corrupted[0] id not an integer
+[S3] bad-type entries reported with index/reason/snippet ✓
+[S3] report-r1.json persisted ✓
+[S4] empty legacy → 0 notes ✓
+[S5] fresh dir → empty store, no demo seed ✓ (AC-05)
+Traceback (most recent call last):
+  File "<string>", line 5, in <module>
+    a=json.load(open(OUT+'/s6-create1.json'))
+  File "C:\Python314\Lib\json\__init__.py", line 298, in load
+    return loads(fp.read(),
+                 ~~~~~~~^^
+UnicodeDecodeError: 'gbk' codec can't decode byte 0xad in position 107: illegal multibyte sequence
+FAIL: S6 idempotent create
+Traceback (most recent call last):
+  File "<string>", line 5, in <module>
+    ok=json.load(open(OUT+'/s7-update-ok.json'))
+  File "C:\Python314\Lib\json\__init__.py", line 298, in load
+    return loads(fp.read(),
+        cls=cls, object_hook=object_hook,
+        parse_float=parse_float, parse_int=parse_int,
+        parse_constant=parse_constant, object_pairs_hook=object_pairs_hook, **kw)
+  File "C:\Python314\Lib\json\__init__.py", line 352, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python314\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\json\decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+FAIL: S7 revision conflict
+Traceback (most recent call last):
+  File "<string>", line 7, in <module>
+    d=json.load(open(OUT+'/s7c-%d.json'%i))
+  File "C:\Python314\Lib\json\__init__.py", line 298, in load
+    return loads(fp.read(),
+        cls=cls, object_hook=object_hook,
+        parse_float=parse_float, parse_int=parse_int,
+        parse_constant=parse_constant, object_pairs_hook=object_pairs_hook, **kw)
+  File "C:\Python314\Lib\json\__init__.py", line 352, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python314\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\json\decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+FAIL: S7b 8-way concurrent same-revision -> exactly 1 success
+Traceback (most recent call last):
+  File "<string>", line 5, in <module>
+    t=json.load(open(OUT+'/s8-trash.json'))
+  File "C:\Python314\Lib\json\__init__.py", line 298, in load
+    return loads(fp.read(),
+        cls=cls, object_hook=object_hook,
+        parse_float=parse_float, parse_int=parse_int,
+        parse_constant=parse_constant, object_pairs_hook=object_pairs_hook, **kw)
+  File "C:\Python314\Lib\json\__init__.py", line 352, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python314\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\json\decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+FAIL: S8 trash/restore
+[S9] fault leaves no success receipt; retry lands cleanly ✓ (AC-02)
+[S10 crash] 外部驱动：kill 后端 → 重启（NOTES_TEST_MODE=1）→ setup 同目录 → GET /api/v1/notes
+== battery done; fails=4; artifacts in D:/autostack/auto-os/apps/015-notes/.auto/notes-r3-recheck-1791211292414458300/battery
+BATTERY FAILED: 4 assertion(s)

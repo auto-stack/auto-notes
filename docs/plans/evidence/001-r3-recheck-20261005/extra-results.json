@@ -1,0 +1,128 @@
+{
+  "update_fault": {
+    "http": 200,
+    "value": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-1",
+        "revision": 2,
+        "title": "must not commit before fault",
+        "body": "must not commit before fault",
+        "tags": [],
+        "color": "",
+        "pinned": false,
+        "state": "active",
+        "folder": "work",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 1,
+        "seq": 1
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "update-fault",
+        "note_id": "n-1",
+        "revision": 2,
+        "status": "committed"
+      }
+    }
+  },
+  "update_fault_after": {
+    "http": 200,
+    "value": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-1",
+        "revision": 2,
+        "title": "must not commit before fault",
+        "body": "must not commit before fault",
+        "tags": [],
+        "color": "",
+        "pinned": false,
+        "state": "active",
+        "folder": "work",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 1,
+        "seq": 1
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "",
+        "note_id": "",
+        "revision": 0,
+        "status": ""
+      }
+    }
+  },
+  "changed_intent": {
+    "first": {
+      "http": 200,
+      "value": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "original",
+          "body": "body-A",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "work",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "same-intent",
+          "note_id": "n-1",
+          "revision": 1,
+          "status": "committed"
+        }
+      }
+    },
+    "changed": {
+      "http": 200,
+      "value": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "original",
+          "body": "body-A",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "work",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "same-intent",
+          "note_id": "n-1",
+          "revision": 1,
+          "status": "committed"
+        }
+      }
+    }
+  }
+}

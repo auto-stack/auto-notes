@@ -1,0 +1,78 @@
+{
+  "conflictBefore": {
+    "body": "client-B conflict draft must survive",
+    "saveVisible": true,
+    "requests": [
+      {
+        "expected_revision": 1,
+        "title": "Welcome",
+        "body": "client-B conflict draft must survive",
+        "request_id": ""
+      }
+    ]
+  },
+  "conflictAfterTag": {
+    "body": "client-A saved",
+    "saveVisible": false
+  },
+  "folderFlush": {
+    "body": "Milk, Eggs, Bread, Cheese",
+    "saveVisible": false
+  },
+  "responseLoss": {
+    "intercepted": {
+      "expected_revision": 2,
+      "title": "Welcome",
+      "body": "save committed before response loss",
+      "request_id": ""
+    },
+    "body": "save committed before response loss",
+    "saveVisible": true,
+    "lastTwoRequests": [
+      {
+        "expected_revision": 2,
+        "title": "Welcome",
+        "body": "save committed before response loss",
+        "request_id": ""
+      },
+      {
+        "expected_revision": 2,
+        "title": "Welcome",
+        "body": "save committed before response loss",
+        "request_id": ""
+      }
+    ],
+    "serverAfterLoss": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-1",
+        "revision": 3,
+        "title": "Welcome",
+        "body": "save committed before response loss",
+        "tags": [
+          "intro",
+          "seed",
+          "review-tag"
+        ],
+        "color": "",
+        "pinned": true,
+        "state": "active",
+        "folder": "",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 1,
+        "seq": 1
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "",
+        "note_id": "",
+        "revision": 0,
+        "status": ""
+      }
+    }
+  }
+}

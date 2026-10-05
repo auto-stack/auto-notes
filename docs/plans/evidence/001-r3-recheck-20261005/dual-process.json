@@ -1,0 +1,283 @@
+{
+  "calls": [
+    {
+      "http": 200,
+      "value": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 2,
+          "title": "writer-0",
+          "body": "writer-0",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "work",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "dual-0",
+          "note_id": "n-1",
+          "revision": 2,
+          "status": "committed"
+        }
+      }
+    },
+    {
+      "http": 200,
+      "value": {
+        "ok": false,
+        "err_code": "revision_conflict",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "",
+          "revision": 0,
+          "title": "",
+          "body": "",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 0,
+          "seq": 0
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    },
+    {
+      "http": 200,
+      "value": {
+        "ok": false,
+        "err_code": "revision_conflict",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "",
+          "revision": 0,
+          "title": "",
+          "body": "",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 0,
+          "seq": 0
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    },
+    {
+      "http": 200,
+      "value": {
+        "ok": false,
+        "err_code": "revision_conflict",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "",
+          "revision": 0,
+          "title": "",
+          "body": "",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 0,
+          "seq": 0
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    },
+    {
+      "http": 200,
+      "value": {
+        "ok": false,
+        "err_code": "revision_conflict",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "",
+          "revision": 0,
+          "title": "",
+          "body": "",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 0,
+          "seq": 0
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    },
+    {
+      "http": 200,
+      "value": {
+        "ok": false,
+        "err_code": "revision_conflict",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "",
+          "revision": 0,
+          "title": "",
+          "body": "",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 0,
+          "seq": 0
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    },
+    {
+      "http": 200,
+      "value": {
+        "ok": false,
+        "err_code": "revision_conflict",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "",
+          "revision": 0,
+          "title": "",
+          "body": "",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 0,
+          "seq": 0
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    },
+    {
+      "http": 200,
+      "value": {
+        "ok": false,
+        "err_code": "revision_conflict",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "",
+          "revision": 0,
+          "title": "",
+          "body": "",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 0,
+          "seq": 0
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    }
+  ],
+  "final": {
+    "http": 200,
+    "value": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-1",
+        "revision": 2,
+        "title": "writer-0",
+        "body": "writer-0",
+        "tags": [],
+        "color": "",
+        "pinned": false,
+        "state": "active",
+        "folder": "work",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 1,
+        "seq": 1
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "",
+        "note_id": "",
+        "revision": 0,
+        "status": ""
+      }
+    }
+  }
+}
