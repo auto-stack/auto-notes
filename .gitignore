@@ -19,3 +19,6 @@ __pycache__/
 /playwright-report/
 /tests/probe/evidence/v1/wk/
 /tests/probe/evidence/v1/direct/data/
+
+# a2r 中间产物（生成器交换格式，不入库）
+src/back/*.a2r.rs
