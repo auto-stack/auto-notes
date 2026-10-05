@@ -20,22 +20,16 @@ pub type Note = {
 // NOTES-001 v1 数据契约（实现见 src/back/repository.at）
 // ═══════════════════════════════════════════════════════════
 
-/// 正文块。v1 只产生 text 块；checklist/asset/link 随 NOTES-002 扩展。
-pub type NoteBlock = {
-    kind: str
-    text: str
-    checked: bool
-}
-
-/// NoteDocument v1：磁盘实体文件（notes/<note_id>.r<rev>.json）的完整内容。
-/// 设计文档 §4 的超集：folder 为保留旧 UI 能力的扩展字段（记录于 Spec delta）；
-/// created_at/updated_at 在无后端时钟能力期间为空串（显式缺失，T-00 §4）。
+/// NoteDocument v1（r3 SQLite 时代）：inbox.db notes 行的完整文档 JSON。
+/// folder 为保留旧 UI 能力的扩展字段（记录于 Spec delta）；
+/// created_at/updated_at 在无后端时钟能力期间为空串（显式缺失，T-00 §4）；
+/// r3 起正文为单 body 文本（v1 只产生 text 块，blocks 语法糖随 NOTES-002 再议）。
 pub type NoteDocument = {
     schema_version: int
     note_id: str
     revision: int
     title: str
-    blocks: []NoteBlock
+    body: str
     tags: []str
     color: str
     pinned: bool
@@ -91,7 +85,7 @@ pub type RepoResult = {
 // ═══════════════════════════════════════════════════════════
 
 use db
-use repository
+use p2probe
 
 // ═══════════════════════════════════════════════════════════
 // NOTES-001 v1 端点（T-01/T-02 采证面；测试端点在 T-04 收尾时评估保留）
@@ -146,7 +140,7 @@ pub fn v1_restore_note(nid str) RepoResult {
     return db.v1_restore_note(nid)
 }
 
-/// active 列表（seq 降序）
+/// active 列表（seq 降序）：仓储文档 JSON 数组 → NoteDocument 列表
 #[api(method = "GET", path = "/api/v1/notes")]
 pub fn v1_list_notes() []NoteDocument {
     return db.v1_list_notes()
@@ -180,208 +174,84 @@ pub fn v1_test_listloop() int {
 /// GET /api/notes
 #[api(method = "GET", path = "/api/notes")]
 pub fn list_notes() []Note {
-    var docs []NoteDocument = repository.repo_list_active()
-    var out List<Note> = List<Note>.new([])
-    for d in docs {
-        var body str = ""
-        if d.blocks.len() > 0 {
-            body = d.blocks[0].text
-        }
-        var t str = d.updated_at
-        if t == "" {
-            t = "Just now"
-        }
-        out.push(Note {
-            id: d.legacy_id,
-            title: d.title,
-            body: body,
-            time: t,
-            pinned: d.pinned,
-            tags: d.tags,
-            folder: d.folder,
-        })
-    }
-    return out
+    return db.all_notes()
 }
 
 /// Get a single note by ID
 /// GET /api/notes/:id
 #[api(method = "GET", path = "/api/notes/:id")]
 pub fn get_note(id int) ?Note {
-    var r = repository.repo_get(repository.nid_of(id))
-    if r.ok {
-        var body str = ""
-        if r.doc.blocks.len() > 0 {
-            body = r.doc.blocks[0].text
-        }
-        var t str = r.doc.updated_at
-        if t == "" {
-            t = "Just now"
-        }
-        var n Note = Note {
-            id: r.doc.legacy_id,
-            title: r.doc.title,
-            body: body,
-            time: t,
-            pinned: r.doc.pinned,
-            tags: r.doc.tags,
-            folder: r.doc.folder,
-        }
-        return Some(n)
-    }
-    return None
+    return db.find_note(id)
 }
 
 /// Create a new note
 /// POST /api/notes
 #[api(method = "POST", path = "/api/notes")]
 pub fn create_note(title str, body str, folder str) Note {
-    var tags List<str> = List<str>.new([])
-    var r = repository.repo_create(title, body, folder, tags, "")
-    var body str = ""
-    if r.doc.blocks.len() > 0 {
-        body = r.doc.blocks[0].text
-    }
-    var t str = r.doc.updated_at
-    if t == "" {
-        t = "Just now"
-    }
-    var note Note = Note {
-        id: r.doc.legacy_id,
-        title: r.doc.title,
-        body: body,
-        time: t,
-        pinned: r.doc.pinned,
-        tags: r.doc.tags,
-        folder: r.doc.folder,
-    }
-    return note
+    return db.create_note(title, body, folder)
 }
 
 /// Update an existing note
 /// PUT /api/notes/:id
 #[api(method = "PUT", path = "/api/notes/:id")]
 pub fn update_note(id int, title str, body str) ?Note {
-    var nid str = repository.nid_of(id)
-    var cur = repository.repo_get(nid.as_str())
-    if cur.ok == false {
-        return None
-    }
-    var r = repository.repo_update(nid.as_str(), cur.doc.revision, title, body, "")
-    if r.ok {
-    var body str = ""
-    if r.doc.blocks.len() > 0 {
-        body = r.doc.blocks[0].text
-    }
-    var t str = r.doc.updated_at
-    if t == "" {
-        t = "Just now"
-    }
-    return Note {
-        id: r.doc.legacy_id,
-        title: r.doc.title,
-        body: body,
-        time: t,
-        pinned: r.doc.pinned,
-        tags: r.doc.tags,
-        folder: r.doc.folder,
-    }
-    }
-    return None
+    return db.update_note(id, title, body)
 }
 
 /// Delete a note by ID
 /// DELETE /api/notes/:id
 #[api(method = "DELETE", path = "/api/notes/:id")]
 pub fn delete_note(id int) bool {
-    var r = repository.repo_trash(repository.nid_of(id))
-    return r.ok
+    return db.delete_note(id)
 }
 
 /// Toggle pin status
 /// PATCH /api/notes/:id/pin
 #[api(method = "PATCH", path = "/api/notes/:id/pin")]
 pub fn toggle_pin(id int) ?Note {
-    var nid str = repository.nid_of(id)
-    var cur = repository.repo_get(nid.as_str())
-    if cur.ok == false {
-        return None
-    }
-    var want bool = cur.doc.pinned == false
-    var r = repository.repo_set_pinned(nid.as_str(), want)
-    if r.ok {
-    var body str = ""
-    if r.doc.blocks.len() > 0 {
-        body = r.doc.blocks[0].text
-    }
-    var t str = r.doc.updated_at
-    if t == "" {
-        t = "Just now"
-    }
-    return Note {
-        id: r.doc.legacy_id,
-        title: r.doc.title,
-        body: body,
-        time: t,
-        pinned: r.doc.pinned,
-        tags: r.doc.tags,
-        folder: r.doc.folder,
-    }
-    }
-    return None
+    return db.toggle_pin(id)
 }
 
 /// Update tags for a note
 /// PUT /api/notes/:id/tags
 #[api(method = "PUT", path = "/api/notes/:id/tags")]
 pub fn update_tags(id int, tags []str) ?Note {
-    var r = repository.repo_set_tags(repository.nid_of(id), tags)
-    if r.ok {
-    var body str = ""
-    if r.doc.blocks.len() > 0 {
-        body = r.doc.blocks[0].text
-    }
-    var t str = r.doc.updated_at
-    if t == "" {
-        t = "Just now"
-    }
-    return Note {
-        id: r.doc.legacy_id,
-        title: r.doc.title,
-        body: body,
-        time: t,
-        pinned: r.doc.pinned,
-        tags: r.doc.tags,
-        folder: r.doc.folder,
-    }
-    }
-    return None
+    return db.update_tags(id, tags)
 }
 
 /// Search notes by title + body
 /// GET /api/notes/search?q=...
 #[api(method = "GET", path = "/api/notes/search")]
 pub fn search_notes(query str) []Note {
-    var docs []NoteDocument = repository.repo_search(query)
-    var out List<Note> = List<Note>.new([])
-    for d in docs {
-        var body str = ""
-        if d.blocks.len() > 0 {
-            body = d.blocks[0].text
-        }
-        var t str = d.updated_at
-        if t == "" {
-            t = "Just now"
-        }
-        out.push(Note {
-            id: d.legacy_id,
-            title: d.title,
-            body: body,
-            time: t,
-            pinned: d.pinned,
-            tags: d.tags,
-            folder: d.folder,
-        })
-    }
-    return out
+    return db.search_notes(query)
+}
+
+// ═══════════════════════════════════════════════════════════
+// NOTES-001 Phase 2 / T-05 SQLite 能力探针（NOTES_P2PROBE=1 门禁在
+// p2probe 内部；T-11 收尾时随测试门禁一并评估移除）
+// ═══════════════════════════════════════════════════════════
+
+#[api(method = "GET", path = "/api/p2/open")]
+pub fn p2_open() str {
+    return p2probe.open_probe()
+}
+
+#[api(method = "GET", path = "/api/p2/txn")]
+pub fn p2_txn() str {
+    return p2probe.txn_probe()
+}
+
+#[api(method = "GET", path = "/api/p2/busy")]
+pub fn p2_busy() str {
+    return p2probe.busy_probe()
+}
+
+#[api(method = "GET", path = "/api/p2/rollback")]
+pub fn p2_rollback() str {
+    return p2probe.rollback_probe()
+}
+
+#[api(method = "GET", path = "/api/p2/escape")]
+pub fn p2_escape() str {
+    return p2probe.escape_probe()
 }

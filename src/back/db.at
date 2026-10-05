@@ -1,16 +1,169 @@
-// source/back/db.at - Notes 服务层（NOTES-001 T-04：legacy CRUD → 仓储 adapter）
+// source/back/db.at - Notes 服务层（NOTES-001 r3：SQLite 仓储 adapter）
 //
-// 全部持久化经 src/back/repository.at（journal → 实体 → manifest → 收据）。
-// 本文件做两件事：① v1 端点服务层；② legacy Note 视图适配（整数 id /
-// body 字符串 ← NoteDocument），供 api.at 的 legacy 端点直调。
+// repository.at（SQLite 单写者）返回 JSON 字符串信封；本层负责
+// ① v1 端点服务层：把仓储 JSON 解析回 api.at 契约类型（电池按结构化
+//    JSON 断言 receipt/err_code，端点必须返回对象而非字符串）；
+// ② legacy Note 视图适配（整数 id / body 字符串 ← 仓储文档 JSON），
+//    供 api.at 的 legacy 端点直调。
 // 旧内存 CRUD 退役；folders 是笔记级元数据（NoteDocument.folder）。
 
+use api: Note
 use api: NoteDocument
-use api: MigrationReport
 use api: RepoResult
+use api: CaptureReceipt
+use api: MigrationReport
+use api: CorruptItem
 use auto.env
 
 use repository
+use p2probe
+
+// ═══════════════════════════════════════════════════════════
+// JSON → 契约类型（仓储信封解析；访问器全部空安全，
+// 失败信封缺 note/receipt 字段时落默认值）
+// ═══════════════════════════════════════════════════════════
+
+fn str_list_of(tags_json str) List<str> {
+    var tv = json.parse(tags_json)
+    var tn int = json.len(tv)
+    var out List<str> = List<str>.new([])
+    for j in 0..tn {
+        var sv = json.get_at(tv, j)
+        out.push(json.as_string(sv))
+    }
+    return out
+}
+
+fn note_doc_of(doc_json str) NoteDocument {
+    var it = json.parse(doc_json)
+    var v_legacy = json.get(it, "legacy_id")
+    var n_legacy int = json.as_int(v_legacy)
+    var v_rev = json.get(it, "revision")
+    var n_rev int = json.as_int(v_rev)
+    var v_pin = json.get(it, "pinned")
+    var n_pin bool = json.as_bool(v_pin)
+    var v_tags = json.get(it, "tags")
+    var v_tags_json str = json.encode(v_tags)
+    var n_tags List<str> = str_list_of(v_tags_json)
+    var v_nid = json.get(it, "note_id")
+    var n_nid str = json.as_string(v_nid)
+    var v_title = json.get(it, "title")
+    var n_title str = json.as_string(v_title)
+    var v_body = json.get(it, "body")
+    var n_body str = json.as_string(v_body)
+    var v_color = json.get(it, "color")
+    var n_color str = json.as_string(v_color)
+    var v_state = json.get(it, "state")
+    var n_state str = json.as_string(v_state)
+    var v_folder = json.get(it, "folder")
+    var n_folder str = json.as_string(v_folder)
+    var v_created = json.get(it, "created_at")
+    var n_created str = json.as_string(v_created)
+    var v_updated = json.get(it, "updated_at")
+    var n_updated str = json.as_string(v_updated)
+    var v_seq = json.get(it, "seq")
+    var n_seq int = json.as_int(v_seq)
+    var d NoteDocument = NoteDocument {
+        schema_version: 1,
+        note_id: n_nid,
+        revision: n_rev,
+        title: n_title,
+        body: n_body,
+        tags: n_tags,
+        color: n_color,
+        pinned: n_pin,
+        state: n_state,
+        folder: n_folder,
+        created_at: n_created,
+        updated_at: n_updated,
+        legacy_id: n_legacy,
+        seq: n_seq,
+    }
+    return d
+}
+
+fn repo_result_of(js str) RepoResult {
+    var it = json.parse(js)
+    var v_ok = json.get(it, "ok")
+    var okb bool = json.as_bool(v_ok)
+    var v_ec = json.get(it, "err_code")
+    var ec str = json.as_string(v_ec)
+    var v_doc = json.get(it, "note")
+    var docjs str = json.encode(v_doc)
+    var d NoteDocument = note_doc_of(docjs)
+    var v_rc = json.get(it, "receipt")
+    var rcjs str = json.encode(v_rc)
+    var rcit = json.parse(rcjs)
+    var v_rid = json.get(rcit, "request_id")
+    var rid str = json.as_string(v_rid)
+    var v_rnid = json.get(rcit, "note_id")
+    var rnid str = json.as_string(v_rnid)
+    var v_rrev = json.get(rcit, "revision")
+    var rrev int = json.as_int(v_rrev)
+    var v_st = json.get(rcit, "status")
+    var st str = json.as_string(v_st)
+    var rc CaptureReceipt = CaptureReceipt {
+        schema_version: 1,
+        request_id: rid,
+        note_id: rnid,
+        revision: rrev,
+        status: st,
+    }
+    var r RepoResult = RepoResult {
+        ok: okb,
+        err_code: ec,
+        err_detail: "",
+        doc: d,
+        receipt: rc,
+    }
+    return r
+}
+
+fn migration_report_of(js str) MigrationReport {
+    var it = json.parse(js)
+    var v_att = json.get(it, "attempted")
+    var att bool = json.as_bool(v_att)
+    var v_mig = json.get(it, "migrated")
+    var mig int = json.as_int(v_mig)
+    var v_skip = json.get(it, "skipped_existing")
+    var skip bool = json.as_bool(v_skip)
+    var v_saved = json.get(it, "saved")
+    var saved bool = json.as_bool(v_saved)
+    var v_err = json.get(it, "err")
+    var err str = json.as_string(v_err)
+    var v_bak = json.get(it, "backup_file")
+    var bak str = json.as_string(v_bak)
+    var v_cor = json.get(it, "corrupted")
+    var cor_json str = json.encode(v_cor)
+    var cor = json.parse(cor_json)
+    var cn int = json.len(cor)
+    var items List<CorruptItem> = List<CorruptItem>.new([])
+    for j in 0..cn {
+        var cit = json.get_at(cor, j)
+        var v_idx = json.get(cit, "index")
+        var cidx int = json.as_int(v_idx)
+        var v_reason = json.get(cit, "reason")
+        var creason str = json.as_string(v_reason)
+        var v_snip = json.get(cit, "snippet")
+        var csnip str = json.as_string(v_snip)
+        var ci CorruptItem = CorruptItem {
+            index: cidx,
+            reason: creason,
+            snippet: csnip,
+        }
+        items.push(ci)
+    }
+    var r MigrationReport = MigrationReport {
+        attempted: att,
+        migrated: mig,
+        skipped_existing: skip,
+        saved: saved,
+        err: err,
+        backup_file: bak,
+        corrupted: items,
+    }
+    return r
+}
 
 // ═══════════════════════════════════════════════════════════
 // NOTES-001 v1 端点服务层
@@ -33,32 +186,54 @@ pub fn v1_migrate() MigrationReport {
         var d str = repository.data_dir()
         legacy = d + "/notes.json"
     }
-    return repository.migrate_legacy_at(legacy.as_str())
+    var js str = repository.migrate_legacy_at(legacy)
+    return migration_report_of(js)
 }
 
 pub fn v1_create_note(request_id str, title str, body str, folder str) RepoResult {
     var tags List<str> = List<str>.new([])
-    return repository.repo_create(title, body, folder, tags, request_id.as_str())
+    var tj str = json.encode(tags)
+    var js str = repository.repo_create(title, body, folder, tj, request_id)
+    return repo_result_of(js)
 }
 
 pub fn v1_update_note(nid str, expected_revision int, title str, body str, request_id str) RepoResult {
-    return repository.repo_update(nid, expected_revision, title, body, request_id)
+    var js str = repository.repo_update(nid, expected_revision, title, body, request_id)
+    return repo_result_of(js)
 }
 
 pub fn v1_get_note(nid str) RepoResult {
-    return repository.repo_get(nid)
+    var docjs str = repository.repo_get(nid)
+    if docjs == "" {
+        var e RepoResult = repo_result_of("{\"ok\":false,\"err_code\":\"not_found\"}")
+        return e
+    }
+    var env_js str = "{\"ok\":true,\"err_code\":\"\",\"note\":" + docjs + ",\"receipt\":{\"schema_version\":1,\"request_id\":\"\",\"note_id\":\"\",\"revision\":0,\"status\":\"\"}}"
+    return repo_result_of(env_js)
 }
 
 pub fn v1_trash_note(nid str) RepoResult {
-    return repository.repo_trash(nid)
+    var js str = repository.repo_trash(nid)
+    return repo_result_of(js)
 }
 
 pub fn v1_restore_note(nid str) RepoResult {
-    return repository.repo_restore(nid)
+    var js str = repository.repo_restore(nid)
+    return repo_result_of(js)
 }
 
 pub fn v1_list_notes() []NoteDocument {
-    return repository.repo_list_active()
+    var js str = repository.repo_list_active()
+    var arr = json.parse(js)
+    var n int = json.len(arr)
+    var out List<NoteDocument> = List<NoteDocument>.new([])
+    for i in 0..n {
+        var it = json.get_at(arr, i)
+        var ijs str = json.encode(it)
+        var d NoteDocument = note_doc_of(ijs)
+        out.push(d)
+    }
+    return out
 }
 
 pub fn v1_test_open() str {
@@ -91,36 +266,168 @@ pub fn v1_test_fault(stage str) str {
 // api.at 的 handler 体直调 repository，本组满足存在性检查）
 // ═══════════════════════════════════════════════════════════
 
-pub fn all_notes() []NoteDocument {
-    return repository.repo_list_active()
+// Plan 742/T-05: SQLite 能力探针端点的同名委托（api.at 端点名字匹配要求）
+pub fn p2_open() str {
+    return p2probe.open_probe()
 }
 
-pub fn find_note(id int) RepoResult {
-    return repository.repo_get(repository.nid_of(id))
+pub fn p2_txn() str {
+    return p2probe.txn_probe()
 }
 
-pub fn create_note(title str, body str, folder str) RepoResult {
+pub fn p2_busy() str {
+    return p2probe.busy_probe()
+}
+
+pub fn p2_rollback() str {
+    return p2probe.rollback_probe()
+}
+
+pub fn p2_escape() str {
+    return p2probe.escape_probe()
+}
+
+// ═══════════════════════════════════════════════════════════
+// legacy CRUD adapter（NOTES-001 r3：repository-backed）
+// Note 视图映射在本模块（api → db → repository 无环链上，
+// use api: Note 在此解析正常——D-742-1 仅影响 repository 直引）
+// ═══════════════════════════════════════════════════════════
+
+/// 仓储文档 JSON → legacy Note 视图（body 直读，时间缺省 "Just now"）
+fn note_from_json_str(doc_json str) Note {
+    var it = json.parse(doc_json)
+    var v_legacy = json.get(it, "legacy_id")
+    var n_id int = json.as_int(v_legacy)
+    var v_title = json.get(it, "title")
+    var n_title str = json.as_string(v_title)
+    var v_body = json.get(it, "body")
+    var n_body str = json.as_string(v_body)
+    var v_time = json.get(it, "updated_at")
+    var t str = json.as_string(v_time)
+    if t == "" {
+        t = "Just now"
+    }
+    var v_pin = json.get(it, "pinned")
+    var n_pin bool = json.as_bool(v_pin)
+    var v_tags = json.get(it, "tags")
+    var v_tags_json str = json.encode(v_tags)
+    var n_tags List<str> = str_list_of(v_tags_json)
+    var v_folder = json.get(it, "folder")
+    var n_folder str = json.as_string(v_folder)
+    var n Note = Note {
+        id: n_id,
+        title: n_title,
+        body: n_body,
+        time: t,
+        pinned: n_pin,
+        tags: n_tags,
+        folder: n_folder,
+    }
+    return n
+}
+
+/// 仓储结果信封 JSON → Note 视图（ok=true 时取 note 字段）
+fn note_of_result(js str) ?Note {
+    var it = json.parse(js)
+    var v_ok = json.get(it, "ok")
+    var okb bool = json.as_bool(v_ok)
+    if okb {
+        var v_doc = json.get(it, "note")
+        var docjs str = json.encode(v_doc)
+        var n Note = note_from_json_str(docjs)
+        return Some(n)
+    }
+    return None
+}
+
+pub fn all_notes() []Note {
+    var js str = repository.repo_list_active()
+    var arr = json.parse(js)
+    var n int = json.len(arr)
+    var out List<Note> = List<Note>.new([])
+    for i in 0..n {
+        var it = json.get_at(arr, i)
+        var ijs str = json.encode(it)
+        var one Note = note_from_json_str(ijs)
+        out.push(one)
+    }
+    return out
+}
+
+pub fn find_note(id int) ?Note {
+    var js str = repository.repo_get(repository.nid_of(id))
+    if js == "" {
+        return None
+    }
+    return note_of_result(js)
+}
+
+pub fn create_note(title str, body str, folder str) Note {
     var tags List<str> = List<str>.new([])
-    return repository.repo_create(title, body, folder, tags, repository.ui_request_id("ui"))
+    var tj str = json.encode(tags)
+    var rid str = repository.ui_request_id("ui")
+    var js str = repository.repo_create(title, body, folder, tj, rid)
+    var it = json.parse(js)
+    var v_doc = json.get(it, "note")
+    var docjs str = json.encode(v_doc)
+    return note_from_json_str(docjs)
 }
 
-pub fn update_note(id int, title str, body str) RepoResult {
-    return repository.repo_get(repository.nid_of(id))
+pub fn update_note(id int, title str, body str) ?Note {
+    var nid str = repository.nid_of(id)
+    var cur_js str = repository.repo_get(nid)
+    if cur_js == "" {
+        return None
+    }
+    var cur = json.parse(cur_js)
+    var v_rev = json.get(cur, "revision")
+    var rev int = json.as_int(v_rev)
+    var rid str = repository.ui_request_id("ui-upd")
+    var js str = repository.repo_update(nid, rev, title, body, rid)
+    return note_of_result(js)
 }
 
 pub fn delete_note(id int) bool {
-    var r = repository.repo_trash(repository.nid_of(id))
-    return r.ok
+    var js str = repository.repo_trash(repository.nid_of(id))
+    var it = json.parse(js)
+    var v_ok = json.get(it, "ok")
+    return json.as_bool(v_ok)
 }
 
-pub fn toggle_pin(id int) RepoResult {
-    return repository.repo_get(repository.nid_of(id))
+pub fn toggle_pin(id int) ?Note {
+    var nid str = repository.nid_of(id)
+    var cur_js str = repository.repo_get(nid)
+    if cur_js == "" {
+        return None
+    }
+    var cur = json.parse(cur_js)
+    var v_pin = json.get(cur, "pinned")
+    var pb bool = json.as_bool(v_pin)
+    var want bool = true
+    if pb {
+        want = false
+    }
+    var js str = repository.repo_set_pinned(nid, want)
+    return note_of_result(js)
 }
 
-pub fn update_tags(id int, tags []str) RepoResult {
-    return repository.repo_set_tags(repository.nid_of(id), tags)
+pub fn update_tags(id int, tags []str) ?Note {
+    var nid str = repository.nid_of(id)
+    var tj str = json.encode(tags)
+    var js str = repository.repo_set_tags(nid, tj)
+    return note_of_result(js)
 }
 
-pub fn search_notes(query str) []NoteDocument {
-    return repository.repo_search(query)
+pub fn search_notes(query str) []Note {
+    var js str = repository.repo_search(query)
+    var arr = json.parse(js)
+    var n int = json.len(arr)
+    var out List<Note> = List<Note>.new([])
+    for i in 0..n {
+        var it = json.get_at(arr, i)
+        var ijs str = json.encode(it)
+        var one Note = note_from_json_str(ijs)
+        out.push(one)
+    }
+    return out
 }

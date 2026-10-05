@@ -1,0 +1,173 @@
+// p2probe.at — NOTES-001 Phase 2 / T-05 SQLite 能力探针（临时模块）。
+// 门禁：NOTES_P2PROBE=1 否则一律返回 "disabled"（F-001-06 教训：
+// 变更型测试钩子不得常驻）。T-11 收尾时随测试门禁一并评估移除。
+
+use auto.env
+use auto.sqlite
+
+fn p2_enabled() str {
+    return env.get("NOTES_P2PROBE")
+}
+
+fn p2_guard() str {
+    if p2_enabled() == "1" {
+        return "ok"
+    }
+    return "disabled"
+}
+
+// 打开 + PRAGMA（journal_mode / busy_timeout）+ 实际落盘验证
+pub fn open_probe() str {
+    if p2_guard() == "disabled" {
+        return "disabled"
+    }
+    var path str = env.get("NOTES_P2DB")
+    if path == "" {
+        path = "p2probe.db"
+    }
+    var db SqliteDb = sqlite.open(path)
+    var jm int = db.exec("PRAGMA journal_mode=WAL")
+    var bt int = db.exec("PRAGMA busy_timeout=3000")
+    var r int = db.exec("CREATE TABLE IF NOT EXISTS p2(k TEXT PRIMARY KEY, v TEXT)")
+    var rows List<List<str>> = db.query("SELECT v FROM p2 WHERE k='open-probe'")
+    var n int = rows.len()
+    var w int = db.exec("INSERT OR REPLACE INTO p2(k, v) VALUES('open-probe', 'seen')")
+    var out str = "{\"journal_mode_rows\":"
+    out = out + json.encode(jm)
+    out = out + ",\"busy_timeout_rows\":"
+    out = out + json.encode(bt)
+    out = out + ",\"create_rows\":"
+    out = out + json.encode(r)
+    out = out + ",\"select_rows_before\":"
+    out = out + json.encode(n)
+    out = out + ",\"insert_rows\":"
+    out = out + json.encode(w)
+    out = out + ",\"last_error\":"
+    out = out + json.encode(sqlite.last_error())
+    out = out + "}"
+    return out
+}
+
+// 事务 batch：BEGIN IMMEDIATE + INSERT + COMMIT 单次 exec
+pub fn txn_probe() str {
+    if p2_guard() == "disabled" {
+        return "disabled"
+    }
+    var path str = env.get("NOTES_P2DB")
+    if path == "" {
+        path = "p2probe.db"
+    }
+    var db SqliteDb = sqlite.open(path)
+    var begin int = db.exec("BEGIN IMMEDIATE")
+    var i1 int = db.exec("INSERT OR REPLACE INTO p2(k, v) VALUES('txn-marker', 'committed')")
+    var commit int = db.exec("COMMIT")
+    var rows List<List<str>> = db.query("SELECT v FROM p2 WHERE k='txn-marker'")
+    var v str = ""
+    if rows.len() > 0 {
+        var row List<str> = rows[0]
+        v = row[0]
+    }
+    var out str = "{\"begin\":"
+    out = out + json.encode(begin)
+    out = out + ",\"insert\":"
+    out = out + json.encode(i1)
+    out = out + ",\"commit\":"
+    out = out + json.encode(commit)
+    out = out + ",\"value\":"
+    out = out + json.encode(v)
+    out = out + ",\"last_error\":"
+    out = out + json.encode(sqlite.last_error())
+    out = out + "}"
+    return out
+}
+
+// 双连接写冲突：A 连接 BEGIN IMMEDIATE 持锁，B 连接 BEGIN IMMEDIATE 应失败
+pub fn busy_probe() str {
+    if p2_guard() == "disabled" {
+        return "disabled"
+    }
+    var path str = env.get("NOTES_P2DB")
+    if path == "" {
+        path = "p2probe.db"
+    }
+    var a SqliteDb = sqlite.open(path)
+    var b SqliteDb = sqlite.open(path)
+    var ab int = a.exec("BEGIN IMMEDIATE")
+    var bb int = b.exec("BEGIN IMMEDIATE")
+    var b_err str = sqlite.last_error()
+    var rb int = b.exec("ROLLBACK")
+    var ra int = a.exec("COMMIT")
+    var out str = "{\"a_begin\":"
+    out = out + json.encode(ab)
+    out = out + ",\"b_begin\":"
+    out = out + json.encode(bb)
+    out = out + ",\"b_last_error\":"
+    out = out + json.encode(b_err)
+    out = out + ",\"b_rollback\":"
+    out = out + json.encode(rb)
+    out = out + ",\"a_commit\":"
+    out = out + json.encode(ra)
+    out = out + "}"
+    return out
+}
+
+// 回滚语义：BEGIN + INSERT + ROLLBACK → 行不存在
+pub fn rollback_probe() str {
+    if p2_guard() == "disabled" {
+        return "disabled"
+    }
+    var path str = env.get("NOTES_P2DB")
+    if path == "" {
+        path = "p2probe.db"
+    }
+    var db SqliteDb = sqlite.open(path)
+    var begin int = db.exec("BEGIN IMMEDIATE")
+    var ins int = db.exec("INSERT OR REPLACE INTO p2(k, v) VALUES('rb-marker', 'should-not-exist')")
+    var rb int = db.exec("ROLLBACK")
+    var rows List<List<str>> = db.query("SELECT v FROM p2 WHERE k='rb-marker'")
+    var out str = "{\"begin\":"
+    out = out + json.encode(begin)
+    out = out + ",\"insert\":"
+    out = out + json.encode(ins)
+    out = out + ",\"rollback\":"
+    out = out + json.encode(rb)
+    out = out + ",\"rows_after\":"
+    out = out + json.encode(rows.len())
+    out = out + "}"
+    return out
+}
+
+// 转义与 Unicode 往返：单引号注入尝试 + 中文/emoji
+pub fn escape_probe() str {
+    if p2_guard() == "disabled" {
+        return "disabled"
+    }
+    var path str = env.get("NOTES_P2DB")
+    if path == "" {
+        path = "p2probe.db"
+    }
+    var db SqliteDb = sqlite.open(path)
+    var evil str = "it's a 'test' 🎉"
+    var safe str = evil.replace("'", "''")
+    var sql str = "INSERT OR REPLACE INTO p2(k, v) VALUES('escape-probe', '" + safe + "')"
+    var w int = db.exec(sql)
+    var rows List<List<str>> = db.query("SELECT v FROM p2 WHERE k='escape-probe'")
+    var got str = ""
+    if rows.len() > 0 {
+        var row0 List<str> = rows[0]
+        got = row0[0]
+    }
+    var roundtrip bool = got == evil
+    var out str = "{\"insert_rows\":"
+    out = out + json.encode(w)
+    out = out + ",\"roundtrip_ok\":"
+    if roundtrip {
+        out = out + "true"
+    } else {
+        out = out + "false"
+    }
+    out = out + ",\"got\":"
+    out = out + json.encode(got)
+    out = out + "}"
+    return out
+}
