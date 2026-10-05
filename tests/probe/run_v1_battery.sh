@@ -4,7 +4,10 @@
 # 前置：
 #   1. 后端已就绪（auto run 或 cargo run），BASE 默认 http://localhost:17819；
 #   2. 服务器以 NOTES_TEST_MODE=1 启动（电池依赖 /api/v1/test/setup 隔离目录；
-#      未开启时电池立即退出 1——这本身是 T-10 门禁的负例）。
+#      未开启时电池立即退出 1——这本身是 T-10 门禁的负例）；
+#   3. 同一实例 NOTES_SEED 必须未设：seed 模式会对每个 setup 的新目录注入
+#      6 条种子（T-03 设计行为），migrate 将全部 skipped_existing（F-R3-1）。
+#      且单进程 env 全局——电池/冒烟/场景不要混跑同一实例（复审实证污染）。
 # 用法：bash tests/probe/run_v1_battery.sh [OUTDIR]
 #   OUTDIR 缺省为 mktemp 隔离目录（修复复审指出的「写死 wk/OUTDIR 不隔离」）。
 # 退出码：任一断言失败 → 1（修复「失败被 tee 掩盖」）；全部通过 → 0。

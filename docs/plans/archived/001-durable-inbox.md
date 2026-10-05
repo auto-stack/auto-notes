@@ -1,7 +1,7 @@
 ---
 plan_id: NOTES-001
 title: "可靠 Inbox、稳定标识与恢复"
-status: reviewed
+status: archived
 feature_name: "可靠 Inbox、稳定标识与恢复"
 author: [Codex]
 created_at: 2026-10-04T00:00:00Z
@@ -190,6 +190,8 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
   合入前 Notes 须以 lang-742 工具链构建（或 742 先行合入）。
   遗留：D-742-1 跨模块类型解析缺陷（绕开）；掉电窗口（manifest 非原子）。
   next：独立复审（/auto-plan:review）→ merge（含 742 合入顺序决策）。
+
+- 合入收据 PLAN-001:r3：prepared=复审基线 29b8824（v0.6-dev 线性，修订2授权主检出直接开发；canonical spec 已随 e812ac5 落地 docs/specs/notes/durable-inbox.md SD-02..06；冻结 delta SHA256=c5e9e77…复核一致） | landed=交付链 e42eab0..29b8824 已在 v0.6-dev（review 记录 744d851 为 projection-only 后代=delivery 收尾提交；origin/v0.6-dev 已推至 29b8824，后补 744d851+F-R3-1） | ledger_refreshed=n/a（本仓无 ledger 基建，canonical spec 即交付物——沿 r2 先例） | archived=docs/plans/archived/001-durable-inbox.md, completion_kind=delivered | cleaned=.wt/auto-notes-20261004-01 保留（wt-guard.sh 缺失按仓规不清理，rev2 废弃）；lang-742 worktree 属 auto-lang plan-742 自有流程 | 跨仓顺序（F-R3-4 决策）：① vendor/auto-down engine files 补丁已提交（auto-down 96f095b，分支 Blueprint）→ ② auto-lang plan-742 合 v0.6-dev 由该计划自有 merge 流程执行（sqlite.rs 与直补 ed2d00b90 内容相同，冲突取任一；742 另带 qualify/D8/mkdir_all 路由）→ ③ notes 合并后工具链重建验证 → ④ 父仓 auto-os gitlink 登记 | pending-push=无（v0.6-dev 已推送；本收据提交后补推）
 
 - 合入收据 PLAN-001:r2：prepared=基线 a377e3f/规范增量 SD-01(docs/specs/notes/durable-inbox.md@1088e19)/交付链 c764364..a84bce9 | landed=v0.6-dev 线性历史(修订2授权主检出直接开发,无 dev 分支,无需 ff-only；origin/v0.6-dev=a377e3f 无分叉) | ledger_refreshed=n/a(本仓无 ledger 基建,canonical spec 即交付物) | archived=docs/plans/archive/001-durable-inbox.md, completion_kind=delivered | cleaned=.wt/auto-notes-20261004-01 保留(修订2废弃+wt-guard.sh 缺失按仓规不清理)；lang-742 属 auto-lang plan-742 待其独立复审合入 | pending-push=origin/v0.6-dev 推送被网络阻断(github 443 连接失败×3,2026-10-05T10:2x)；本地 v0.6-dev=a84bce9+归档提交就绪,网络恢复后 `git push origin v0.6-dev` 即可,随后由 OS 计划登记 gitlink
 
