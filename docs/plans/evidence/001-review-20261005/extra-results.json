@@ -1,0 +1,165 @@
+{
+  "legacy_stale": {
+    "snapshot_a": {
+      "http": 200,
+      "value": {
+        "id": 1,
+        "title": "中文 🎉",
+        "body": "第一行\n第二行",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [],
+        "folder": "work"
+      }
+    },
+    "snapshot_b": {
+      "http": 200,
+      "value": {
+        "id": 1,
+        "title": "中文 🎉",
+        "body": "第一行\n第二行",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [],
+        "folder": "work"
+      }
+    },
+    "save_a": {
+      "http": 200,
+      "value": {
+        "id": 1,
+        "title": "client-A",
+        "body": "client-A new content",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [],
+        "folder": "work"
+      }
+    },
+    "save_b": {
+      "http": 200,
+      "value": {
+        "id": 1,
+        "title": "client-B stale",
+        "body": "client-B based on stale snapshot",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [],
+        "folder": "work"
+      }
+    },
+    "final": {
+      "http": 200,
+      "value": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 3,
+          "title": "client-B stale",
+          "blocks": [
+            {
+              "kind": "text",
+              "text": "client-B based on stale snapshot",
+              "checked": false
+            }
+          ],
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "work",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    },
+    "old_revision_exists": false
+  },
+  "request_id_path": {
+    "response": {
+      "http": 200,
+      "value": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-4",
+          "revision": 1,
+          "title": "中文 🎉",
+          "blocks": [
+            {
+              "kind": "text",
+              "text": "第一行\n第二行",
+              "checked": false
+            }
+          ],
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "work",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 4,
+          "seq": 4
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "../escaped",
+          "note_id": "n-4",
+          "revision": 1,
+          "status": "committed"
+        }
+      }
+    },
+    "outside_receipts_exists": true
+  },
+  "torn_manifest_simulation": {
+    "get": {
+      "http": 200,
+      "value": {
+        "ok": false,
+        "err_code": "corrupt",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "",
+          "revision": 0,
+          "title": "",
+          "blocks": [],
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": -1,
+          "seq": 0
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    },
+    "journal_files": 4,
+    "receipt_files": 3
+  }
+}

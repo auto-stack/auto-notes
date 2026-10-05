@@ -1,0 +1,961 @@
+{
+  "reviewed_commit": "9158fd5e9fbe83629c79bb626242f18ea014c38a",
+  "binary": "D:\\autostack\\auto-os\\apps\\015-notes\\rust-workspace\\target\\debug\\app-015-notes-back.exe",
+  "binary_sha256": "1ae6dee3342d0c8b0c42ef3d5fc82bc14f709afac5a806336ac1fb3155bad1f8",
+  "binary_mtime": 1791165737.583461,
+  "runtime_note": "Existing generated backend binary; no fresh generation/build in this review.",
+  "results": {
+    "create_retry": {
+      "first": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 1,
+            "title": "中文 🎉",
+            "blocks": [
+              {
+                "kind": "text",
+                "text": "第一行\n第二行",
+                "checked": false
+              }
+            ],
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "create-1",
+            "note_id": "n-1",
+            "revision": 1,
+            "status": "committed"
+          }
+        }
+      },
+      "replay": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 1,
+            "title": "中文 🎉",
+            "blocks": [
+              {
+                "kind": "text",
+                "text": "第一行\n第二行",
+                "checked": false
+              }
+            ],
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "create-1",
+            "note_id": "n-1",
+            "revision": 1,
+            "status": "committed"
+          }
+        }
+      },
+      "fault": {
+        "http": 200,
+        "value": {
+          "ok": false,
+          "err_code": "fault_injected",
+          "err_detail": "after_manifest",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "",
+            "revision": 0,
+            "title": "",
+            "blocks": [],
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": -1,
+            "seq": 0
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "",
+            "note_id": "",
+            "revision": 0,
+            "status": ""
+          }
+        }
+      },
+      "before": {
+        "http": 200,
+        "value": [
+          {
+            "schema_version": 1,
+            "note_id": "n-2",
+            "revision": 1,
+            "title": "中文 🎉",
+            "blocks": [
+              {
+                "kind": "text",
+                "text": "第一行\n第二行",
+                "checked": false
+              }
+            ],
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 2,
+            "seq": 2
+          },
+          {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 1,
+            "title": "中文 🎉",
+            "blocks": [
+              {
+                "kind": "text",
+                "text": "第一行\n第二行",
+                "checked": false
+              }
+            ],
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          }
+        ]
+      },
+      "retry": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-3",
+            "revision": 1,
+            "title": "中文 🎉",
+            "blocks": [
+              {
+                "kind": "text",
+                "text": "第一行\n第二行",
+                "checked": false
+              }
+            ],
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 3,
+            "seq": 3
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "create-fault",
+            "note_id": "n-3",
+            "revision": 1,
+            "status": "committed"
+          }
+        }
+      },
+      "after": {
+        "http": 200,
+        "value": [
+          {
+            "schema_version": 1,
+            "note_id": "n-3",
+            "revision": 1,
+            "title": "中文 🎉",
+            "blocks": [
+              {
+                "kind": "text",
+                "text": "第一行\n第二行",
+                "checked": false
+              }
+            ],
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 3,
+            "seq": 3
+          },
+          {
+            "schema_version": 1,
+            "note_id": "n-2",
+            "revision": 1,
+            "title": "中文 🎉",
+            "blocks": [
+              {
+                "kind": "text",
+                "text": "第一行\n第二行",
+                "checked": false
+              }
+            ],
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 2,
+            "seq": 2
+          },
+          {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 1,
+            "title": "中文 🎉",
+            "blocks": [
+              {
+                "kind": "text",
+                "text": "第一行\n第二行",
+                "checked": false
+              }
+            ],
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          }
+        ]
+      }
+    },
+    "update_retry": {
+      "first": {
+        "http": 200,
+        "value": {
+          "ok": true,
+          "err_code": "",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "更新",
+            "blocks": [
+              {
+                "kind": "text",
+                "text": "新正文",
+                "checked": false
+              }
+            ],
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "update-1",
+            "note_id": "n-1",
+            "revision": 2,
+            "status": "committed"
+          }
+        }
+      },
+      "replay": {
+        "http": 200,
+        "value": {
+          "ok": false,
+          "err_code": "revision_conflict",
+          "err_detail": "2",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "更新",
+            "blocks": [
+              {
+                "kind": "text",
+                "text": "新正文",
+                "checked": false
+              }
+            ],
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "",
+            "note_id": "",
+            "revision": 0,
+            "status": ""
+          }
+        }
+      },
+      "stale": {
+        "http": 200,
+        "value": {
+          "ok": false,
+          "err_code": "revision_conflict",
+          "err_detail": "2",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "更新",
+            "blocks": [
+              {
+                "kind": "text",
+                "text": "新正文",
+                "checked": false
+              }
+            ],
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "work",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "",
+            "note_id": "",
+            "revision": 0,
+            "status": ""
+          }
+        }
+      }
+    },
+    "before_crash": {
+      "http": 200,
+      "value": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 2,
+          "title": "更新",
+          "blocks": [
+            {
+              "kind": "text",
+              "text": "新正文",
+              "checked": false
+            }
+          ],
+          "tags": [
+            "中文标签",
+            "emoji🎉"
+          ],
+          "color": "",
+          "pinned": false,
+          "state": "trashed",
+          "folder": "work",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    },
+    "restart_without_override": {
+      "http": 200,
+      "value": {
+        "ok": false,
+        "err_code": "second_writer",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "",
+          "revision": 0,
+          "title": "",
+          "blocks": [],
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": -1,
+          "seq": 0
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    },
+    "restart_forced": {
+      "http": 200,
+      "value": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 2,
+          "title": "更新",
+          "blocks": [
+            {
+              "kind": "text",
+              "text": "新正文",
+              "checked": false
+            }
+          ],
+          "tags": [
+            "中文标签",
+            "emoji🎉"
+          ],
+          "color": "",
+          "pinned": false,
+          "state": "trashed",
+          "folder": "work",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    },
+    "restore": {
+      "http": 200,
+      "value": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 2,
+          "title": "更新",
+          "blocks": [
+            {
+              "kind": "text",
+              "text": "新正文",
+              "checked": false
+            }
+          ],
+          "tags": [
+            "中文标签",
+            "emoji🎉"
+          ],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "work",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        }
+      }
+    },
+    "receipt_failure": {
+      "http": 200,
+      "value": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 2,
+          "title": "应确认收据",
+          "blocks": [
+            {
+              "kind": "text",
+              "text": "内容",
+              "checked": false
+            }
+          ],
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "work",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "update-blocked",
+          "note_id": "n-1",
+          "revision": 2,
+          "status": "committed"
+        }
+      },
+      "receipt_is_directory": true
+    },
+    "migration_null": {
+      "http": 200,
+      "value": {
+        "attempted": true,
+        "migrated": 1,
+        "skipped_existing": false,
+        "saved": true,
+        "err": "",
+        "backup_file": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-20261005\\migration-null/backup/notes.json.bak",
+        "corrupted": []
+      }
+    },
+    "migration_null_list": {
+      "http": 200,
+      "value": [
+        {
+          "schema_version": 1,
+          "note_id": "n-10",
+          "revision": 1,
+          "title": "前项",
+          "blocks": [
+            {
+              "kind": "text",
+              "text": "a",
+              "checked": false
+            }
+          ],
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 10,
+          "seq": 1
+        }
+      ]
+    },
+    "migration_lock_bypass": {
+      "open": {
+        "http": 200,
+        "value": {
+          "ok": false,
+          "err_code": "second_writer",
+          "err_detail": "",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "",
+            "revision": 0,
+            "title": "",
+            "blocks": [],
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": -1,
+            "seq": 0
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "",
+            "note_id": "",
+            "revision": 0,
+            "status": ""
+          }
+        }
+      },
+      "migrate": {
+        "http": 200,
+        "value": {
+          "attempted": true,
+          "migrated": 3,
+          "skipped_existing": false,
+          "saved": true,
+          "err": "",
+          "backup_file": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-20261005\\migration-locked/backup/notes.json.bak",
+          "corrupted": []
+        }
+      },
+      "manifest_created": true
+    },
+    "concurrent_revision": {
+      "calls": [
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "corrupt",
+            "err_detail": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-20261005\\concurrent/notes/n-1.r2.json",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "",
+              "revision": 0,
+              "title": "",
+              "blocks": [],
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "active",
+              "folder": "",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": -1,
+              "seq": 0
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "update-0",
+              "note_id": "n-1",
+              "revision": 2,
+              "status": "committed"
+            }
+          }
+        },
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "corrupt",
+            "err_detail": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-20261005\\concurrent/notes/n-1.r2.json",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "",
+              "revision": 0,
+              "title": "",
+              "blocks": [],
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "active",
+              "folder": "",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": -1,
+              "seq": 0
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "update-1",
+              "note_id": "n-1",
+              "revision": 2,
+              "status": "committed"
+            }
+          }
+        },
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "corrupt",
+            "err_detail": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-20261005\\concurrent/notes/n-1.r2.json",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "",
+              "revision": 0,
+              "title": "",
+              "blocks": [],
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "active",
+              "folder": "",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": -1,
+              "seq": 0
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "",
+              "note_id": "",
+              "revision": 0,
+              "status": ""
+            }
+          }
+        },
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "revision_conflict",
+            "err_detail": "2",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "n-1",
+              "revision": 2,
+              "title": "中文 🎉",
+              "blocks": [
+                {
+                  "kind": "text",
+                  "text": "第一行\n第二行",
+                  "checked": false
+                }
+              ],
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "active",
+              "folder": "work",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": 1,
+              "seq": 1
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "",
+              "note_id": "",
+              "revision": 0,
+              "status": ""
+            }
+          }
+        },
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "revision_conflict",
+            "err_detail": "2",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "n-1",
+              "revision": 2,
+              "title": "writer-1",
+              "blocks": [
+                {
+                  "kind": "text",
+                  "text": "body-1",
+                  "checked": false
+                }
+              ],
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "active",
+              "folder": "work",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": 1,
+              "seq": 1
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "",
+              "note_id": "",
+              "revision": 0,
+              "status": ""
+            }
+          }
+        },
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "revision_conflict",
+            "err_detail": "2",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "n-1",
+              "revision": 2,
+              "title": "writer-1",
+              "blocks": [
+                {
+                  "kind": "text",
+                  "text": "body-1",
+                  "checked": false
+                }
+              ],
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "active",
+              "folder": "work",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": 1,
+              "seq": 1
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "",
+              "note_id": "",
+              "revision": 0,
+              "status": ""
+            }
+          }
+        },
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "corrupt",
+            "err_detail": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-20261005\\concurrent/notes/n-1.r2.json",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "",
+              "revision": 0,
+              "title": "",
+              "blocks": [],
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "active",
+              "folder": "",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": -1,
+              "seq": 0
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "",
+              "note_id": "",
+              "revision": 0,
+              "status": ""
+            }
+          }
+        },
+        {
+          "http": 200,
+          "value": {
+            "ok": false,
+            "err_code": "corrupt",
+            "err_detail": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-20261005\\concurrent/notes/n-1.r2.json",
+            "doc": {
+              "schema_version": 1,
+              "note_id": "",
+              "revision": 0,
+              "title": "",
+              "blocks": [],
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "active",
+              "folder": "",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": -1,
+              "seq": 0
+            },
+            "receipt": {
+              "schema_version": 1,
+              "request_id": "",
+              "note_id": "",
+              "revision": 0,
+              "status": ""
+            }
+          }
+        }
+      ],
+      "final": {
+        "http": 200,
+        "value": {
+          "ok": false,
+          "err_code": "corrupt",
+          "err_detail": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-20261005\\concurrent/notes/n-1.r2.json",
+          "doc": {
+            "schema_version": 1,
+            "note_id": "",
+            "revision": 0,
+            "title": "",
+            "blocks": [],
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": -1,
+            "seq": 0
+          },
+          "receipt": {
+            "schema_version": 1,
+            "request_id": "",
+            "note_id": "",
+            "revision": 0,
+            "status": ""
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "reviewed_commit": "9158fd5e9fbe83629c79bb626242f18ea014c38a",
+  "base_commit": "28d5157b7ed8d4f49e55f835bf8a365d2f97a89a",
+  "plan_revision_reviewed": 2,
+  "plan_revision_handoff": 3,
+  "scope": "Review and plan revision only; no implementation fixes.",
+  "dependencies": {
+    "auto-lang-742": "bd1ae6ec93253687ee08424b0d621438b18ef7d2",
+    "auto-lang-main": "965b368a20db7c97fab7d1b0d51863b3ccca0f11",
+    "auto-down": "fba6563ed2148ce85e68208863159b4ccccac710"
+  },
+  "source_sha256": {
+    "src/back/repository.at": "6ff2486dc2a64ca5c372746df190a39013d6254bffad8e1107f125af5669f050",
+    "src/back/api.at": "94e5beb8b9f8428680a2f6e96c08ddae19ca773ae482dec7f65958e100f6ff38",
+    "src/back/db.at": "54dadb9045889514f8bc083704ee8b50c55aae385002e6b94519abc3aebfb81c",
+    "src/front/notes_store.at": "26d7a1b989ee1fed2a4be063a691623c7d767cf5db02b066bed1e0c6db2fef5e",
+    "src/front/editor.at": "333c583788796f28b2e59345e59f1e32f0a32007cd5a961ee7b8aeefcff61265",
+    "docs/design/01-product-design.md": "f71cd630e6990b0327587028344dd4a6fa44810e6b4a2a9f9fec5da93ba58152",
+    "docs/specs/notes/durable-inbox.md": "0c6288f24cbafece922d275351e396470158f85693f7a6a0e56878762eb32dbe",
+    "tests/probe/run_v1_battery.sh": "919e73d535e08fbf63cebd2cb30987792a73bdc539057a5072b03586c3eeec41"
+  },
+  "evidence_sha256": {
+    "extra-results.json": "ecc44ba32b5af82a0c09b528f38db13e45916f689bd91754e5fd05311656b0ee",
+    "playwright.log": "92bb93477acc66cb725e351f9bdf7abafd1d929f756a0f30b09594c1a3ff0293",
+    "README.md": "bc3890642b3c7c1d0e17adb0a6aa17a46071c26770fd92101b8a15ed9a632ab4",
+    "reproduce.py": "1d03668d38006cc86d67fdef8f92f0335d883e5cb3f917bdd18011ac3ccd0cf6",
+    "results.json": "1573cf94b46ac2bbbc993afd4122b8feee52ba1d5cd8ddbbc1be41802b3f64f2",
+    "run-playwright.py": "31fc93f4e9d1ab6c96c973273b073085d8dfbf29a3c398fc7f26be2df8953703",
+    "spec-delta-r2.md": "5325f9e8091304f4455ef00bdc412c4c16d7946aafb97406ff3793d28e9e3057",
+    "spec-delta-r3.md": "c5e9e7738be3d3689464d267c54d8e7d96c98aa14e038428a3a38929e0a64476"
+  },
+  "runtime": "Existing generated backend binary; no fresh generation/build in this review."
+}
