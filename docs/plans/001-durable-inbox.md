@@ -1,7 +1,7 @@
 ---
 plan_id: NOTES-001
 title: "可靠 Inbox、稳定标识与恢复"
-status: execution_done
+status: reviewed
 feature_name: "可靠 Inbox、稳定标识与恢复"
 author: [Codex]
 created_at: 2026-10-04T00:00:00Z
@@ -104,6 +104,8 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
   合入前 Notes 须以 lang-742 工具链构建（或 742 先行合入）。
   遗留：D-742-1 跨模块类型解析缺陷（绕开）；掉电窗口（manifest 非原子）。
   next：独立复审（/auto-plan:review）→ merge（含 742 合入顺序决策）。
+
+- stage: review | plan_id=NOTES-001 | plan_revision=2 | outcome=pass | reviewed_commit=notes:a84bce9(+impl c764364..e94163d on v0.6-dev) + auto-lang:bd1ae6ec9(plan-742-dev) | base_commit=28d5157b | dependency_revisions=auto-lang plan-742-dev@bd1ae6ec9(未合 master，Notes 构建依赖其 CLI/生成器), auto-down@fba6563, CLI=lang-742 worktree build | spec_inputs=docs/specs/notes/durable-inbox.md@1088e19(SD-01 add) | acceptance_results=AC-01 pass(kill后重启3条迁移笔记全恢复,review-s10-recovery.json;此前s9-crash-recovery.json n-1 rev2恢复) | AC-02 pass(S6同request_id同note_id;S9注入后无半成品收据+重试干净) | AC-03 pass(S1 3迁0损+幂等skip;S2 2迁1损坏入报告+备份+原件md5不变;S3按因拒绝) | AC-04 pass(S7陈旧写入conflict+内容保全;陈旧锁second_writer拒绝) | AC-05 pass(S5空目录0种子;smoke T6/T7;S8 trash→restore) | findings=F-1 low:tests/probe/evidence/v1/{wk,seeded,direct/data}为运行时目录未gitignore(不阻塞,建议merge时补); F-2 low:D-742-1跨模块类型解析与掉电窗口为已登记债务(spec 已载),非本计划范围失败; F-3 info:独立复审限制——同会话复审,但结论基于制品重建(battery 2026-10-05T10:00 重跑全绿+smoke 13/13 重跑+kill/restart 独立复现),非采信执行者摘要; tt 对比:修复分支29 vs 基线33(net -4,2个疑似差异隔离重跑 PASS=并发flake) | evidence=tests/probe/run_v1_battery.sh 输出(2026-10-05T10:00), tests/probe/evidence/v1/summary.txt, review-s10-recovery.json, smoke 13/13(2026-10-05T10:1x seeded-review 实例), auto-lang 742 测试+tt 对比 | next=merge(先合 auto-lang plan-742 → master,再推 notes v0.6-dev + 父仓 gitlink;清理 .wt/{lang-742,auto-notes-20261004-01} 前 wt-guard)
 
 - 实际起点HEAD/工作目录/工具版本：v0.6-dev@7ecfa5d（计划文档提交）；工具 auto CLI 0.1.0+v0.4.2-2564-g168b56923。工作目录按修订2调整：最初在 `D:/autostack/.wt/auto-notes-20261004-01/auto-notes`（分支 codex/auto-notes-20261004-01，T-00 提交 8078502），用户修订2后移植到本检出 v0.6-dev（cherry-pick 为 c764364）。原 worktree 保留未清理（wt-guard.sh 缺失，仓规禁止递归清理；后续任务不再使用）。
 - T0能力与阻塞报告：已完成，见 `tests/probe/CAPABILITY-REPORT.md`（含跨仓缺口登记：a2r facade 缺 time 再导出、fs.rename/read_dir 无 a2r 面、db.at 风格 `[]T` 字段转译缺陷）。无阻塞；协议设计按「journal 先行 + manifest 提交点 + 收据后置」修订，时间戳字段以持久化单调计数替代并显式 null。
