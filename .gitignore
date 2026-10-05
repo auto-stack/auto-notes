@@ -35,3 +35,4 @@ tests/probe/evidence/v1/direct/
 tests/probe/evidence/v1/*.db
 tests/probe/evidence/v1/*.db-wal
 tests/probe/evidence/v1/*.db-shm
+trans-r*.json
