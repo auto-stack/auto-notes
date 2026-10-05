@@ -79,6 +79,7 @@ pub type RepoResult = {
     err_detail: str
     doc: NoteDocument
     receipt: CaptureReceipt
+    replayed: bool
 }
 
 // ═══════════════════════════════════════════════════════════

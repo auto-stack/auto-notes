@@ -29,7 +29,8 @@ widget EditorPanel() {
     msg {
         EditTitle(str), EditBody(str),
         ShowTagInput, TagInputChanged(str), AddTag, RemoveTag(str),
-        SaveDraft, TogglePinActive, DeleteArmed, DeleteCancelled, DeleteConfirmed
+        SaveDraft, TogglePinActive, DeleteArmed, DeleteCancelled, DeleteConfirmed,
+        DiscardDraft, RecoverDraft, DiscardRecovery
     }
 
     model {
@@ -44,6 +45,25 @@ widget EditorPanel() {
             // ── 编辑头：标题 + 状态 + 动作 ───────────────────────────
             col {
                 style: "shrink-0 gap-2 px-8 pt-6 pb-3 border-b border-border"
+
+                // 恢复槽（SD-10）：冲突导航存下的未保存草稿，可恢复/放弃
+                if .store.has_recovery {
+                    row {
+                        style: "items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10"
+                        icon (name: "alert-triangle", size: 13, style: "text-amber-600")
+                        text "Unsaved draft kept aside" { style: "text-xs text-amber-700" }
+                        button {
+                            onclick: .RecoverDraft
+                            style: pill_btn
+                            text "Recover" { style: "text-xs" }
+                        }
+                        button {
+                            onclick: .DiscardRecovery
+                            style: ghost_btn
+                            text "Dismiss" { style: "text-xs" }
+                        }
+                    }
+                }
 
                 row {
                     style: "items-center gap-2"
@@ -63,9 +83,14 @@ widget EditorPanel() {
                             text "Save" { style: "text-xs font-medium" }
                         }
                         if .store.conflict {
-                            // SD-05：冲突可恢复——草稿未丢，点 Save 以当前草稿重试
-                            // 仍会失败，需切走再切回载入服务端版本后重新编辑。
+                            // SD-10：冲突双路径——Save 原样重试（丢响应场景同 rid
+                            // 幂等恢复）；「放弃」显式取服务器版本。
                             text "Conflict: server has a newer version" { style: "text-xs text-destructive" }
+                            button {
+                                onclick: .DiscardDraft
+                                style: ghost_btn
+                                text "Discard" { style: "text-xs" }
+                            }
                         }
                     } else {
                         text "Saved" { style: "text-xs text-muted-foreground/70" }
@@ -184,5 +209,8 @@ widget EditorPanel() {
         .DeleteArmed -> { store.DeleteArmed() }
         .DeleteCancelled -> { store.DeleteCancelled() }
         .DeleteConfirmed -> { store.DeleteConfirmed() }
+        .DiscardDraft -> { store.DiscardDraft() }
+        .RecoverDraft -> { store.RecoverDraft() }
+        .DiscardRecovery -> { store.DiscardRecovery() }
     }
 }

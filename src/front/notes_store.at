@@ -1,4 +1,4 @@
-// notes_store.at — 015-notes 单一状态源（PLAN-616 清爽化重做）。
+// notes_store.at — 015-notes 单一状态源（PLAN-616 清爽化重做 + NOTES-001 r4 T-15）。
 //
 // 设计要点（依据 PLAN-616 §4.2 在真实后端数据上的能力探针）：
 //
@@ -24,6 +24,15 @@
 //    并读到旧数据——实证：搜索在 Vue 端完全不过滤（VM 端 merged 模式调用同步，无此问题，
 //    所以只在 Vue 侧暴露）。纯同步小工具（ApplyFilter / LoadDraft / SelectFirstVisible /
 //    SeedVocab）仍可自由复用。
+//
+// 6. **r4 SD-10（T-15/F-R4-04）**：
+//    - 编辑意图稳定非空 rid：首次 EditTitle/EditBody 即取 next_request_id 并在整个草稿
+//      会话持有；保存失败/响应丢失后原样重试 = 同一意图（服务端按意图重放幂等）。
+//    - 任何动作（标签/置顶/筛选/切换/搜索/新建）在 flush 失败/冲突时**绝不**清
+//      draft/dirty、**绝不**用 LoadDraft 覆盖草稿；冲突下的导航把失败草稿存入恢复槽
+//      （has_recovery）后照常继续——本地与服务器版本都可恢复。
+//    - flush 成功后刷新 notes/revision 再 LoadDraft（防旧正文冒充已保存，F-R4-04 P2）。
+//    - create 返回 id==0 视为失败，不冒充成功选中空笔记。
 
 use back.api: list_notes, create_note, update_note, delete_note, toggle_pin, update_tags, search_notes, next_request_id
 
@@ -43,8 +52,7 @@ store NotesStore {
         var visible_notes []int = []
 
         // 标签 / 文件夹词表。模型字段而非 computed：旧写法 `computed all_tags => []` 恒空，
-        // 让筛选区那一行永远渲染成空白占位（PLAN-616 U4）。文件夹同理由笔记数据派生，
-        // 不再在视图里硬编码 Notes/Work/Personal 三组。
+        // 让筛选区那一行永远渲染成空白占位（PLAN-616 U4）。
         var all_tags []str = []
         var all_folders []str = []
 
@@ -56,16 +64,26 @@ store NotesStore {
         var draft_time str = ""
         var draft_folder str = ""
         var draft_pinned bool = false
-        // SD-05 结果契约：草稿会话的稳定 request_id（首次编辑时取，durable 后清；
-        // 失败/冲突保留 → 重试同一 request_id 幂等）。conflict=true 表示上次保存
-        // 被服务端拒绝（revision 陈旧），此时草稿与服务端版本都还在，可恢复/选择。
+        // SD-05/10：草稿会话的稳定请求意图（首次编辑即取非空 id，durable 后清；
+        // 失败/冲突保留 → 原样重试同一意图幂等）。conflict=true = 上次保存被拒。
         var draft_request_id str = ""
         var conflict bool = false
-        // 标签单独镜像一份：视图里 `for t in .store.draft_tags` 比遍历
-        // `.store.notes[.store.active_id].tags` 这种「下标 + 点路径」更可靠。
+        // 标签单独镜像一份：视图遍历 .store.draft_tags 比下标点路径可靠。
         var draft_tags []str = []
         var dirty bool = false
         var confirm_delete bool = false
+
+        // 恢复槽（SD-10）：冲突下导航时，失败草稿整体入槽，可恢复/放弃。
+        var has_recovery bool = false
+        var rec_id int = 0
+        var rec_revision int = 0
+        var rec_title str = ""
+        var rec_body str = ""
+        var rec_time str = ""
+        var rec_folder str = ""
+        var rec_pinned bool = false
+        var rec_tags []str = []
+        var rec_request_id str = ""
 
         // 主题（沿用 PLAN-360/458/601 机制：store 持有，负责 applyAccent 重放）
         var dark_mode bool = true
@@ -80,6 +98,7 @@ store NotesStore {
         DeleteArmed, DeleteConfirmed, DeleteCancelled, TogglePin(int), TogglePinActive,
         SetSearch(str), SelectFolder(str), SelectTag(str), ClearTag,
         TagAdded(str), TagRemoved(str),
+        StashDraft, RecoverDraft, DiscardRecovery, DiscardDraft,
         ToggleDarkMode, SetMode(str), SetAccent(str), ToggleSettings
     }
 
@@ -127,8 +146,7 @@ store NotesStore {
             }
         }
 
-        // 可见索引表：作用域（all / pinned / 具体文件夹）+ 标签两个维度，
-        // 单趟扫描产出两组下标。
+        // 可见索引表：作用域 + 标签两个维度，单趟扫描产出两组下标。
         .ApplyFilter -> {
             var pinned []int = []
             var plain []int = []
@@ -168,35 +186,35 @@ store NotesStore {
             .visible_notes = plain
         }
 
+        // LoadDraft 只在无未保存内容时装载（SD-10：冲突/草稿保护期绝不覆盖草稿）。
         .LoadDraft -> {
-            if .notes.len() > 0 {
-                .draft_id = .notes[.active_id].id
-                .draft_revision = .notes[.active_id].revision
-                .draft_title = .notes[.active_id].title
-                .draft_body = .notes[.active_id].body
-                .draft_time = .notes[.active_id].time
-                .draft_folder = .notes[.active_id].folder
-                .draft_pinned = .notes[.active_id].pinned
-                .draft_tags = .notes[.active_id].tags
-            } else {
-                // 无笔记时编辑栏不渲染（App 走空态），这里只清标量字段。
-                // 注意不要写 `.draft_tags = []`——空数组字面量赋值会撞 VM codegen
-                // 的 "Assignment to complex LHS" panic（见文件头 ②）。
-                .draft_id = 0
-                .draft_revision = 0
-                .draft_title = ""
-                .draft_body = ""
-                .draft_time = ""
-                .draft_folder = ""
-                .draft_pinned = false
+            if .dirty == false {
+                if .notes.len() > 0 {
+                    .draft_id = .notes[.active_id].id
+                    .draft_revision = .notes[.active_id].revision
+                    .draft_title = .notes[.active_id].title
+                    .draft_body = .notes[.active_id].body
+                    .draft_time = .notes[.active_id].time
+                    .draft_folder = .notes[.active_id].folder
+                    .draft_pinned = .notes[.active_id].pinned
+                    .draft_tags = .notes[.active_id].tags
+                } else {
+                    // 空数组字面量赋值会撞 VM codegen panic（文件头 ②），只清标量。
+                    .draft_id = 0
+                    .draft_revision = 0
+                    .draft_title = ""
+                    .draft_body = ""
+                    .draft_time = ""
+                    .draft_folder = ""
+                    .draft_pinned = false
+                }
+                .draft_request_id = ""
+                .conflict = false
             }
-            .dirty = false
-            .conflict = false
-            .draft_request_id = ""
             .confirm_delete = false
         }
 
-        // 切换作用域后把选中项落到第一条可见笔记，避免「编辑区显示列表外的笔记」。
+        // 切换作用域后把选中项落到第一条可见笔记。
         .SelectFirstVisible -> {
             if .visible_pinned.len() > 0 {
                 .active_id = .visible_pinned[0]
@@ -206,8 +224,68 @@ store NotesStore {
             .LoadDraft()
         }
 
+        // ── 恢复槽（SD-10）─────────────────────────────────────────────────
+
+        // 当前编辑器内容入恢复槽（单槽，后入覆盖）。
+        .StashDraft -> {
+            .has_recovery = true
+            .rec_id = .draft_id
+            .rec_revision = .draft_revision
+            .rec_title = .draft_title
+            .rec_body = .draft_body
+            .rec_time = .draft_time
+            .rec_folder = .draft_folder
+            .rec_pinned = .draft_pinned
+            .rec_tags = .draft_tags
+            .rec_request_id = .draft_request_id
+        }
+
+        // 恢复：回到该笔记（列表找得到时）并装载草稿；dirty/conflict 复原，
+        // 同 rid 原样重试。
+        .RecoverDraft -> {
+            if .dirty {
+                .StashDraft()
+            }
+            var found bool = false
+            var i int = 0
+            for n in .notes {
+                if n.id == .rec_id {
+                    .active_id = i
+                    found = true
+                }
+                i = i + 1
+            }
+            .draft_id = .rec_id
+            .draft_revision = .rec_revision
+            .draft_title = .rec_title
+            .draft_body = .rec_body
+            .draft_time = .rec_time
+            .draft_folder = .rec_folder
+            .draft_pinned = .rec_pinned
+            .draft_tags = .rec_tags
+            .draft_request_id = .rec_request_id
+            .dirty = true
+            .conflict = true
+            .has_recovery = false
+            .ApplyFilter()
+        }
+
+        .DiscardRecovery -> {
+            .has_recovery = false
+        }
+
+        // 放弃当前草稿 = 显式选择服务器版本。
+        .DiscardDraft -> {
+            .dirty = false
+            .conflict = false
+            .draft_request_id = ""
+            .LoadDraft()
+            .ApplyFilter()
+        }
+
         // ── 入口 handler（API 调用内联，见文件头 ⑤）────────────────────────
 
+        // 冲突下导航不被阻止：失败草稿入恢复槽后照常切换（SD-10）。
         .SelectNote(i) -> {
             if .dirty {
                 if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
@@ -219,26 +297,35 @@ store NotesStore {
                     } else {
                         .notes = search_notes(.search)
                     }
+                    .active_id = i
+                    .LoadDraft()
                 } else {
-                    // 冲突/失败：草稿保留（dirty 不清），服务端版本仍在 .notes；
-                    // 不切换选中项，避免草稿被 LoadDraft 冲掉。
                     .conflict = true
+                    .StashDraft()
+                    .dirty = false
+                    .active_id = i
+                    .LoadDraft()
                 }
-            }
-            if .conflict == false {
-                .dirty = false
+            } else {
                 .active_id = i
                 .LoadDraft()
             }
         }
 
+        // 编辑意图：首次编辑取稳定非空 rid（响应丢失后原样重试 = 同一意图）。
         .EditTitle(v) -> {
             .draft_title = v
+            if .draft_request_id == "" {
+                .draft_request_id = next_request_id("ui-edit")
+            }
             .dirty = true
         }
 
         .EditBody(v) -> {
             .draft_body = v
+            if .draft_request_id == "" {
+                .draft_request_id = next_request_id("ui-edit")
+            }
             .dirty = true
         }
 
@@ -256,6 +343,8 @@ store NotesStore {
                     .LoadDraft()
                     .ApplyFilter()
                 } else {
+                    // 冲突/失败：草稿保留（dirty 保持），Save 仍在——丢响应场景
+                    // 原样重试即恢复（同 rid 幂等）；真冲突可「放弃」选服务器版。
                     .conflict = true
                 }
             } else {
@@ -276,11 +365,12 @@ store NotesStore {
                     }
                 } else {
                     .conflict = true
+                    .StashDraft()
+                    .dirty = false
                 }
             }
             if .conflict == false {
-                .dirty = false
-                // 清掉搜索：新笔记标题为空，在有搜索词时不会命中，会导致「新建了却看不见」。
+                // 清掉搜索：新笔记标题为空，有搜索词时看不见
                 .search = ""
                 var f str = ""
                 if .active_folder != "all" {
@@ -289,15 +379,20 @@ store NotesStore {
                     }
                 }
                 var rid str = next_request_id("ui-new")
-                create_note("", "", f, rid)
-                .notes = list_notes()
-                .active_id = 0
-                .LoadDraft()
-                .ApplyFilter()
+                var created Note = create_note("", "", f, rid)
+                if created.id == 0 {
+                    // 创建失败不冒充成功（SD-10）
+                    .conflict = true
+                } else {
+                    .notes = list_notes()
+                    .active_id = 0
+                    .LoadDraft()
+                    .ApplyFilter()
+                }
             }
         }
 
-        // 删除改为两步：先武装确认，再确认才真删。
+        // 删除两步：先武装确认，再确认才真删。
         .DeleteArmed -> {
             .confirm_delete = true
         }
@@ -325,15 +420,13 @@ store NotesStore {
         .TogglePin(idx) -> {
             if idx < .notes.len() {
                 // 先读进局部量再取反：a2r 对「取反 + 下标字段读」的 RHS 会发射出
-                // 残缺表达式（`!(as usize]["pinned"]...)`，Rust 轨编译失败。
+                // 残缺表达式（Rust 轨编译失败）。
                 var cur bool = .notes[idx].pinned
                 .notes[idx].pinned = !cur
             }
         }
 
-        // 置顶落库（旧实现只翻转本地内存，刷新即丢，见 PLAN-616 U7）。
-        // 不做本地预翻转：merged 模式下 store 与后端共享同一份笔记对象，
-        // 本地翻转会被 toggle_pin 再翻一次（净零）。
+        // 置顶落库：dirty 先 flush；冲突时不动作、不清草稿。
         .TogglePinActive -> {
             if .notes.len() > 0 {
                 if .dirty {
@@ -346,7 +439,7 @@ store NotesStore {
                     }
                 }
                 if .conflict == false {
-                        toggle_pin(.notes[.active_id].id)
+                    toggle_pin(.notes[.active_id].id)
                     if .search == "" {
                         .notes = list_notes()
                     } else {
@@ -358,8 +451,7 @@ store NotesStore {
             }
         }
 
-        // 搜索词由输入事件实参显式带入（不依赖双向绑定写入时序——VM 端
-        // 程序化输入不回填绑定状态，实证见 PLAN-616 T-05 执行记录）。
+        // 搜索：冲突时草稿入恢复槽后照常导航（SD-10）。
         .SetSearch(q) -> {
             if .dirty {
                 if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
@@ -368,37 +460,39 @@ store NotesStore {
                     .draft_request_id = ""
                 } else {
                     .conflict = true
+                    .StashDraft()
+                    .dirty = false
                 }
             }
-            if .conflict == false {
-                .search = q
-                if .search == "" {
-                    .notes = list_notes()
-                } else {
-                    .notes = search_notes(.search)
-                }
-                .active_id = 0
-                .LoadDraft()
-                .ApplyFilter()
+            .search = q
+            if .search == "" {
+                .notes = list_notes()
+            } else {
+                .notes = search_notes(.search)
             }
+            .active_id = 0
+            .LoadDraft()
+            .ApplyFilter()
         }
 
+        // 筛选切换：flush 成功后**刷新 notes**（防旧正文冒充已保存——F-R4-04 P2）。
         .SelectFolder(f) -> {
             if .dirty {
                 if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
                     .dirty = false
                     .conflict = false
                     .draft_request_id = ""
+                    .notes = list_notes()
                 } else {
                     .conflict = true
+                    .StashDraft()
+                    .dirty = false
                 }
             }
-            if .conflict == false {
-                .active_folder = f
-                .active_tag = ""
-                .ApplyFilter()
-                .SelectFirstVisible()
-            }
+            .active_folder = f
+            .active_tag = ""
+            .ApplyFilter()
+            .SelectFirstVisible()
         }
 
         .SelectTag(t) -> {
@@ -407,16 +501,17 @@ store NotesStore {
                     .dirty = false
                     .conflict = false
                     .draft_request_id = ""
+                    .notes = list_notes()
                 } else {
                     .conflict = true
+                    .StashDraft()
+                    .dirty = false
                 }
             }
-            if .conflict == false {
-                .active_tag = t
-                .active_folder = "all"
-                .ApplyFilter()
-                .SelectFirstVisible()
-            }
+            .active_tag = t
+            .active_folder = "all"
+            .ApplyFilter()
+            .SelectFirstVisible()
         }
 
         .ClearTag -> {
@@ -425,19 +520,31 @@ store NotesStore {
                     .dirty = false
                     .conflict = false
                     .draft_request_id = ""
+                    .notes = list_notes()
                 } else {
                     .conflict = true
+                    .StashDraft()
+                    .dirty = false
                 }
             }
-            if .conflict == false {
-                .active_tag = ""
-                .ApplyFilter()
-                .SelectFirstVisible()
-            }
+            .active_tag = ""
+            .ApplyFilter()
+            .SelectFirstVisible()
         }
 
+        // 标签动作基于服务器当前版本执行；dirty 先 flush，失败时动作继续但
+        // **绝不清草稿**（LoadDraft 由 dirty 守卫挡住）——F-R4-04 主诉。
         .TagAdded(t) -> {
             if .notes.len() > 0 {
+                if .dirty {
+                    if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                        .dirty = false
+                        .conflict = false
+                        .draft_request_id = ""
+                    } else {
+                        .conflict = true
+                    }
+                }
                 var tl []str = []
                 var exists bool = false
                 for tg in .notes[.active_id].tags {
@@ -471,6 +578,15 @@ store NotesStore {
 
         .TagRemoved(t) -> {
             if .notes.len() > 0 {
+                if .dirty {
+                    if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                        .dirty = false
+                        .conflict = false
+                        .draft_request_id = ""
+                    } else {
+                        .conflict = true
+                    }
+                }
                 var tl []str = []
                 for tg in .notes[.active_id].tags {
                     if tg != t {
@@ -492,10 +608,8 @@ store NotesStore {
             .dark_mode = !.dark_mode
         }
 
-        // 显式模式（外观面板的 Dark/Light 两键）——避免「点 Dark 反而切到 Light」。
-        // 真正需要翻转时走 ToggleDarkMode：生成器只给 SetAccent/ToggleDarkMode
-        // 追加 applyAccent（含暗色亮度补偿 + .dark 元素上的 --primary 覆盖），
-        // 直接写 dark_mode 会漏掉主题色重放（T12-DARK 契约）。
+        // 显式模式（外观面板 Dark/Light 两键）——走 ToggleDarkMode 保持
+        // applyAccent 重放（T12-DARK 契约）。
         .SetMode(m) -> {
             if m == "dark" {
                 if .dark_mode == false {

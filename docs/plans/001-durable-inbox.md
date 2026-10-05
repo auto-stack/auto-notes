@@ -7,7 +7,7 @@ author: [Codex]
 created_at: 2026-10-04T00:00:00Z
 updated_at: 2026-10-05T22:45:00+08:00
 plan_revision: 4
-current_step: 4
+current_step: 8
 total_steps: 17
 created: 2026-10-04
 base_branch: v0.6-dev
@@ -115,11 +115,11 @@ T-00先行；T-01→T-02→T-03→T-04顺序实施。T-00输出能力报告，T-
 
 依赖：T-12/T-13/T-14 可独立修复仓储；T-15 依赖 T-14 的稳定收据契约；T-16 最后整体验证。保持 app 仓与纯.at范围；框架修改只能另立依赖计划。
 
-- [ ] T-12: 补齐 Phase 1→SQLite 安全升级。核对 `repository.at:open_repository`、旧 manifest/notes/*.json/receipts 布局与本仓冻结旧证据；实现事务化导入并保留旧副本，完整保留正文（旧blocks→body）、标签、状态、置顶、folder、note_id、revision、legacy_id 和请求映射。探测到旧已保存数据时不能静默创建空库；失败给结构化错误并保留原件，重启/重试不重复。验证：隔离复制旧提交的 wedge-snapshot，升级后 n-1 rev2/body two 可读，元数据/收据一致，再正常重启/硬杀读回；新增中文、多行、trash和损坏实体样本。覆盖 AC-01/03、F-R4-01，重验 T-02/T-07；不得再以“旧数据仅测试”为由缩减契约。
-- [ ] T-13: 完整迁移损坏报告及 Unicode 安全。修正 `migrate_legacy_at` 中 null 记录分支、snippet/salvage 中 char_at 与字节sub混用、报告COMMIT后写且忽略结果的问题。优先将损坏记录作为迁移事务内的可靠数据保存，外部报告输出按已验证协议保证可重试，不能先标 migrated 再丢掉报告；严格校验顶层数组及整数/标题/标签等类型。验证 `[valid,null,valid]`→migrated=2/corrupted=1、长中文/emoji坏项不panic且后项可迁、报告路径预建目录→失败/可恢复重试而非saved=true、原件hash不变；报告成功后重跑幂等。覆盖 AC-03、F-R4-02，重验 T-01/T-08。
-- [ ] T-14: 持久请求意图与原收据。修改 requests schema（含已有SQLite的版本迁移）、`replay_in_txn`、create/update及返回结果：存实际目标/操作/规范化意图与提交revision/收据；完全相同请求返回原收据，后续文档变更不能改写历史receipt；同rid用于另一笔记/操作/内容明确失败，不能以ok=true为未执行的新操作确认。补 update 的COMMIT前/后注入与真重启；修改id序列时确保原子分配和错误可见。验证 update-1 rev2→update-2 rev3→重放update-1仍receipt.rev2；rid从createA复用于updateB拒绝、B不变；幂等重试无重复。覆盖 AC-02/04、F-R4-03，重验 T-02/T-07/T-10。
-- [ ] T-15: 草稿意图、冲突恢复与动作保护。修改 `notes_store.at`/`editor.at` 及adapter必要结果契约：编辑意图分配并保存非空rid，响应丢失后相同意图重试复用；变更内容需明确新意图。所有标签、置顶、筛选、切换、新建动作不得在失败/冲突下清draft/dirty；保留本地与最新服务器内容并提供实际可用的恢复/选择路径，不能只提示冲突却阻止切换且用Tag清掉草稿。成功flush后刷新notes/revision再LoadDraft。Vue/VM验证：双客户端A成功B冲突→B加/删标签后草稿仍可恢复；COMMIT后丢HTTP响应→同rid重试成功；文件夹flush后重选显示已保存正文；失败创建/元数据错误不冒充成功。覆盖 AC-02/04/05、F-R4-04，重验 T-04/T-09。
-- [ ] T-16: 回归门与提交/依赖证据。保留现有18项Vue成功回归，新增上列真实负例与升级/长Unicode/原收据/双UI/响应丢失的断言；battery显式UTF-8，覆盖update故障、null报告与同fault request_id重放，不能只测不同request_id。按原T-11完成 `auto run` 与 `auto run -r vm` 的保存冲突/恢复实际验收；修订Spec增量，固定AutoDown gitlink和AutoLang工具链提交，使用合并后的可复现工具链重建；保留他人WIP不混入提交。全部AC与delta通过后才复审并归档，更新current_step和checkbox。覆盖 AC-01–05/F-R4-05，重验 T-11。
+- [x] T-12: 补齐 Phase 1→SQLite 安全升级。核对 `repository.at:open_repository`、旧 manifest/notes/*.json/receipts 布局与本仓冻结旧证据；实现事务化导入并保留旧副本，完整保留正文（旧blocks→body）、标签、状态、置顶、folder、note_id、revision、legacy_id 和请求映射。探测到旧已保存数据时不能静默创建空库；失败给结构化错误并保留原件，重启/重试不重复。验证：隔离复制旧提交的 wedge-snapshot，升级后 n-1 rev2/body two 可读，元数据/收据一致，再正常重启/硬杀读回；新增中文、多行、trash和损坏实体样本。覆盖 AC-01/03、F-R4-01，重验 T-02/T-07；不得再以“旧数据仅测试”为由缩减契约。
+- [x] T-13: 完整迁移损坏报告及 Unicode 安全。修正 `migrate_legacy_at` 中 null 记录分支、snippet/salvage 中 char_at 与字节sub混用、报告COMMIT后写且忽略结果的问题。优先将损坏记录作为迁移事务内的可靠数据保存，外部报告输出按已验证协议保证可重试，不能先标 migrated 再丢掉报告；严格校验顶层数组及整数/标题/标签等类型。验证 `[valid,null,valid]`→migrated=2/corrupted=1、长中文/emoji坏项不panic且后项可迁、报告路径预建目录→失败/可恢复重试而非saved=true、原件hash不变；报告成功后重跑幂等。覆盖 AC-03、F-R4-02，重验 T-01/T-08。
+- [x] T-14: 持久请求意图与原收据。修改 requests schema（含已有SQLite的版本迁移）、`replay_in_txn`、create/update及返回结果：存实际目标/操作/规范化意图与提交revision/收据；完全相同请求返回原收据，后续文档变更不能改写历史receipt；同rid用于另一笔记/操作/内容明确失败，不能以ok=true为未执行的新操作确认。补 update 的COMMIT前/后注入与真重启；修改id序列时确保原子分配和错误可见。验证 update-1 rev2→update-2 rev3→重放update-1仍receipt.rev2；rid从createA复用于updateB拒绝、B不变；幂等重试无重复。覆盖 AC-02/04、F-R4-03，重验 T-02/T-07/T-10。
+- [x] T-15: 草稿意图、冲突恢复与动作保护。修改 `notes_store.at`/`editor.at` 及adapter必要结果契约：编辑意图分配并保存非空rid，响应丢失后相同意图重试复用；变更内容需明确新意图。所有标签、置顶、筛选、切换、新建动作不得在失败/冲突下清draft/dirty；保留本地与最新服务器内容并提供实际可用的恢复/选择路径，不能只提示冲突却阻止切换且用Tag清掉草稿。成功flush后刷新notes/revision再LoadDraft。Vue/VM验证：双客户端A成功B冲突→B加/删标签后草稿仍可恢复；COMMIT后丢HTTP响应→同rid重试成功；文件夹flush后重选显示已保存正文；失败创建/元数据错误不冒充成功。覆盖 AC-02/04/05、F-R4-04，重验 T-04/T-09。
+- [ ] T-16: 回归门与提交/依赖证据。（应用侧门完成：battery S0-S14 EXIT=0 + Vue 16/16 + 依赖登记；VM 验收被 D-VM-SQLITE 阻塞，见 work 记录 8）保留现有18项Vue成功回归，新增上列真实负例与升级/长Unicode/原收据/双UI/响应丢失的断言；battery显式UTF-8，覆盖update故障、null报告与同fault request_id重放，不能只测不同request_id。按原T-11完成 `auto run` 与 `auto run -r vm` 的保存冲突/恢复实际验收；修订Spec增量，固定AutoDown gitlink和AutoLang工具链提交，使用合并后的可复现工具链重建；保留他人WIP不混入提交。全部AC与delta通过后才复审并归档，更新current_step和checkbox。覆盖 AC-01–05/F-R4-05，重验 T-11。
 
 ## 6. 测试设计
 
@@ -154,6 +154,36 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
 
 ## 9. 复审记录
 
+- work 记录 8（r4 第 1 批，T-12/T-13/T-14/T-15 + T-16 应用侧门）：stage=work | plan_id=NOTES-001 | plan_revision=4 | outcome=executing（T-16 的 VM 验收项被框架缺口阻塞，详见 D-VM-SQLITE） | code_commit=本批 | task_ids=T-12, T-13, T-14, T-15, T-16(部分) | evidence=tests/probe/evidence/r4-final/（电池 S0-S14 全绿 EXIT=0，19 断言，含 S11 update故障回滚+同rid重试 / S12 跨目标 request_conflict / S13 原收据不漂移(rev2≠rev3) / S14 null 报告）、tests/negatives-r4.spec.ts（Vue 负例 3/3：B冲突后加标签草稿存活、丢响应同意图重试恢复、flush 后筛选切回显示已保存正文）、smoke 13/13（2026-10-06T01:1x）、T-12 升级实证（wedge-snapshot 复制→启动→n-1 rev2 body two 可读+d-2 收据重放 rev2+kill/重启存活）、T-13 实证（[valid,null,valid]→2+1+报告；中文长项省略 snippet 不 panic；报告路径为文件→saved=false 可重试→修复后成功+幂等） | blockers=D-VM-SQLITE（见下） | next=T-16 收尾：VM 验收等依赖计划，其余全部就绪待独立复审
+
+  T-12（F-R4-01）：open_repository 挂 upgrade_if_legacy——空库+探测到 manifest.json 时
+  BEGIN IMMEDIATE 内导入 entries（blocks→body 多块换行连接）、receipts/ 经 D9 fs.dir_names
+  枚举导入请求映射（旧行 intent/doc 通配）；旧树整体复制 legacy-backup/；坏实体记
+  meta.corrupted_r1 跳过不终止；upgraded 占位防重复；manifest 不可读→ROLLBACK+结构化错误。
+  T-13（F-R4-02）：报告/插入平级重构（null 也报告）；严格顶层/ title/tags 类型校验；
+  snippet 超 400 字节省略内容（不再非边界 sub）；**salvage v4**=字符索引扫描+char_w
+  UTF-8 宽度同步字节偏移（长中文/emoji 安全，python 逐位复刻对拍）；报告与
+  meta.corrupted_r1 先于 COMMIT，写失败→ROLLBACK 可重试。
+  T-14（F-R4-03）：requests schema v2（rev/doc_json/intent 列，ALTER 兼容旧库）；
+  意图串 create/update 规范化；重放校验 kind/目标/意图——匹配返回**存储的原收据+
+  文档快照**（后续变更不改写历史），不一致 request_conflict（ok=false）；update 消费
+  NOTES_FAULT（after_entity 回滚/after_manifest 报失败）。
+  T-15（F-R4-04）：EditTitle/EditBody 首次编辑取稳定 rid（响应丢失原样重试=同意图）；
+  全动作冲突路径不清 draft/dirty（LoadDraft 由 dirty 守卫）；冲突导航=草稿入恢复槽
+  （StashDraft/RecoverDraft/DiscardRecovery）照常切换；Editor 冲突提供 Discard
+  （显式取服务器版）+ 恢复槽横幅；flush 成功后刷新 notes（修 P2 旧正文冒充）；
+  NewNote create id==0 不冒充成功。
+  D9 依赖：fs.dir_names（742 14e642773+67d655f76，v0.6-dev facade 37235c8d+0c0702e6；
+  list_dir 名被 Plan-626 VM walk 面占用，避让改名）。
+
+  **D-VM-SQLITE（新登记依赖项，阻塞 T-16 VM 验收）**：`auto run -r vm` 与 `-r vm --server
+  rust` 均 boot 失败——VM DynamicComponent 链接整个模块图（merged 桥接把 repository.at
+  一并链接），报 `Undefined symbol: sqlite.open in module App`；VM 侧无 sqlite 模块实现，
+  非 app 仓 pure-.at 可修。需要独立依赖计划：VM sqlite 模块或链接图拆分（store 经 HTTP
+  调后端）。boot 日志留存 /tmp/vm-run.log、/tmp/vm-run2.log（会话内）。
+  依赖状态：AutoDown 实际检出 96f095b（已提交于 auto-down Blueprint 分支），gitlink 待
+  父仓推进（T-16 残留）；AutoLang 工具链=worktree 742@14e642773（CLI）+ v0.6-dev@0c0702e6
+  （运行时 facade）。
 - stage: review | plan_id=NOTES-001 | plan_revision=3 | outcome=pass | reviewed_commit=29b8824b16c5c9a0ddcc952020c347a0567cfe87 | base_commit=e42eab0（r3 重开点） | dependency_revisions=auto-lang plan-742-dev@9f6481e8c（CLI/worktree，6 commits 未合）, auto-lang v0.6-dev 运行时直补 ed2d00b90+1cd4af1cf, auto-down@fba6563+engine files 未提交补丁 | spec_inputs=docs/specs/notes/durable-inbox.md@e812ac5（SD-02..06 落地版）, 冻结 delta spec-delta-r3.md SHA256=c5e9e7738be3d3689464d267c54d8e7d96c98aa14e038428a3a38929e0a64476（复核一致） | acceptance_results=AC-01 pass（S10 全新采证：kill PID→重启→「崩溃前」存活+同 rid 重放 committed；S7b 8并发单写者） | AC-02 pass（电池 S6 同 rid 同 note_id=n-1；S9 after_entity/after_manifest 无虚假收据+重试干净） | AC-03 pass（S1 3迁0损+幂等skip；S2 2+1+备份+原件md5不变+report-r1.json落盘；S3 index/reason/snippet+报告文件） | AC-04 pass（S7 陈旧写入 conflict+内容保全；S7b 8→1成功7冲突） | AC-05 pass（S4 空档0迁；S5 全新目录无种子；S8 trash→hidden→restore；smoke T6/T7） | findings=F-R3-1 medium(测试环境耦合,非AC失败): 电池需 NOTES_TEST_MODE=1 且 NOTES_SEED 未设的专用实例——NOTES_SEED=1 实例会对每个 setup 新目录注入种子（T-03 设计行为），电池 S1-S5/S9 全数 skipped_existing（本次复审首跑实证 8 失败，专用实例 EXIT=0）；且单进程 env 全局，电池/冒烟/场景混跑同实例会互相污染（seeded-r3 曾混入 S9 场景笔记）。修复=电池头注补一行「NOTES_SEED 必须未设」+复审运行手册注明单实例单用途（merge 时并入，2 行文档） | F-R3-2 low: 后端端口被占时 bind 失败 panic（exit 101）而非优雅报错（僵尸实例排障时两次观察，开发期健壮性） | F-R3-3 low(债务,已登记): VM/MCP 保存冲突场景与 T14 parity 本轮未重跑（UI 视觉增量仅条件态冲突提示一行） | F-R3-4 info: 跨仓合入顺序已定——① vendor/auto-down 提交 engine files 补丁 ② auto-lang plan-742 合 v0.6-dev（sqlite.rs 与直补 ed2d00b90 内容相同，冲突取任一；742 额外带 qualify/D8/路由）③ notes 以合并后工具链重建验证 ④ 父仓 gitlink 登记 | evidence=tests/probe/evidence/review-r3/（电池全新重跑 EXIT=0, S0-S9）、门禁负例（17821 无 NOTES_TEST_MODE 实例 setup/fault 均 test-mode-disabled，业务端点正常）、S10 全新 kill/restart 采证、smoke 13/13（2026-10-05T17:0x, seeded-r3 干净实例 6 种子核验后重跑）、生成码对照（BEGIN IMMEDIATE×4=crate/update/set_meta/migrate；requests 同事务×2；valid_request_id 调用点；sql_str×17；NOTES_TEST_MODE 门禁 db.rs:125/192；TEMP 端点 0 残留；frozen delta SHA256 复核一致） | 复审独立性声明: 本复审在实施会话内完成（无独立上下文授权），结论全部由制品重建——电池/门禁/S10/冒烟均为本复审全新执行，非采信实施者摘要；实施期失败（首跑 8 失败）如实入档 | next=merge（按 F-R3-4 顺序：vendor→742→notes 重建验证→gitlink），merge 时并入 F-R3-1 两行文档
 - work 记录 7（r3 第 2 批，T-09/T-10/T-11）：stage=work（待独立复审） | plan_id=NOTES-001 | plan_revision=3 | outcome=pass（实现+采证完成） | code_commit=45d748a（T-09/T-10）+ 本批（seed/req_seq/pinned-bool/电池/spec） | task_ids=T-09, T-10, T-11 | evidence=tests/probe/evidence/v1-r3-final/（修订电池 S0-S9 全绿 EXIT=0，含 S0 rid 负例 + S7b 8并发 1 成功 7 conflict）、Playwright smoke 13/13（2026-10-05T16:1x，seeded-r3 隔离目录）、spec-delta-r3.md SD-02..06 落地至 docs/specs/notes/durable-inbox.md | blockers=无 | next=独立复审（/auto-plan:review）→ 通过后 merge/归档/push
 

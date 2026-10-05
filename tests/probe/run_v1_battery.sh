@@ -12,6 +12,7 @@
 #   OUTDIR 缺省为 mktemp 隔离目录（修复复审指出的「写死 wk/OUTDIR 不隔离」）。
 # 退出码：任一断言失败 → 1（修复「失败被 tee 掩盖」）；全部通过 → 0。
 set -u
+export PYTHONUTF8=1
 BASE=${BASE:-http://localhost:17819}
 OUT=${1:-$(mktemp -d "${TMPDIR:-/tmp}/notes-battery-XXXXXX")}
 FIX="tests/fixtures/inbox/legacy-v0"
@@ -275,6 +276,100 @@ assert l==[], l
 assert f2['ok']==False and f2['err_code']=='fault_injected', f2
 assert rt['ok'] and rt['receipt']['status']=='committed', rt
 print('[S9] fault leaves no success receipt; retry lands cleanly ✓ (AC-02)')
+" | tee -a "$SUM"
+
+# ── T-16 场景 S11：update 故障注入（F-R4-03：update 也消费 NOTES_FAULT）──
+D11="$work/t14-ufault"; D11W="$work_win/t14-ufault"; mkdir -p "$D11/data"
+setup "$D11W/data" "$D11W/nope.json" > /dev/null
+payload "$work/p11c.json" <<'JSONEOF'
+{"request_id":"uf-c1","title":"故障前的更新","body":"v1","folder":""}
+JSONEOF
+curl -s -m 10 -X POST "$BASE/api/v1/notes" -H "Content-Type: application/json" --data-binary @"$work/p11c.json" -o "$OUT/s11-create.json"
+nid11=$(jq_get "$OUT/s11-create.json" "d['doc']['note_id']")
+rev11=$(jq_get "$OUT/s11-create.json" "d['doc']['revision']")
+curl -s -m 10 -X POST "$BASE/api/v1/test/fault" -H "Content-Type: application/json" -d '{"stage":"after_entity"}' -o /dev/null
+payload "$work/p11u.json" <<JSONEOF
+{"expected_revision":$rev11,"title":"update故障","body":"x","request_id":"uf-u1"}
+JSONEOF
+curl -s -m 10 -X PUT "$BASE/api/v1/notes/$nid11" -H "Content-Type: application/json" --data-binary "@$work/p11u.json" -o "$OUT/s11-ufault.json"
+curl -s -m 10 -X POST "$BASE/api/v1/test/fault" -H "Content-Type: application/json" -d '{"stage":"off"}' -o /dev/null
+curl -s -m 10 "$BASE/api/v1/notes/$nid11" -o "$OUT/s11-after.json"
+payload "$work/p11r.json" <<JSONEOF
+{"expected_revision":$rev11,"title":"update故障","body":"x","request_id":"uf-u1"}
+JSONEOF
+curl -s -m 10 -X PUT "$BASE/api/v1/notes/$nid11" -H "Content-Type: application/json" --data-binary "@$work/p11r.json" -o "$OUT/s11-retry.json"
+assert_py "S11 update fault rollback + retry" "
+f=json.load(open(OUT+'/s11-ufault.json'))
+assert f['ok']==False and f['err_code']=='fault_injected', f
+after=json.load(open(OUT+'/s11-after.json'))
+assert after['doc']['title']=='故障前的更新' and after['doc']['revision']==$rev11, after
+rt=json.load(open(OUT+'/s11-retry.json'))
+assert rt['ok'] and rt['doc']['revision']==$rev11+1, rt
+print('[S11] update fault: rollback无痕 + 同rid重试落地 ✓')
+" | tee -a "$SUM"
+
+# ── T-16 场景 S12/S13：同 rid 跨目标拒绝 + 原收据不漂移（SD-09）─────────────
+D13="$work/t14-rid"; D13W="$work_win/t14-rid"; mkdir -p "$D13/data"
+setup "$D13W/data" "$D13W/nope.json" > /dev/null
+payload "$work/p13a.json" <<'JSONEOF'
+{"request_id":"rid-A","title":"A-doc","body":"a","folder":""}
+JSONEOF
+curl -s -m 10 -X POST "$BASE/api/v1/notes" -H "Content-Type: application/json" --data-binary @"$work/p13a.json" -o "$OUT/s13-a.json"
+nidA=$(jq_get "$OUT/s13-a.json" "d['doc']['note_id']")
+revA=$(jq_get "$OUT/s13-a.json" "d['doc']['revision']")
+payload "$work/p13x.json" <<'JSONEOF'
+{"expected_revision":1,"title":"impersonate-A","body":"x","request_id":"rid-A"}
+JSONEOF
+curl -s -m 10 -X PUT "$BASE/api/v1/notes/n-2" -H "Content-Type: application/json" --data-binary "@$work/p13x.json" -o "$OUT/s12-cross.json"
+# 先确保存在第二个目标（无则建）
+curl -s -m 10 -X POST "$BASE/api/v1/notes" -H "Content-Type: application/json" --data-binary '{"request_id":"rid-B","title":"B-doc","body":"b","folder":""}' -o /dev/null
+curl -s -m 10 -X PUT "$BASE/api/v1/notes/n-2" -H "Content-Type: application/json" --data-binary "@$work/p13x.json" -o "$OUT/s12-cross.json"
+# update-1 / update-2 / 原样重放 update-1 → 原收据
+payload "$work/p13u1.json" <<JSONEOF
+{"expected_revision":$revA,"title":"A-upd1","body":"u1","request_id":"rid-u1"}
+JSONEOF
+curl -s -m 10 -X PUT "$BASE/api/v1/notes/$nidA" -H "Content-Type: application/json" --data-binary "@$work/p13u1.json" -o "$OUT/s13-u1.json"
+revA1=$(jq_get "$OUT/s13-u1.json" "d['doc']['revision']")
+payload "$work/p13u2.json" <<JSONEOF
+{"expected_revision":$revA1,"title":"A-upd2","body":"u2","request_id":"rid-u2"}
+JSONEOF
+curl -s -m 10 -X PUT "$BASE/api/v1/notes/$nidA" -H "Content-Type: application/json" --data-binary "@$work/p13u2.json" -o "$OUT/s13-u2.json"
+payload "$work/p13r.json" <<JSONEOF
+{"expected_revision":$revA,"title":"A-upd1","body":"u1","request_id":"rid-u1"}
+JSONEOF
+curl -s -m 10 -X PUT "$BASE/api/v1/notes/$nidA" -H "Content-Type: application/json" --data-binary "@$work/p13r.json" -o "$OUT/s13-replay.json"
+assert_py "S12/S13 cross-target conflict + original receipt" "
+x=json.load(open(OUT+'/s12-cross.json'))
+assert x['ok']==False and x['err_code']=='request_conflict', x
+u1=json.load(open(OUT+'/s13-u1.json'))
+u2=json.load(open(OUT+'/s13-u2.json'))
+rp=json.load(open(OUT+'/s13-replay.json'))
+assert u1['ok'] and u2['ok'], (u1,u2)
+assert rp['ok'] and rp['replayed'], rp
+assert rp['receipt']['revision']==u1['receipt']['revision'], (rp['receipt'], u1['receipt'])
+assert rp['receipt']['revision']!=u2['receipt']['revision'], 'receipt drifted to latest'
+print('[S12] same rid cross-target -> request_conflict, target unchanged ✓')
+print('[S13] replay update-1 keeps original receipt rev=%s (latest is %s) ✓' % (rp['receipt']['revision'], u2['receipt']['revision']))
+" | tee -a "$SUM"
+
+# ── T-16 场景 S14：null 项报告（F-R4-02）──────────────────────────────────
+D14="$work/t13-null"; D14W="$work_win/t13-null"; mkdir -p "$D14/data"
+python - "$D14/notes-null.json" <<'PYEOF'
+import json, sys
+items = [
+    {"id": 0, "title": "valid-0", "body": "ok", "folder": "", "pinned": False, "tags": []},
+    None,
+    {"id": 2, "title": "valid-2", "body": "ok", "folder": "", "pinned": False, "tags": []},
+]
+open(sys.argv[1], 'wb').write(json.dumps(items, ensure_ascii=False).encode('utf-8'))
+PYEOF
+setup "$D14W/data" "$D14W/notes-null.json" > /dev/null
+curl -s -m 15 -X POST "$BASE/api/v1/migrate" -o "$OUT/s14-migrate.json"
+assert_py "S14 null reported + later item salvaged" "
+d=json.load(open(OUT+'/s14-migrate.json'))
+assert d['migrated']==2, d
+assert len(d['corrupted'])==1 and d['corrupted'][0]['reason']=='null entry', d
+print('[S14] [valid,null,valid] -> migrated=2, corrupted=1(null entry) ✓')
 " | tee -a "$SUM"
 
 # ── S10：真重启恢复（外部驱动）：kill 后端 → 重启（NOTES_TEST_MODE=1）

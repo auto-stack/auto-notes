@@ -109,12 +109,15 @@ fn repo_result_of(js str) RepoResult {
         revision: rrev,
         status: st,
     }
+    var v_rep = json.get(it, "replayed")
+    var rep bool = json.as_bool(v_rep)
     var r RepoResult = RepoResult {
         ok: okb,
         err_code: ec,
         err_detail: "",
         doc: d,
         receipt: rc,
+        replayed: rep,
     }
     return r
 }
