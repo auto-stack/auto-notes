@@ -176,11 +176,14 @@ class McpAdapter:
     def _call(self, tool: str, **args) -> str:
         """Call an MCP tool and return the text result."""
         self.req_id += 1
+        # r4/T-16：Connection: close —— VM 轨 axum 为 current-thread runtime，
+        # keep-alive 复用在无头会话下偶发挂死（请求被服务但客户端等不到响应，
+        # PLAN-066 脆弱类的一个具体触发面）。逐请求短连接规避。
         resp = requests.post(self.url, json={
             "jsonrpc": "2.0", "method": "tools/call",
             "params": {"name": tool, "arguments": args},
             "id": self.req_id,
-        }, timeout=15)
+        }, timeout=15, headers={"Connection": "close"})
         data = resp.json()
         if "error" in data:
             raise RuntimeError(f"MCP error: {data['error']}")

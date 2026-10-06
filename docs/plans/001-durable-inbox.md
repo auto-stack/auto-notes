@@ -183,9 +183,14 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
   （a2r_std 引擎同源）+ auto.sqlite.*/auto.sqlitedb.* 双形注册 + fs.dir_names VM shim。
   复验：notes 应用 VM 模式启动/链接通过（sqlite+dir_names 符号全解析）、MCP 起服、
   App Init 经 sqlite 路径完成、autotest T0（初始状态=种子经 VM sqlite 路径装载）通过。
-  残留（非本计划范围）：MCP 服务在此无头会话首批请求后断连/挂起（PLAN-066 登记的
-  基建脆弱类，ui/mcp_server.rs），VM 全套 19 场景编排采证受其限制；同一 store 逻辑
-  已在 Vue 轨 negatives-r4 3/3 等价实证。boot 日志 tests/probe/evidence/vm-r4-boot.log。
+  残留（已解除，work 记录 9）：MCP 首批请求后断连的根因=测试套件自身契约缺陷
+  （跨轮数据污染 + 场景次序的筛选残留 + r3 种子顺序变更后索引期望未更新）与
+  runner 缺省 240s 采证时长的叠加，非 MCP 服务缺陷（服务端 157/157 请求全服务，
+  diag 打点实证）； PLAN-066 的 9247 共址脆弱类另经 AUTOUI_MCP_PORT=9260 隔离规避。
+  终态采证：净库单轮 **19/19 全绿 EXIT=0**（/tmp/vm-final5-suite.log + 
+  tests/probe/evidence/vm-r4/）。boot 日志 tests/probe/evidence/vm-r4-boot.log.txt。
+
+- work 记录 9（r4 第 2 批，T-16 VM 验收完成）：stage=work | plan_id=NOTES-001 | plan_revision=4 | outcome=executing（T-16 全部门完成，待独立复审） | code_commit=本批（store rid 保存点获取 + autotest 契约修订 + runner Connection:close） | task_ids=T-16 | evidence=VM autotest 19/19 全绿 EXIT=0（净库单轮，/tmp/vm-final5-suite.log，场景序 T0,T1,T5a-c,T2a-c,T3,T3b,T4,T6,T8,T9,T7,T7b,T11,T11b,T12）、Vue smoke+negatives 16/16（净库重置后终跑） | 关键修正=①store 的 rid 获取从 EditTitle（输入事件内联 HTTP，与 MCP execute_action_vnode 等待路径互等死锁——type_text 后无请求到达服务端，diag 打点定位）移到**保存点**（SaveDraft/flush 位，意图稳定性不变：rid 一经分配贯穿草稿会话，丢响应原样重试同 rid）②autotest 契约修订：净库种子基线注记、索引期望按 r3 种子 seq-DESC 修正（T2a [5]、T2b [0,1,2,3,4]）、T4 回原位（[2,3]）、T0 首条=最新（Sprint Planning）③runner Connection: close（keep-alive 复用规避） | 教训=VM 套件与 Vue smoke 一样依赖净库基线；跨轮复用持久目录会数据漂移连错（与电池 F-R3-1 同类） | next=独立复审（/auto-plan:review）→ 通过后 merge/归档
   依赖状态：AutoDown 实际检出 96f095b（已提交于 auto-down Blueprint 分支），gitlink 待
   父仓推进（T-16 残留）；AutoLang 工具链=worktree 742@14e642773（CLI）+ v0.6-dev@0c0702e6
   （运行时 facade）。

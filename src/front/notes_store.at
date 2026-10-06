@@ -288,6 +288,9 @@ store NotesStore {
         // 冲突下导航不被阻止：失败草稿入恢复槽后照常切换（SD-10）。
         .SelectNote(i) -> {
             if .dirty {
+                if .draft_request_id == "" {
+                    .draft_request_id = next_request_id("ui-edit")
+                }
                 if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
                     .dirty = false
                     .conflict = false
@@ -312,25 +315,26 @@ store NotesStore {
             }
         }
 
-        // 编辑意图：首次编辑取稳定非空 rid（响应丢失后原样重试 = 同一意图）。
+        // 编辑意图（SD-10）：rid 在**保存点**获取（见 flush 位）——输入事件
+        // handler 保持同步（VM/MCP action 等待路径上内联 HTTP 会撞调度死锁，
+        // 实证：type_text 触发 EditTitle→next_request_id 的 HttpRequest 与
+        // execute_action_vnode 的完成等待互等）。rid 一经分配贯穿整个草稿
+        // 会话：丢响应后原样重试 = 同一意图，幂等恢复。
         .EditTitle(v) -> {
             .draft_title = v
-            if .draft_request_id == "" {
-                .draft_request_id = next_request_id("ui-edit")
-            }
             .dirty = true
         }
 
         .EditBody(v) -> {
             .draft_body = v
-            if .draft_request_id == "" {
-                .draft_request_id = next_request_id("ui-edit")
-            }
             .dirty = true
         }
 
         .SaveDraft -> {
             if .dirty {
+                if .draft_request_id == "" {
+                    .draft_request_id = next_request_id("ui-edit")
+                }
                 if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
                     .dirty = false
                     .conflict = false
@@ -354,6 +358,9 @@ store NotesStore {
 
         .NewNote -> {
             if .dirty {
+                if .draft_request_id == "" {
+                    .draft_request_id = next_request_id("ui-edit")
+                }
                 if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
                     .dirty = false
                     .conflict = false
@@ -430,6 +437,9 @@ store NotesStore {
         .TogglePinActive -> {
             if .notes.len() > 0 {
                 if .dirty {
+                    if .draft_request_id == "" {
+                        .draft_request_id = next_request_id("ui-edit")
+                    }
                     if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
                         .dirty = false
                         .conflict = false
@@ -454,6 +464,9 @@ store NotesStore {
         // 搜索：冲突时草稿入恢复槽后照常导航（SD-10）。
         .SetSearch(q) -> {
             if .dirty {
+                if .draft_request_id == "" {
+                    .draft_request_id = next_request_id("ui-edit")
+                }
                 if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
                     .dirty = false
                     .conflict = false
@@ -478,6 +491,9 @@ store NotesStore {
         // 筛选切换：flush 成功后**刷新 notes**（防旧正文冒充已保存——F-R4-04 P2）。
         .SelectFolder(f) -> {
             if .dirty {
+                if .draft_request_id == "" {
+                    .draft_request_id = next_request_id("ui-edit")
+                }
                 if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
                     .dirty = false
                     .conflict = false
@@ -497,6 +513,9 @@ store NotesStore {
 
         .SelectTag(t) -> {
             if .dirty {
+                if .draft_request_id == "" {
+                    .draft_request_id = next_request_id("ui-edit")
+                }
                 if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
                     .dirty = false
                     .conflict = false
@@ -516,6 +535,9 @@ store NotesStore {
 
         .ClearTag -> {
             if .dirty {
+                if .draft_request_id == "" {
+                    .draft_request_id = next_request_id("ui-edit")
+                }
                 if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
                     .dirty = false
                     .conflict = false
@@ -537,6 +559,9 @@ store NotesStore {
         .TagAdded(t) -> {
             if .notes.len() > 0 {
                 if .dirty {
+                    if .draft_request_id == "" {
+                        .draft_request_id = next_request_id("ui-edit")
+                    }
                     if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
                         .dirty = false
                         .conflict = false
@@ -579,6 +604,9 @@ store NotesStore {
         .TagRemoved(t) -> {
             if .notes.len() > 0 {
                 if .dirty {
+                    if .draft_request_id == "" {
+                        .draft_request_id = next_request_id("ui-edit")
+                    }
                     if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
                         .dirty = false
                         .conflict = false

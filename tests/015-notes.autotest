@@ -6,6 +6,8 @@
 #
 # 设计原则：
 #   * 每个场景自包含 —— 开头清搜索 / 回 All 范围（并关掉可能开着的删除确认）。
+#   * r4/T-16：套件假定**净库种子基线**（NOTES_SEED=1 全新数据目录，单轮单跑）——
+#     T5 系改名/T6 建号/T7 删号会留痕，跨轮复用同一目录会因数据漂移连错。
 #   * 断言绑定到 store 可观察状态与真实标签，不用「快照节点数 > 0」这类弱断言。
 #   * 可被找到的控件必须有文字标签（纯图标按钮 MCP 按 label 找不到），
 #     因此删除/置顶/设置等控件都带文字。
@@ -14,9 +16,9 @@ suite "015-notes 清爽化核心流程"
 
 # ── 初始状态 ────────────────────────────────────────────
 
-scenario T0 "初始状态：全量 + 首条选中 + 暗色"
+scenario T0 "初始状态：全量 + 首条选中（seq DESC → 最新在前）+ 暗色"
   then  state field="active_folder" equals="all"
-  then  state field="draft_title" equals="Welcome"
+  then  state field="draft_title" equals="Sprint Planning"
   then  state field="dark_mode" equals=true
 
 # ── 导航：切换笔记 ──────────────────────────────────────
@@ -28,15 +30,38 @@ scenario T1 "点击列表切换笔记"
 
 # ── 筛选：作用域 ────────────────────────────────────────
 
-scenario T2a "Pinned 筛选只剩置顶笔记"
+scenario T5a "直接输入即进入未保存态"
+  when  click_button label="Shopping List"
+  when  type_text input label="Untitled" value="Shopping Draft"
+  then  state field="dirty" equals=true
+  then  exists button label="Save"
+
+scenario T5b "Save 落库并回到已保存态"
+  when  type_text input label="Untitled" value="Shopping Renamed"
+  when  click_button label="Save"
+  then  state field="dirty" equals=false
+  then  state field="draft_title" equals="Shopping Renamed"
+  then  exists button label="Shopping Renamed"
+
+scenario T5c "切换笔记自动落盘上一条草稿"
+  when  click_button label="Shopping Renamed"
+  when  type_text input label="Untitled" value="Auto Flushed"
+  when  click_button label="Welcome"
+  then  exists button label="Auto Flushed"
+  when  click_button label="Auto Flushed"
+  then  state field="draft_title" equals="Auto Flushed"
+  when  type_text input label="Untitled" value="Shopping List"
+  when  click_button label="Save"
+
+scenario T2a "Pinned 筛选只剩置顶笔记（净库前提；r3 种子 seq DESC → Welcome=idx5）"
   when  click_button label="Pinned"
-  then  state field="visible_pinned" equals="[0]"
+  then  state field="visible_pinned" equals="[5]"
   then  state field="visible_notes" equals="[]"
 
 scenario T2b "All 恢复全量并按置顶分组"
   when  click_button label="All"
-  then  state field="visible_pinned" equals="[0]"
-  then  state field="visible_notes" equals="[1, 2, 3, 4, 5]"
+  then  state field="visible_pinned" equals="[5]"
+  then  state field="visible_notes" equals="[0, 1, 2, 3, 4]"
   then  exists text label="Notes"
 
 scenario T2c "文件夹筛选（personal）"
@@ -63,6 +88,9 @@ scenario T3b "搜索无命中显示空态"
 
 # ── 筛选：标签 ──────────────────────────────────────────
 
+
+# ── 新建：自动选中（修掉旧契约 T6 的「已接受瑕疵」）─────
+
 scenario T4 "标签筛选生效"
   when  click_button label="home"
   then  state field="active_tag" equals="home"
@@ -71,31 +99,6 @@ scenario T4 "标签筛选生效"
   then  state field="active_tag" equals=""
 
 # ── 编辑：始终可编辑 + 显式保存 ─────────────────────────
-
-scenario T5a "直接输入即进入未保存态"
-  when  click_button label="Shopping List"
-  when  type_text input label="Untitled" value="Shopping Draft"
-  then  state field="dirty" equals=true
-  then  exists button label="Save"
-
-scenario T5b "Save 落库并回到已保存态"
-  when  type_text input label="Untitled" value="Shopping Renamed"
-  when  click_button label="Save"
-  then  state field="dirty" equals=false
-  then  state field="draft_title" equals="Shopping Renamed"
-  then  exists button label="Shopping Renamed"
-
-scenario T5c "切换笔记自动落盘上一条草稿"
-  when  click_button label="Shopping Renamed"
-  when  type_text input label="Untitled" value="Auto Flushed"
-  when  click_button label="Welcome"
-  then  exists button label="Auto Flushed"
-  when  click_button label="Auto Flushed"
-  then  state field="draft_title" equals="Auto Flushed"
-  when  type_text input label="Untitled" value="Shopping List"
-  when  click_button label="Save"
-
-# ── 新建：自动选中（修掉旧契约 T6 的「已接受瑕疵」）─────
 
 scenario T6 "New note 新建并自动选中空笔记"
   when  click_button label="New note"
