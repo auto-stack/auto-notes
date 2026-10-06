@@ -176,11 +176,16 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
   D9 依赖：fs.dir_names（742 14e642773+67d655f76，v0.6-dev facade 37235c8d+0c0702e6；
   list_dir 名被 Plan-626 VM walk 面占用，避让改名）。
 
-  **D-VM-SQLITE（新登记依赖项，阻塞 T-16 VM 验收）**：`auto run -r vm` 与 `-r vm --server
-  rust` 均 boot 失败——VM DynamicComponent 链接整个模块图（merged 桥接把 repository.at
-  一并链接），报 `Undefined symbol: sqlite.open in module App`；VM 侧无 sqlite 模块实现，
-  非 app 仓 pure-.at 可修。需要独立依赖计划：VM sqlite 模块或链接图拆分（store 经 HTTP
-  调后端）。boot 日志留存 /tmp/vm-run.log、/tmp/vm-run2.log（会话内）。
+  **D-VM-SQLITE（依赖项 → 已由 AutoLang PLAN-744 解除）**：`auto run -r vm` 曾 boot
+  失败（`Undefined symbol: sqlite.open in module App`——VM 无 sqlite 模块）。
+  依赖计划 **PLAN-744**（auto-lang v0.6-dev cb7a59ede+7b732dae4+7f527e2d2+9cfe7f65c，
+  plan-742-dev 5bbb51caa+8c2f733ed）已实施：stdlib/auto/sqlite.vm.at + 句柄注册表 shims
+  （a2r_std 引擎同源）+ auto.sqlite.*/auto.sqlitedb.* 双形注册 + fs.dir_names VM shim。
+  复验：notes 应用 VM 模式启动/链接通过（sqlite+dir_names 符号全解析）、MCP 起服、
+  App Init 经 sqlite 路径完成、autotest T0（初始状态=种子经 VM sqlite 路径装载）通过。
+  残留（非本计划范围）：MCP 服务在此无头会话首批请求后断连/挂起（PLAN-066 登记的
+  基建脆弱类，ui/mcp_server.rs），VM 全套 19 场景编排采证受其限制；同一 store 逻辑
+  已在 Vue 轨 negatives-r4 3/3 等价实证。boot 日志 tests/probe/evidence/vm-r4-boot.log。
   依赖状态：AutoDown 实际检出 96f095b（已提交于 auto-down Blueprint 分支），gitlink 待
   父仓推进（T-16 残留）；AutoLang 工具链=worktree 742@14e642773（CLI）+ v0.6-dev@0c0702e6
   （运行时 facade）。
