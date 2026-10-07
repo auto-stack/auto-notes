@@ -1,0 +1,101 @@
+{
+  "recover_overwrites_slot": {
+    "before": {
+      "body": "Milk, Eggs, Bread, Cheese",
+      "recover": true
+    },
+    "after": {
+      "title": "Shopping List",
+      "body": "new shopping draft C",
+      "recover": false,
+      "save": true
+    },
+    "server": {
+      "schema_version": 1,
+      "note_id": "n-1",
+      "revision": 2,
+      "title": "Welcome",
+      "body": "server latest welcome A",
+      "tags": [
+        "intro",
+        "seed"
+      ],
+      "color": "",
+      "pinned": true,
+      "state": "active",
+      "folder": "",
+      "created_at": "",
+      "updated_at": "",
+      "legacy_id": 1,
+      "seq": 1
+    }
+  },
+  "discard_stale_server": {
+    "old": "server latest welcome A",
+    "displayed": "server latest welcome A",
+    "save": false,
+    "server": {
+      "schema_version": 1,
+      "note_id": "n-1",
+      "revision": 3,
+      "title": "Welcome",
+      "body": "newest server version D",
+      "tags": [
+        "intro",
+        "seed"
+      ],
+      "color": "",
+      "pinned": true,
+      "state": "active",
+      "folder": "",
+      "created_at": "",
+      "updated_at": "",
+      "legacy_id": 1,
+      "seq": 1
+    }
+  },
+  "edited_after_response_loss": {
+    "requests": [
+      {
+        "expected_revision": 3,
+        "title": "Welcome",
+        "body": "first intent committed response lost",
+        "request_id": "ui-edit-5"
+      },
+      {
+        "expected_revision": 3,
+        "title": "Welcome",
+        "body": "second intent must be saveable",
+        "request_id": "ui-edit-5"
+      },
+      {
+        "expected_revision": 3,
+        "title": "Welcome",
+        "body": "second intent must be saveable",
+        "request_id": "ui-edit-5"
+      }
+    ],
+    "body": "second intent must be saveable",
+    "save": true,
+    "conflict": 0,
+    "server": {
+      "schema_version": 1,
+      "note_id": "n-1",
+      "revision": 4,
+      "title": "Welcome",
+      "body": "first intent committed response lost",
+      "tags": [
+        "intro",
+        "seed"
+      ],
+      "color": "",
+      "pinned": true,
+      "state": "active",
+      "folder": "",
+      "created_at": "",
+      "updated_at": "",
+      "legacy_id": 1,
+      "seq": 1
+    }
+  }
+}

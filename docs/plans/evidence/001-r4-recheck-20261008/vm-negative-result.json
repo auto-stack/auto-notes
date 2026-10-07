@@ -1,0 +1,87 @@
+{
+  "command": [
+    "D:/autostack/auto-lang/target/debug/auto.exe",
+    "run",
+    "-r",
+    "vm",
+    "-B",
+    "11367"
+  ],
+  "mcp_port": 11366,
+  "backend_port": 11367,
+  "run_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\notes-r4-vm-negative-1791389052423125300",
+  "suite_exit": null,
+  "pid": 36592,
+  "mcp_ready": true,
+  "negative_results": {
+    "initial": "State:\n  conflict: false (bool)\n  dirty: false (bool)\n  draft_body: \"This is your notes app. Click on any note to view it.\" (str)\n  draft_request_id: \"\" (str)\n  draft_revision: 1 (int)\n  draft_title: \"Welcome\" (str)\n  has_recovery: false (bool)\n  rec_title: \"\" (str)\n",
+    "external_update": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-1",
+        "revision": 2,
+        "title": "VM server latest",
+        "body": "VM server latest body",
+        "tags": [
+          "intro",
+          "seed"
+        ],
+        "color": "",
+        "pinned": true,
+        "state": "active",
+        "folder": "",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 1,
+        "seq": 1
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "vm-external",
+        "note_id": "n-1",
+        "revision": 2,
+        "status": "committed"
+      },
+      "replayed": false
+    },
+    "conflict": "State:\n  conflict: true (bool)\n  dirty: true (bool)\n  draft_body: \"This is your notes app. Click on any note to view it.\" (str)\n  draft_request_id: \"ui-edit-1\" (str)\n  draft_revision: 1 (int)\n  draft_title: \"VM local conflict\" (str)\n  has_recovery: false (bool)\n  rec_title: \"\" (str)\n",
+    "discard": "State:\n  conflict: false (bool)\n  dirty: false (bool)\n  draft_body: \"This is your notes app. Click on any note to view it.\" (str)\n  draft_request_id: \"\" (str)\n  draft_revision: 1 (int)\n  draft_title: \"Welcome\" (str)\n  has_recovery: false (bool)\n  rec_title: \"\" (str)\n",
+    "stashed": "State:\n  conflict: false (bool)\n  dirty: false (bool)\n  draft_body: \"Milk, Eggs, Bread, Cheese\" (str)\n  draft_request_id: \"\" (str)\n  draft_revision: 1 (int)\n  draft_title: \"Shopping List\" (str)\n  has_recovery: true (bool)\n  rec_title: \"VM precious recovery draft\" (str)\n",
+    "recovered": "State:\n  conflict: true (bool)\n  dirty: true (bool)\n  draft_body: \"Milk, Eggs, Bread, Cheese\" (str)\n  draft_request_id: \"\" (str)\n  draft_revision: 1 (int)\n  draft_title: \"VM new shopping draft\" (str)\n  has_recovery: false (bool)\n  rec_title: \"VM new shopping draft\" (str)\n",
+    "server_final": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-1",
+        "revision": 2,
+        "title": "VM server latest",
+        "body": "VM server latest body",
+        "tags": [
+          "intro",
+          "seed"
+        ],
+        "color": "",
+        "pinned": true,
+        "state": "active",
+        "folder": "",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 1,
+        "seq": 1
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "",
+        "note_id": "",
+        "revision": 0,
+        "status": ""
+      },
+      "replayed": false
+    }
+  }
+}

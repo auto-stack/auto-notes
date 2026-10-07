@@ -1,0 +1,113 @@
+
+> fn load_doc(note_id str) RepoResult {
+      var r RepoResult = empty_result()
+      var i int = entry_index(note_id)
+      if i < 0 {
+          r.err_code = "not_found"
+          return r
+      }
+      var p str = notes_dir() + "/" + e_file[i]
+      var raw str = fs.read_text(p)
+      var valid bool = json.is_valid(raw)
+      if valid == false {
+          r.err_code = "corrupt"
+          r.err_detail = p
+          return r
+      }
+      var d = doc_from_value(raw)
+      d.state = e_state[i]
+      d.pinned = e_pinned[i]
+          d.revision = parse_int(e_revision[i].as_str())
+      d.folder = e_folder[i]
+      d.tags = tags_of(i)
+      r.ok = true
+      r.doc = d
+      return r
+  }
+
+  fn tags_of(i int) []str {
+      var out List<str> = List<str>.new([])
+      var tj str = e_tags_json[i]
+      var valid bool = json.is_valid(tj)
+      if valid == false {
+          return out
+      }
+      var tv = json.parse(tj)
+      var n int = 0
+      var n_guard int = 0
+      while n_guard < 1000000 {
+          n_guard = n_guard + 1
+          var n_probe = json.get_at(tv, n)
+          var n_t str = json.encode(n_probe)
+          if n_t == "null" {
+              break
+          }
+          n = n + 1
+      }
+      for k in 0..n {
+          var x = json.get_at(tv, k)
+          out.push(json.as_string(x))
+      }
+      return out
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 仓储操作（T-02）：全部经 manifest 提交点，第二写者不可绕开
+  // ═══════════════════════════════════════════════════════════
+
+> fn repo_set_meta(note_id str, new_state str, pin int, tags List<str>, set_tags bool, folder str, set_folder bool) RepoResult {
+      var oerr str = open_repository()
+      if oerr != "" {
+          var e = empty_result()
+          e.err_code = oerr
+          return e
+      }
+      var i int = entry_index(note_id)
+      if i < 0 {
+          var e2 = empty_result()
+          e2.err_code = "not_found"
+          return e2
+      }
+      var old_state str = e_state[i]
+      var old_pin bool = e_pinned[i]
+      var old_tags str = e_tags_json[i]
+      var old_folder str = e_folder[i]
+      var ns str = new_state.to_string()
+      if ns != "" {
+          e_state[i] = ns
+      }
+      if pin >= 0 {
+          if pin == 1 {
+              e_pinned[i] = true
+          } else {
+              e_pinned[i] = false
+          }
+      }
+      if set_tags {
+          e_tags_json[i] = json.encode(tags)
+      }
+      if set_folder {
+          e_folder[i] = folder.to_string()
+      }
+      var saved bool = save_manifest_to_disk()
+      if saved == false {
+          e_state[i] = old_state
+          e_pinned[i] = old_pin
+          e_tags_json[i] = old_tags
+          e_folder[i] = old_folder
+          var e3 = empty_result()
+          e3.err_code = "storage_unwritable"
+          return e3
+      }
+      var out = load_doc(note_id)
+      return out
+  }
+
+  /// 软删除 → 回收站（现有 CRUD 的 DELETE 语义，AC-05 可恢复）。
+  pub fn repo_trash(note_id str) RepoResult {
+      return repo_set_meta(note_id, "trashed", -1, empty_tags(), false, "", false)
+  }
+
+  pub fn repo_archive(note_id str) RepoResult {
+      return repo_set_meta(note_id, "archived", -1, empty_tags(), false, "", false)
+  }
