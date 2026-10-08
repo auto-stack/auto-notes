@@ -33,8 +33,19 @@
 //      （has_recovery）后照常继续——本地与服务器版本都可恢复。
 //    - flush 成功后刷新 notes/revision 再 LoadDraft（防旧正文冒充已保存，F-R4-04 P2）。
 //    - create 返回 id==0 视为失败，不冒充成功选中空笔记。
+//
+// 7. **r5 SD-14（T-19/F-R5-03）**：
+//    - 双恢复槽（A/B 可恢复集合，容量 2 保最旧）：Recover 先把当前 dirty 草稿
+//      保全到另一槽再装载目标槽——Recover 不再自我覆盖暂存内容；两份内容同时
+//      可恢复。三份并存超出容量时显式不动作（不静默覆盖横幅在案的槽）。
+//    - Discard = 显式取最新服务器版本：先刷新工作集（list/search）再按
+//      draft_id 装载，不用陈旧列表冒充服务器版。
+//    - 保存走结构化结果（update_note_r）：err_code 空 = 传输层未知（可能已
+//      提交）→ 记未确认提交快照（pend_*）；其后内容变更再保存 → 新意图新
+//      rid；revision 冲突时按服务器内容裁决旧提交是否落地，落地则采用其
+//      revision 重试新意图，保留新草稿（不再沿用陈旧 revision 卡死）。
 
-use back.api: list_notes, create_note, update_note, delete_note, toggle_pin, update_tags, search_notes, next_request_id
+use back.api: list_notes, create_note, update_note_r, get_note_r, delete_note, toggle_pin, update_tags, search_notes, next_request_id
 
 store NotesStore {
     model {
@@ -73,7 +84,10 @@ store NotesStore {
         var dirty bool = false
         var confirm_delete bool = false
 
-        // 恢复槽（SD-10）：冲突下导航时，失败草稿整体入槽，可恢复/放弃。
+        // 恢复槽（SD-10/SD-14）：冲突下导航时，失败草稿整体入槽，可恢复/放弃。
+        // r5/T-19（F-R5-03）：双槽可恢复集合——Recover 时当前 dirty 草稿入空闲
+        // 槽，绝不覆盖正要装载的槽；两份内容同时可恢复。容量 2，保最旧
+        // （横幅首选槽 A），驱逐较新的 B；策略记录于 spec delta，非静默。
         var has_recovery bool = false
         var rec_id int = 0
         var rec_revision int = 0
@@ -84,6 +98,31 @@ store NotesStore {
         var rec_pinned bool = false
         var rec_tags []str = []
         var rec_request_id str = ""
+        var has_recovery2 bool = false
+        var rec2_id int = 0
+        var rec2_revision int = 0
+        var rec2_title str = ""
+        var rec2_body str = ""
+        var rec2_time str = ""
+        var rec2_folder str = ""
+        var rec2_pinned bool = false
+        var rec2_tags []str = []
+        var rec2_request_id str = ""
+
+        // 意图快照（SD-14/T-19）：pend_* = 当前 draft_request_id 首次提交时绑定
+        // 的内容/基线修订（BindIntent，在 rid 分配点记录——传输层失败会中断
+        // handler，失败后再补记来不及）；prev_* = 轮换掉的上一个意图。裁决：
+        // 保存被明确拒绝（revision_conflict/request_conflict）且有 prev 时，
+        // 取服务器当前版本对比 prev——一致 ⇒ 旧提交已落地，采用其 revision
+        // 重试新意图；不一致 ⇒ 双方版本保留。会话作用域：成功/discard/stash 清。
+        var has_pend bool = false
+        var pend_rid str = ""
+        var pend_revision int = 0
+        var pend_title str = ""
+        var pend_body str = ""
+        var has_prev bool = false
+        var prev_title str = ""
+        var prev_body str = ""
 
         // 主题（沿用 PLAN-360/458/601 机制：store 持有，负责 applyAccent 重放）
         var dark_mode bool = true
@@ -98,7 +137,8 @@ store NotesStore {
         DeleteArmed, DeleteConfirmed, DeleteCancelled, TogglePin(int), TogglePinActive,
         SetSearch(str), SelectFolder(str), SelectTag(str), ClearTag,
         TagAdded(str), TagRemoved(str),
-        StashDraft, RecoverDraft, DiscardRecovery, DiscardDraft,
+        StashDraft, RecoverDraft, RecoverDraft2, DiscardRecovery, DiscardRecovery2, DiscardDraft,
+        BindIntent,
         ToggleDarkMode, SetMode(str), SetAccent(str), ToggleSettings
     }
 
@@ -186,6 +226,16 @@ store NotesStore {
             .visible_notes = plain
         }
 
+        // 意图绑定快照（纯同步）：rid 分配点紧随调用——记录该 rid 首次提交的
+        // 内容与基线修订。传输层失败会中断 async handler，失败后补记来不及。
+        .BindIntent -> {
+            .has_pend = true
+            .pend_rid = .draft_request_id
+            .pend_revision = .draft_revision
+            .pend_title = .draft_title
+            .pend_body = .draft_body
+        }
+
         // LoadDraft 只在无未保存内容时装载（SD-10：冲突/草稿保护期绝不覆盖草稿）。
         .LoadDraft -> {
             if .dirty == false {
@@ -210,6 +260,8 @@ store NotesStore {
                 }
                 .draft_request_id = ""
                 .conflict = false
+                .has_pend = false
+                .has_prev = false
             }
             .confirm_delete = false
         }
@@ -224,62 +276,251 @@ store NotesStore {
             .LoadDraft()
         }
 
-        // ── 恢复槽（SD-10）─────────────────────────────────────────────────
+        // ── 恢复槽（SD-10/SD-14 双槽）────────────────────────────────────
 
-        // 当前编辑器内容入恢复槽（单槽，后入覆盖）。
+        // 当前编辑器内容入槽：A 空入 A；否则入 B（B 已有内容时被驱逐——
+        // 容量 2 保最旧，A 是横幅首选，驱逐只在 B 上发生且横幅可见）。
         .StashDraft -> {
-            .has_recovery = true
-            .rec_id = .draft_id
-            .rec_revision = .draft_revision
-            .rec_title = .draft_title
-            .rec_body = .draft_body
-            .rec_time = .draft_time
-            .rec_folder = .draft_folder
-            .rec_pinned = .draft_pinned
-            .rec_tags = .draft_tags
-            .rec_request_id = .draft_request_id
+            if .has_recovery == false {
+                .has_recovery = true
+                .rec_id = .draft_id
+                .rec_revision = .draft_revision
+                .rec_title = .draft_title
+                .rec_body = .draft_body
+                .rec_time = .draft_time
+                .rec_folder = .draft_folder
+                .rec_pinned = .draft_pinned
+                .rec_tags = .draft_tags
+                .rec_request_id = .draft_request_id
+            } else {
+                .has_recovery2 = true
+                .rec2_id = .draft_id
+                .rec2_revision = .draft_revision
+                .rec2_title = .draft_title
+                .rec2_body = .draft_body
+                .rec2_time = .draft_time
+                .rec2_folder = .draft_folder
+                .rec2_pinned = .draft_pinned
+                .rec2_tags = .draft_tags
+                .rec2_request_id = .draft_request_id
+            }
+            .has_pend = false
+            .has_prev = false
         }
 
-        // 恢复：回到该笔记（列表找得到时）并装载草稿；dirty/conflict 复原，
-        // 同 rid 原样重试。
+        // 恢复首选槽 A：当前 dirty 草稿先入 B（绝不覆盖正要装载的 A——
+        // F-R5-03 主诉：旧实现先 StashDraft 把 rec_* 自己覆盖掉）。
         .RecoverDraft -> {
-            if .dirty {
-                .StashDraft()
-            }
-            var found bool = false
-            var i int = 0
-            for n in .notes {
-                if n.id == .rec_id {
-                    .active_id = i
-                    found = true
+            if .has_recovery {
+                if .dirty {
+                    .has_recovery2 = true
+                    .rec2_id = .draft_id
+                    .rec2_revision = .draft_revision
+                    .rec2_title = .draft_title
+                    .rec2_body = .draft_body
+                    .rec2_time = .draft_time
+                    .rec2_folder = .draft_folder
+                    .rec2_pinned = .draft_pinned
+                    .rec2_tags = .draft_tags
+                    .rec2_request_id = .draft_request_id
+                    .has_pend = false
                 }
-                i = i + 1
+                var found bool = false
+                var i int = 0
+                for n in .notes {
+                    if n.id == .rec_id {
+                        .active_id = i
+                        found = true
+                    }
+                    i = i + 1
+                }
+                .draft_id = .rec_id
+                .draft_revision = .rec_revision
+                .draft_title = .rec_title
+                .draft_body = .rec_body
+                .draft_time = .rec_time
+                .draft_folder = .rec_folder
+                .draft_pinned = .rec_pinned
+                .draft_tags = .rec_tags
+                .draft_request_id = .rec_request_id
+                .dirty = true
+                .conflict = true
+                .has_recovery = false
+                .ApplyFilter()
+            } else {
+                if .has_recovery2 {
+                    // 恢复槽 B：当前内容入 A；A 已被占用且当前 dirty = 三份
+                    // 未保存内容超出容量——显式不动作（SD-14 允许显式阻止），
+                    // 用户先保存/放弃当前或 Dismiss 一个槽。
+                    var blocked bool = false
+                    if .dirty {
+                        if .has_recovery == false {
+                            .has_recovery = true
+                            .rec_id = .draft_id
+                            .rec_revision = .draft_revision
+                            .rec_title = .draft_title
+                            .rec_body = .draft_body
+                            .rec_time = .draft_time
+                            .rec_folder = .draft_folder
+                            .rec_pinned = .draft_pinned
+                            .rec_tags = .draft_tags
+                            .rec_request_id = .draft_request_id
+                            .has_pend = false
+                        } else {
+                            blocked = true
+                        }
+                    }
+                    if blocked == false {
+                        var found2 bool = false
+                        var i2 int = 0
+                        for n2 in .notes {
+                            if n2.id == .rec2_id {
+                                .active_id = i2
+                                found2 = true
+                            }
+                            i2 = i2 + 1
+                        }
+                        .draft_id = .rec2_id
+                        .draft_revision = .rec2_revision
+                        .draft_title = .rec2_title
+                        .draft_body = .rec2_body
+                        .draft_time = .rec2_time
+                        .draft_folder = .rec2_folder
+                        .draft_pinned = .rec2_pinned
+                        .draft_tags = .rec2_tags
+                        .draft_request_id = .rec2_request_id
+                        .dirty = true
+                        .conflict = true
+                        .has_recovery2 = false
+                        .ApplyFilter()
+                    }
+                }
             }
-            .draft_id = .rec_id
-            .draft_revision = .rec_revision
-            .draft_title = .rec_title
-            .draft_body = .rec_body
-            .draft_time = .rec_time
-            .draft_folder = .rec_folder
-            .draft_pinned = .rec_pinned
-            .draft_tags = .rec_tags
-            .draft_request_id = .rec_request_id
-            .dirty = true
-            .conflict = true
-            .has_recovery = false
-            .ApplyFilter()
+        }
+
+        // 恢复槽 B 的显式入口（横幅第二行）：等价 RecoverDraft 的 B 分支。
+        .RecoverDraft2 -> {
+            if .has_recovery2 {
+                var blocked bool = false
+                if .dirty {
+                    if .has_recovery == false {
+                        .has_recovery = true
+                        .rec_id = .draft_id
+                        .rec_revision = .draft_revision
+                        .rec_title = .draft_title
+                        .rec_body = .draft_body
+                        .rec_time = .draft_time
+                        .rec_folder = .draft_folder
+                        .rec_pinned = .draft_pinned
+                        .rec_tags = .draft_tags
+                        .rec_request_id = .draft_request_id
+                        .has_pend = false
+                    } else {
+                        blocked = true
+                    }
+                }
+                if blocked == false {
+                    var found2 bool = false
+                    var i2 int = 0
+                    for n2 in .notes {
+                        if n2.id == .rec2_id {
+                            .active_id = i2
+                            found2 = true
+                        }
+                        i2 = i2 + 1
+                    }
+                    .draft_id = .rec2_id
+                    .draft_revision = .rec2_revision
+                    .draft_title = .rec2_title
+                    .draft_body = .rec2_body
+                    .draft_time = .rec2_time
+                    .draft_folder = .rec2_folder
+                    .draft_pinned = .rec2_pinned
+                    .draft_tags = .rec2_tags
+                    .draft_request_id = .rec2_request_id
+                    .dirty = true
+                    .conflict = true
+                    .has_recovery2 = false
+                    .ApplyFilter()
+                }
+            } else {
+                if .has_recovery {
+                    if .dirty {
+                        .has_recovery2 = true
+                        .rec2_id = .draft_id
+                        .rec2_revision = .draft_revision
+                        .rec2_title = .draft_title
+                        .rec2_body = .draft_body
+                        .rec2_time = .draft_time
+                        .rec2_folder = .draft_folder
+                        .rec2_pinned = .draft_pinned
+                        .rec2_tags = .draft_tags
+                        .rec2_request_id = .draft_request_id
+                        .has_pend = false
+                    }
+                    var found bool = false
+                    var i int = 0
+                    for n in .notes {
+                        if n.id == .rec_id {
+                            .active_id = i
+                            found = true
+                        }
+                        i = i + 1
+                    }
+                    .draft_id = .rec_id
+                    .draft_revision = .rec_revision
+                    .draft_title = .rec_title
+                    .draft_body = .rec_body
+                    .draft_time = .rec_time
+                    .draft_folder = .rec_folder
+                    .draft_pinned = .rec_pinned
+                    .draft_tags = .rec_tags
+                    .draft_request_id = .rec_request_id
+                    .dirty = true
+                    .conflict = true
+                    .has_recovery = false
+                    .ApplyFilter()
+                }
+            }
         }
 
         .DiscardRecovery -> {
             .has_recovery = false
         }
 
-        // 放弃当前草稿 = 显式选择服务器版本。
+        .DiscardRecovery2 -> {
+            .has_recovery2 = false
+        }
+
+        // 放弃当前草稿 = 显式选择服务器版本（SD-14：先刷新工作集再按
+        // draft_id 装载最新版——不得用陈旧列表冒充服务器版本，F-R5-03）。
         .DiscardDraft -> {
+            if .search == "" {
+                .notes = list_notes()
+            } else {
+                .notes = search_notes(.search)
+            }
+            var found bool = false
+            var i int = 0
+            var target int = 0
+            for n in .notes {
+                if n.id == .draft_id {
+                    target = i
+                    found = true
+                }
+                i = i + 1
+            }
             .dirty = false
             .conflict = false
             .draft_request_id = ""
-            .LoadDraft()
+            .has_pend = false
+            .has_prev = false
+            if found {
+                .active_id = target
+                .LoadDraft()
+            } else {
+                .SelectFirstVisible()
+            }
             .ApplyFilter()
         }
 
@@ -290,11 +531,14 @@ store NotesStore {
             if .dirty {
                 if .draft_request_id == "" {
                     .draft_request_id = next_request_id("ui-edit")
+                    .BindIntent()
                 }
-                if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                var fr RepoResult = update_note_r(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id)
+                if fr.ok {
                     .dirty = false
                     .conflict = false
                     .draft_request_id = ""
+                    .has_pend = false
                     if .search == "" {
                         .notes = list_notes()
                     } else {
@@ -332,13 +576,37 @@ store NotesStore {
 
         .SaveDraft -> {
             if .dirty {
+                // SD-14/T-19 意图裁决：rid 已绑定且内容已变 → 轮换新意图；把
+                // 旧意图快照转入 prev（其提交结果未知——可能已落地）。内容未变
+                // → 原 rid 原样重试（服务端按意图重放幂等，已落地返回原收据）。
+                if .has_pend {
+                    if .draft_title != .pend_title {
+                        .has_prev = true
+                        .prev_title = .pend_title
+                        .prev_body = .pend_body
+                        .draft_request_id = next_request_id("ui-edit2")
+                        .BindIntent()
+                    } else {
+                        if .draft_body != .pend_body {
+                            .has_prev = true
+                            .prev_title = .pend_title
+                            .prev_body = .pend_body
+                            .draft_request_id = next_request_id("ui-edit2")
+                            .BindIntent()
+                        }
+                    }
+                }
                 if .draft_request_id == "" {
                     .draft_request_id = next_request_id("ui-edit")
+                    .BindIntent()
                 }
-                if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                var r RepoResult = update_note_r(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id)
+                if r.ok {
                     .dirty = false
                     .conflict = false
                     .draft_request_id = ""
+                    .has_pend = false
+                    .has_prev = false
                     if .search == "" {
                         .notes = list_notes()
                     } else {
@@ -347,9 +615,56 @@ store NotesStore {
                     .LoadDraft()
                     .ApplyFilter()
                 } else {
-                    // 冲突/失败：草稿保留（dirty 保持），Save 仍在——丢响应场景
-                    // 原样重试即恢复（同 rid 幂等）；真冲突可「放弃」选服务器版。
                     .conflict = true
+                    // 明确拒绝（请求未执行）且有未裁决的旧意图：取服务器当前
+                    // 版本对比 prev——一致 ⇒ 旧提交已落地：采用其 revision 为
+                    // 新意图基线，保留新草稿立即重试；不一致 ⇒ 双方版本保留
+                    // （冲突横幅 + Discard 取最新服务器版）。revision_conflict
+                    // 与 request_conflict 都触发：前者=基线过期，后者=旧 rid
+                    // 被新内容复用（旧提交结果未知）。传输层未知结果（err_code
+                    // 空）不进来——快照已在 BindIntent 记录，下次保存裁决。
+                    // 裁决体按文件头 ⑤ 内联在入口 handler 里（await 顺序可靠）。
+                    var adjudicate bool = false
+                    if r.err_code == "revision_conflict" {
+                        adjudicate = true
+                    } else {
+                        if r.err_code == "request_conflict" {
+                            adjudicate = true
+                        }
+                    }
+                    if adjudicate {
+                        if .has_prev {
+                            var srv RepoResult = get_note_r(.draft_id)
+                            if srv.ok {
+                                if srv.doc.title == .prev_title {
+                                    if srv.doc.body == .prev_body {
+                                        .draft_revision = srv.doc.revision
+                                        .has_prev = false
+                                        .BindIntent()
+                                        var r2 RepoResult = update_note_r(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id)
+                                        if r2.ok {
+                                            .dirty = false
+                                            .conflict = false
+                                            .draft_request_id = ""
+                                            .has_pend = false
+                                            .has_prev = false
+                                            if .search == "" {
+                                                .notes = list_notes()
+                                            } else {
+                                                .notes = search_notes(.search)
+                                            }
+                                            .LoadDraft()
+                                            .ApplyFilter()
+                                        } else {
+                                            .conflict = true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // 草稿保留（dirty 保持），Save 仍在——丢响应场景原样重试
+                    // 即恢复（同 rid 幂等）；真冲突可「放弃」取服务器版。
                 }
             } else {
                 .conflict = false
@@ -360,11 +675,14 @@ store NotesStore {
             if .dirty {
                 if .draft_request_id == "" {
                     .draft_request_id = next_request_id("ui-edit")
+                    .BindIntent()
                 }
-                if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                var fr RepoResult = update_note_r(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id)
+                if fr.ok {
                     .dirty = false
                     .conflict = false
                     .draft_request_id = ""
+                    .has_pend = false
                     if .search == "" {
                         .notes = list_notes()
                     } else {
@@ -439,11 +757,14 @@ store NotesStore {
                 if .dirty {
                     if .draft_request_id == "" {
                         .draft_request_id = next_request_id("ui-edit")
+                        .BindIntent()
                     }
-                    if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                    var fr2 RepoResult = update_note_r(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id)
+                    if fr2.ok {
                         .dirty = false
                         .conflict = false
                         .draft_request_id = ""
+                        .has_pend = false
                     } else {
                         .conflict = true
                     }
@@ -466,11 +787,14 @@ store NotesStore {
             if .dirty {
                 if .draft_request_id == "" {
                     .draft_request_id = next_request_id("ui-edit")
+                    .BindIntent()
                 }
-                if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                var fr RepoResult = update_note_r(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id)
+                if fr.ok {
                     .dirty = false
                     .conflict = false
                     .draft_request_id = ""
+                    .has_pend = false
                 } else {
                     .conflict = true
                     .StashDraft()
@@ -493,11 +817,14 @@ store NotesStore {
             if .dirty {
                 if .draft_request_id == "" {
                     .draft_request_id = next_request_id("ui-edit")
+                    .BindIntent()
                 }
-                if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                var fr RepoResult = update_note_r(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id)
+                if fr.ok {
                     .dirty = false
                     .conflict = false
                     .draft_request_id = ""
+                    .has_pend = false
                     .notes = list_notes()
                 } else {
                     .conflict = true
@@ -515,11 +842,14 @@ store NotesStore {
             if .dirty {
                 if .draft_request_id == "" {
                     .draft_request_id = next_request_id("ui-edit")
+                    .BindIntent()
                 }
-                if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                var fr RepoResult = update_note_r(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id)
+                if fr.ok {
                     .dirty = false
                     .conflict = false
                     .draft_request_id = ""
+                    .has_pend = false
                     .notes = list_notes()
                 } else {
                     .conflict = true
@@ -537,11 +867,14 @@ store NotesStore {
             if .dirty {
                 if .draft_request_id == "" {
                     .draft_request_id = next_request_id("ui-edit")
+                    .BindIntent()
                 }
-                if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                var fr RepoResult = update_note_r(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id)
+                if fr.ok {
                     .dirty = false
                     .conflict = false
                     .draft_request_id = ""
+                    .has_pend = false
                     .notes = list_notes()
                 } else {
                     .conflict = true
@@ -561,11 +894,14 @@ store NotesStore {
                 if .dirty {
                     if .draft_request_id == "" {
                         .draft_request_id = next_request_id("ui-edit")
+                        .BindIntent()
                     }
-                    if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                    var fr2 RepoResult = update_note_r(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id)
+                    if fr2.ok {
                         .dirty = false
                         .conflict = false
                         .draft_request_id = ""
+                        .has_pend = false
                     } else {
                         .conflict = true
                     }
@@ -606,11 +942,14 @@ store NotesStore {
                 if .dirty {
                     if .draft_request_id == "" {
                         .draft_request_id = next_request_id("ui-edit")
+                        .BindIntent()
                     }
-                    if update_note(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id) {
+                    var fr2 RepoResult = update_note_r(.draft_id, .draft_revision, .draft_title, .draft_body, .draft_request_id)
+                    if fr2.ok {
                         .dirty = false
                         .conflict = false
                         .draft_request_id = ""
+                        .has_pend = false
                     } else {
                         .conflict = true
                     }

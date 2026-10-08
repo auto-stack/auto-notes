@@ -183,6 +183,21 @@ pub fn update_note(id int, expected_revision int, title str, body str, request_i
     return db.update_note(id, expected_revision, title, body, request_id)
 }
 
+/// 条件更新（结构化结果版，SD-14/T-19）：err_code 区分明确拒绝与传输层
+/// 未知结果（UI 未确认提交裁决的依据）
+/// PUT /api/notes/:id/result
+#[api(method = "PUT", path = "/api/notes/:id/result")]
+pub fn update_note_r(id int, expected_revision int, title str, body str, request_id str) RepoResult {
+    return db.update_note_r(id, expected_revision, title, body, request_id)
+}
+
+/// 读取单个文档（结构化结果版，SD-14/T-19：未确认提交裁决取服务器版本）
+/// GET /api/notes/:id/result
+#[api(method = "GET", path = "/api/notes/:id/result")]
+pub fn get_note_r(id int) RepoResult {
+    return db.get_note_r(id)
+}
+
 /// UI 每个草稿会话取一次稳定 request_id（重试同意图复用同一 id）
 /// GET /api/request-id
 #[api(method = "GET", path = "/api/request-id")]

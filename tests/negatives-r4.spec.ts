@@ -67,7 +67,8 @@ test('R4-2: COMMIT 后丢响应，同意图重试恢复', async ({ page }) => {
   const original = await t.inputValue()
 
   let dropped = false
-  await page.route('**/api/notes/*', async route => {
+  // r5：保存端点改为 /api/notes/:id/result（SD-14 结构化结果），glob 需跨段
+  await page.route('**/api/notes/**', async route => {
     if (route.request().method() === 'PUT' && dropped === false) {
       dropped = true
       await route.fetch() // 服务端已提交

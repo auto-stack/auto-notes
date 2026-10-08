@@ -89,6 +89,58 @@ fn parse_int(s str) int {
     return r
 }
 
+/// 严格整数字面量判定（T-20/SD-15）：json.encode 产物必须整体匹配
+/// ^-?[0-9]+$。拒绝布尔（true 会被 SQLite 当 SQL TRUE 静默转成 1）、
+/// 字符串（带引号）与小数（带点）——错类型必须进报告，不得静默导入。
+fn is_int_literal(t str) bool {
+    var n int = t.len()
+    if n == 0 {
+        return false
+    }
+    var i int = 0
+    if t.char_at(0) == 45 {
+        i = 1
+        if n == 1 {
+            return false
+        }
+    }
+    while i < n {
+        var c int = t.char_at(i)
+        if c < 48 {
+            return false
+        }
+        if c > 57 {
+            return false
+        }
+        i = i + 1
+    }
+    return true
+}
+
+// ═══════════════════════════════════════════════════════════
+// 规范化请求意图（T-18/SD-13）：每个字段独立 JSON 编码后再拼接。
+// JSON 字符串字面量有唯一边界（引号成对、控制字符转义），固定字段数下
+// 拼接串与字段元组一一对应——title="a|b"/body="c" 与 title="a"/body="b|c"
+// 不再可能产生同一意图串（r4 的裸管道拼接已被复审证明歧义）。
+// 前缀 v2c| 标记规范格式，供既有 v2 管道行的版本化迁移识别。
+// ═══════════════════════════════════════════════════════════
+
+fn canonical_create_intent(title str, body str, folder str, tags_json str) str {
+    return "v2c|create|" + json.encode(title) + "|" + json.encode(body) + "|" + json.encode(folder) + "|" + json.encode(tags_json)
+}
+
+fn canonical_update_intent(note_id str, expected_revision int, title str, body str) str {
+    return "v2c|update|" + json.encode(note_id) + "|" + json.encode(expected_revision) + "|" + json.encode(title) + "|" + json.encode(body)
+}
+
+/// request_conflict 结构化信封（ok=false；绝不以 ok=true 确认未执行的操作）
+fn request_conflict_envelope(detail str) str {
+    var s str = "{\"ok\":false,\"err_code\":\"request_conflict\",\"err_detail\":" + json.encode(detail)
+    s = s + ",\"doc\":{\"schema_version\":1,\"note_id\":\"\",\"revision\":0,\"title\":\"\",\"body\":\"\",\"tags\":[],\"color\":\"\",\"pinned\":false,\"state\":\"\",\"folder\":\"\",\"created_at\":\"\",\"updated_at\":\"\",\"legacy_id\":0,\"seq\":0}"
+    s = s + ",\"receipt\":{\"schema_version\":1,\"request_id\":\"\",\"note_id\":\"\",\"revision\":0,\"status\":\"\"}}"
+    return s
+}
+
 fn note_cols() str {
     return "note_id, legacy_id, revision, title, body, tags_json, color, pinned, state, folder, seq, created_at, updated_at"
 }
@@ -179,8 +231,47 @@ fn ensure_schema(db SqliteDb) {
     db.exec("ALTER TABLE requests ADD COLUMN rev INTEGER NOT NULL DEFAULT 0")
     db.exec("ALTER TABLE requests ADD COLUMN doc_json TEXT NOT NULL DEFAULT ''")
     db.exec("ALTER TABLE requests ADD COLUMN intent TEXT NOT NULL DEFAULT ''")
-    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('schema_v','2')")
+    // schema v3（SD-13/T-18）：r4 管道拼接意图 → 规范表示（从持久 doc 快照
+    // 确定性重导），版本化一次性迁移；v2c| 前缀行不再重跑。
+    var sv str = meta_get_on(db, "schema_v")
+    if sv != "3" {
+        migrate_request_intents(db)
+    }
+    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('schema_v','3')")
     seed_if_requested(db)
+}
+
+/// r4 时代 v2 行的意图迁移（SD-13）：rev>0 且 doc 快照在案的行，按提交时
+/// 语义重导规范意图——create 用文档 title/body/folder（v1 创建 tags 参数恒
+/// "[]"）；update 用 note_id、expected_revision=快照 revision-1、title/body。
+/// 无法重导的行保持原值：其意图与新请求的规范串必不相同 → 重放明确冲突，
+/// 绝不假确认（信息不足时的安全默认，见 t18 决策制品）。
+fn migrate_request_intents(db SqliteDb) {
+    var rows List<List<str>> = db.query("SELECT request_id, kind, rev, doc_json FROM requests WHERE intent != '' AND intent NOT LIKE 'v2c|%' AND doc_json != '' AND rev > 0")
+    var n int = rows.len()
+    for i in 0..n {
+        var row = rows[i]
+        var kind str = row[1]
+        var it = json.parse(row[3])
+        var ni str = ""
+        if kind == "create" {
+            var t str = json.as_string(json.get(it, "title"))
+            var b str = json.as_string(json.get(it, "body"))
+            var f str = json.as_string(json.get(it, "folder"))
+            ni = canonical_create_intent(t, b, f, "[]")
+        } else {
+            if kind == "update" {
+                var nid2 str = json.as_string(json.get(it, "note_id"))
+                var drev int = json.as_int(json.get(it, "revision"))
+                var t2 str = json.as_string(json.get(it, "title"))
+                var b2 str = json.as_string(json.get(it, "body"))
+                ni = canonical_update_intent(nid2, drev - 1, t2, b2)
+            }
+        }
+        if ni != "" {
+            db.exec("UPDATE requests SET intent=" + sql_str(ni) + " WHERE request_id=" + sql_str(row[0]))
+        }
+    }
 }
 
 // 显式 seed 模式（NOTES_SEED=1，T-03）：仅全新目录写入示例笔记（tag "seed"
@@ -271,33 +362,98 @@ pub fn open_repository() str {
     return ""
 }
 
-/// Phase 1 JSON 布局 → SQLite 安全升级（SD-07/T-12，F-R4-01）。
-/// 仅当 notes 空且未升级过时探测 manifest.json；事务化导入 entries
-/// （实体 blocks→body，多块以换行符连接），receipts/ 经 D9 fs.list_dir 枚举
-/// 导入请求映射（旧行 intent/doc 通配）；旧树整体复制到 legacy-backup/
-/// 原件不动；坏实体逐项记入 meta.corrupted_r1 并跳过不终止；
-/// meta.upgraded 占位防重复；失败 ROLLBACK 返回结构化错误，
-/// 绝不以空库冒充成功（AC-01）。
+/// Phase 1 JSON 布局 → SQLite 安全升级（SD-07/T-12；r5/T-17 修正 F-R5-01）。
+/// 元数据权威规则与旧 load_doc 一致：实体文件提供 title/body(blocks→换行
+/// 连接)/color/时间戳；manifest entry 覆盖 tags/pinned/state/folder/revision/
+/// seq/legacy_id——旧 repo_set_meta 只写 manifest，manifest 是元数据唯一权威。
+/// 失败边界（F-R5-01：不得空成功、不得不可重试）：
+///   * 备份不可用（legacy-backup 被普通文件占据/拷贝失败/校验不过）→ 显式
+///     错误，不完成；
+///   * manifest 不可读或缺 entries 数组（含 {}）→ 显式错误，不完成；
+///   * manifest 引用实体缺失/不可读 → ROLLBACK 显式失败（upgrade_incomplete），
+///     修复旧实体后重试即可——绝不记 corrupted 后置 upgraded 宣告完成；
+///   * 未升级库已有 notes 且旧树并存 → upgrade_conflict，不静默忽略任一侧；
+///   * r4 缺陷库已误写 upgraded（upgrade_error 在案或 legacy-upgrade
+///     corrupted_r1 残留）且旧树仍在 → 清标记按正确规则重跑（合并式导入对
+///     已导入行做权威元数据回收）。
+/// 成功：全量导入且备份校验通过后才在事务内置 upgraded；正常/硬杀/重试幂等；
+/// 原旧树不改动（源 hash 保持），备份保持。
 fn upgrade_if_legacy(db SqliteDb) str {
-    if meta_get_on(db, "upgraded") == "1" {
-        return ""
+    var mpath str = data_dir() + "/manifest.json"
+    var has_legacy bool = fs_exists(mpath)
+    var upgraded str = meta_get_on(db, "upgraded")
+    // 修复证据独立于 upgraded 标记：r4 缺陷库可能 upgraded=1（误写成功），
+    // 部分导入也可能标记已清。upgrade_error 在案或 legacy-upgrade
+    // corrupted_r1 残留 = 本库曾有未完成的旧树导入，允许按正确规则重跑
+    // （合并式导入对已导入行做权威元数据回收，重试安全）。
+    var need_repair bool = false
+    if meta_get_on(db, "upgrade_error") != "" {
+        need_repair = true
     }
-    var cnt_rows List<List<str>> = db.query("SELECT COUNT(*) FROM notes")
-    if cnt_rows.len() > 0 {
-        if parse_int(cnt_rows[0][0]) > 0 {
-            return ""
+    if need_repair == false {
+        var cr1 str = meta_get_on(db, "corrupted_r1")
+        if cr1.contains("legacy upgrade") {
+            need_repair = true
         }
     }
-    var mpath str = data_dir() + "/manifest.json"
-    if fs_exists(mpath) == false {
-        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')")
-        return ""
+    if upgraded == "1" {
+        if need_repair == false {
+            return ""
+        }
+        if has_legacy == false {
+            return ""
+        }
+        db.exec("DELETE FROM meta WHERE k='upgraded'")
+        db.exec("DELETE FROM meta WHERE k='upgrade_error'")
+    } else {
+        if has_legacy == false {
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')")
+            return ""
+        }
+        if need_repair == false {
+            var cnt_rows List<List<str>> = db.query("SELECT COUNT(*) FROM notes")
+            if cnt_rows.len() > 0 {
+                if parse_int(cnt_rows[0][0]) > 0 {
+                    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','legacy tree present but repository already contains notes')")
+                    return "upgrade_conflict"
+                }
+            }
+        } else {
+            db.exec("DELETE FROM meta WHERE k='upgrade_error'")
+        }
     }
+    // 备份先行且必须真实可用（F-R5-01：备份结果不得忽略）
     var bak str = data_dir() + "/legacy-backup"
-    fs_mkdir(bak)
-    fs_copy(mpath, bak + "/manifest.json")
-    fs_copy(data_dir() + "/notes", bak + "/notes")
-    fs_copy(data_dir() + "/receipts", bak + "/receipts")
+    if fs_mkdir(bak) == false {
+        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','legacy-backup not usable (exists as a regular file?)')")
+        return "storage_unwritable"
+    }
+    if fs_copy(mpath, bak + "/manifest.json") == false {
+        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','backup copy failed: manifest.json')")
+        return "storage_unwritable"
+    }
+    if fs_exists(data_dir() + "/notes") {
+        if fs_copy(data_dir() + "/notes", bak + "/notes") == false {
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','backup copy failed: notes/')")
+            return "storage_unwritable"
+        }
+    }
+    if fs_exists(data_dir() + "/receipts") {
+        if fs_copy(data_dir() + "/receipts", bak + "/receipts") == false {
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','backup copy failed: receipts/')")
+            return "storage_unwritable"
+        }
+    }
+    if fs_exists(data_dir() + "/journal") {
+        if fs_copy(data_dir() + "/journal", bak + "/journal") == false {
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','backup copy failed: journal/')")
+            return "storage_unwritable"
+        }
+    }
+    if fs_exists(bak + "/manifest.json") == false {
+        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','backup verification failed: manifest.json missing')")
+        return "storage_unwritable"
+    }
     var begin int = db.exec("BEGIN IMMEDIATE")
     if begin < 0 {
         return "second_writer"
@@ -310,104 +466,177 @@ fn upgrade_if_legacy(db SqliteDb) str {
     }
     var m = json.parse(raw)
     var entries = json.get(m, "entries")
+    var etxt str = json.encode(entries)
+    if etxt.sub(0, 1) != "[" {
+        db.exec("ROLLBACK")
+        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','manifest entries missing or not an array')")
+        return "storage_unwritable"
+    }
     var en int = json.len(entries)
-    var bad_n int = 0
-    var bad_list str = ""
     for i in 0..en {
         var e = json.get_at(entries, i)
         var fid str = json.as_string(json.get(e, "file"))
-        var eraw str = fs_read(data_dir() + "/notes/" + fid)
+        var epath str = data_dir() + "/notes/" + fid
+        if fs_exists(epath) == false {
+            db.exec("ROLLBACK")
+            var emsg str = "entity missing: " + fid
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(emsg) + ")")
+            return "upgrade_incomplete"
+        }
+        var eraw str = fs_read(epath)
         if json.is_valid(eraw) == false {
-            var sep0 str = ""
-            if bad_n > 0 {
-                sep0 = ","
-            }
-            bad_list = bad_list + sep0 + "{\"index\":" + json.encode(i) + ",\"reason\":\"entity unreadable\",\"file\":" + json.encode(fid) + "}"
-            bad_n = bad_n + 1
-        } else {
-            var it = json.parse(eraw)
-            var nid_v = json.get(it, "note_id")
-            var nid str = json.as_string(nid_v)
-            var rev_v = json.get(it, "revision")
-            var rev int = json.as_int(rev_v)
-            var title_v = json.get(it, "title")
-            var title str = json.as_string(title_v)
-            // blocks → body（多块以换行符连接；v1 只产生 text 块）
-            var blocks = json.get(it, "blocks")
-            var bn int = json.len(blocks)
-            var body str = ""
-            var bj int = 0
-            for b in 0..bn {
-                var blk = json.get_at(blocks, b)
-                var tv = json.get(blk, "text")
-                if bj > 0 {
-                    body = body + "
+            db.exec("ROLLBACK")
+            var umsg str = "entity unreadable: " + fid
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(umsg) + ")")
+            return "upgrade_incomplete"
+        }
+        var it = json.parse(eraw)
+        var nid str = json.as_string(json.get(it, "note_id"))
+        var title str = json.as_string(json.get(it, "title"))
+        // blocks → body（多块以换行符连接；v1 只产生 text 块）
+        var blocks = json.get(it, "blocks")
+        var bn int = json.len(blocks)
+        var body str = ""
+        var bj int = 0
+        for b in 0..bn {
+            var blk = json.get_at(blocks, b)
+            var tv = json.get(blk, "text")
+            if bj > 0 {
+                body = body + "
 "
-                }
-                body = body + json.as_string(tv)
-                bj = bj + 1
             }
-            var tags_v = json.get(it, "tags")
-            var tags_json str = json.encode(tags_v)
-            var color_v = json.get(it, "color")
-            var color str = json.as_string(color_v)
-            var pin_v = json.get(it, "pinned")
-            var pinb str = json.encode(pin_v)
-            var pin int = 0
-            if pinb == "true" {
-                pin = 1
+            body = body + json.as_string(tv)
+            bj = bj + 1
+        }
+        var color str = json.as_string(json.get(it, "color"))
+        var cr str = json.as_string(json.get(it, "created_at"))
+        var up str = json.as_string(json.get(it, "updated_at"))
+        // 实体值打底，manifest entry 覆盖（旧 load_doc 权威规则）；manifest
+        // 缺键时回退实体值。旧 manifest 的 revision/seq/legacy_id 是字符串。
+        var rev int = json.as_int(json.get(it, "revision"))
+        var mev = json.get(e, "revision")
+        var mej str = json.encode(mev)
+        if mej != "null" {
+            if mej.sub(0, 1) == "\"" {
+                rev = parse_int(json.as_string(mev))
+            } else {
+                rev = json.as_int(mev)
             }
-            var state_v = json.get(it, "state")
-            var state str = json.as_string(state_v)
-            var folder_v = json.get(it, "folder")
-            var folder str = json.as_string(folder_v)
-            var seq_v = json.get(it, "seq")
-            var seq int = json.as_int(seq_v)
-            var leg_v = json.get(it, "legacy_id")
-            var leg int = json.as_int(leg_v)
-            var cr_v = json.get(it, "created_at")
-            var cr str = json.as_string(cr_v)
-            var up_v = json.get(it, "updated_at")
-            var up str = json.as_string(up_v)
-            var ins int = db.exec("INSERT INTO notes(note_id, legacy_id, revision, title, body, tags_json, color, pinned, state, folder, seq, created_at, updated_at) VALUES(" + sql_str(nid) + ", " + json.encode(leg) + ", " + json.encode(rev) + ", " + sql_str(title) + ", " + sql_str(body) + ", " + sql_str(tags_json) + ", " + sql_str(color) + ", " + json.encode(pin) + ", " + sql_str(state) + ", " + sql_str(folder) + ", " + json.encode(seq) + ", " + sql_str(cr) + ", " + sql_str(up) + ")")
-            if ins < 0 {
-                db.exec("ROLLBACK")
-                db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','entity import failed: ' + fid)")
-                return "storage_unwritable"
+        }
+        var tags_v = json.get(it, "tags")
+        var tags_json str = json.encode(tags_v)
+        var mtv = json.get(e, "tags")
+        if json.encode(mtv) != "null" {
+            tags_json = json.encode(mtv)
+        }
+        var pin int = 0
+        if json.encode(json.get(it, "pinned")) == "true" {
+            pin = 1
+        }
+        var mpv = json.get(e, "pinned")
+        if json.as_bool(mpv) {
+            pin = 1
+        } else {
+            if json.encode(mpv) != "null" {
+                pin = 0
             }
+        }
+        var state str = json.as_string(json.get(it, "state"))
+        var msv = json.get(e, "state")
+        if json.encode(msv) != "null" {
+            state = json.as_string(msv)
+        }
+        var folder str = json.as_string(json.get(it, "folder"))
+        var mfv = json.get(e, "folder")
+        if json.encode(mfv) != "null" {
+            folder = json.as_string(mfv)
+        }
+        var seq int = json.as_int(json.get(it, "seq"))
+        var mqv = json.get(e, "seq")
+        var mqj str = json.encode(mqv)
+        if mqj != "null" {
+            if mqj.sub(0, 1) == "\"" {
+                seq = parse_int(json.as_string(mqv))
+            } else {
+                seq = json.as_int(mqv)
+            }
+        }
+        var leg int = json.as_int(json.get(it, "legacy_id"))
+        var mlv = json.get(e, "legacy_id")
+        var mlj str = json.encode(mlv)
+        if mlj != "null" {
+            if mlj.sub(0, 1) == "\"" {
+                leg = parse_int(json.as_string(mlv))
+            } else {
+                leg = json.as_int(mlv)
+            }
+        }
+        // 幂等合并导入：行已存在（部分导入/r4 缺陷库重跑）→ 权威值回收；
+        // 否则插入。两路同用事务门禁，重试不重复。
+        var ex List<List<str>> = db.query("SELECT note_id FROM notes WHERE note_id=" + sql_str(nid))
+        var sql str = ""
+        if ex.len() > 0 {
+            sql = "UPDATE notes SET legacy_id=" + json.encode(leg) + ", revision=" + json.encode(rev) + ", title=" + sql_str(title) + ", body=" + sql_str(body) + ", tags_json=" + sql_str(tags_json) + ", pinned=" + json.encode(pin) + ", state=" + sql_str(state) + ", folder=" + sql_str(folder) + ", seq=" + json.encode(seq) + " WHERE note_id=" + sql_str(nid)
+        } else {
+            sql = "INSERT INTO notes(note_id, legacy_id, revision, title, body, tags_json, color, pinned, state, folder, seq, created_at, updated_at) VALUES(" + sql_str(nid) + ", " + json.encode(leg) + ", " + json.encode(rev) + ", " + sql_str(title) + ", " + sql_str(body) + ", " + sql_str(tags_json) + ", " + sql_str(color) + ", " + json.encode(pin) + ", " + sql_str(state) + ", " + sql_str(folder) + ", " + json.encode(seq) + ", " + sql_str(cr) + ", " + sql_str(up) + ")"
+        }
+        var ins int = db.exec(sql)
+        if ins < 0 {
+            db.exec("ROLLBACK")
+            var imsg str = "entity import failed: " + fid
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(imsg) + ")")
+            return "storage_unwritable"
         }
     }
     var c_v = json.get(m, "counter")
-    var counter int = json.as_int(c_v)
-    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('counter'," + json.encode(counter) + ")")
-    // receipts → requests 映射（旧行 intent/doc_json 空 = 通配重放）
+    var cj str = json.encode(c_v)
+    if cj != "null" {
+        var counter int = 0
+        if cj.sub(0, 1) == "\"" {
+            counter = parse_int(json.as_string(c_v))
+        } else {
+            counter = json.as_int(c_v)
+        }
+        var cur str = meta_get_on(db, "counter")
+        if cur == "" {
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('counter'," + json.encode(counter) + ")")
+        } else {
+            if counter > parse_int(cur) {
+                db.exec("UPDATE meta SET v=" + json.encode(counter) + " WHERE k='counter'")
+            }
+        }
+    }
+    // receipts → requests：只映射 status=committed 的旧收据。kind 按旧协议
+    // 规则恢复（create=rev1 / update=rev≥2；journal/receipts 有界调查见
+    // t18 决策制品）；intent 留空 = 不可验证旧行：重放一律 request_conflict，
+    // 绝不通配确认新操作或编造收据（F-R5-02）。原收据经 read_receipt 仍可查。
     var rdir str = data_dir() + "/receipts"
-    var names List<str> = fs.dir_names(rdir)
-    var rn int = names.len()
-    for k in 0..rn {
-        var name str = names[k]
-        var rraw str = fs_read(rdir + "/" + name)
-        if json.is_valid(rraw) {
-            var rit = json.parse(rraw)
-            var rid_v = json.get(rit, "request_id")
-            var rid str = json.as_string(rid_v)
-            var rnid_v = json.get(rit, "note_id")
-            var rnid str = json.as_string(rnid_v)
-            var rrev_v = json.get(rit, "revision")
-            var rrev int = json.as_int(rrev_v)
-            var rst_v = json.get(rit, "status")
-            var rst str = json.as_string(rst_v)
-            if rid != "" {
-                if rst == "committed" {
-                    db.exec("INSERT OR IGNORE INTO requests(request_id, note_id, kind, rev, doc_json, intent) VALUES(" + sql_str(rid) + ", " + sql_str(rnid) + ", '', " + json.encode(rrev) + ", '', '')")
+    if fs_exists(rdir) {
+        var names List<str> = fs.dir_names(rdir)
+        var rn int = names.len()
+        for k in 0..rn {
+            var name str = names[k]
+            var rraw str = fs_read(rdir + "/" + name)
+            if json.is_valid(rraw) {
+                var rit = json.parse(rraw)
+                var rid str = json.as_string(json.get(rit, "request_id"))
+                var rnid str = json.as_string(json.get(rit, "note_id"))
+                var rrev int = json.as_int(json.get(rit, "revision"))
+                var rst str = json.as_string(json.get(rit, "status"))
+                if rid != "" {
+                    if rst == "committed" {
+                        var kindx str = "update"
+                        if rrev < 2 {
+                            kindx = "create"
+                        }
+                        db.exec("INSERT OR IGNORE INTO requests(request_id, note_id, kind, rev, doc_json, intent) VALUES(" + sql_str(rid) + ", " + sql_str(rnid) + ", " + sql_str(kindx) + ", " + json.encode(rrev) + ", '', '')")
+                    }
                 }
             }
         }
     }
-    if bad_n > 0 {
-        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('corrupted_r1'," + sql_str("[\"legacy upgrade\"," + bad_list + "]") + ")")
-    }
     db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')")
+    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','')")
     var commit int = db.exec("COMMIT")
     if commit < 0 {
         return "storage_unwritable"
@@ -458,8 +687,9 @@ pub fn repo_create(title str, body str, folder str, tags_json str, request_id st
     if valid_request_id(rid) == false {
         return "{\"ok\":false,\"err_code\":\"invalid_request\"}"
     }
-    // 规范化意图（SD-09）：同 rid 不同内容 = 不同意图，重放时明确拒绝
-    var intent str = "create|" + title + "|" + body + "|" + folder + "|" + tags_json
+    // 规范化意图（SD-09/SD-13）：字段独立 JSON 编码，同 rid 不同内容/目标 =
+    // 不同意图，重放时明确拒绝
+    var intent str = canonical_create_intent(title, body, folder, tags_json)
     var db SqliteDb = sqlite.open(db_path())
     var begin int = db.exec("BEGIN IMMEDIATE")
     if begin < 0 {
@@ -519,18 +749,15 @@ pub fn repo_update(note_id str, expected_revision int, title str, body str, requ
     if valid_request_id(rid) == false {
         return "{\"ok\":false,\"err_code\":\"invalid_request\"}"
     }
-    // 意图串含目标与期望修订：同 rid 换目标/内容/期望修订 = 不同意图
-    var intent str = "update|" + note_id + "|" + json.encode(expected_revision) + "|" + title + "|" + body
+    // 意图串含目标与期望修订（字段独立 JSON 编码，无歧义）：同 rid 换目标/
+    // 内容/期望修订 = 不同意图
+    var intent str = canonical_update_intent(note_id, expected_revision, title, body)
     var db SqliteDb = sqlite.open(db_path())
     var begin int = db.exec("BEGIN IMMEDIATE")
     if begin < 0 {
         return "{\"ok\":false,\"err_code\":\"second_writer\"}"
     }
     var dup = replay_in_txn(db, rid, "update", note_id, intent)
-    if dup != "" {
-        var fin int = db.exec("COMMIT")
-        return dup
-    }
     if dup != "" {
         var fin int = db.exec("COMMIT")
         return dup
@@ -713,6 +940,8 @@ pub fn repo_status() str {
     s = s + ",\"entries\":" + json.encode(cnt)
     s = s + ",\"max_legacy_id\":" + json.encode(maxleg)
     s = s + ",\"migrated\":" + json.encode(migrated)
+    // 升级失败显式可见（F-R5-01：不得以 loaded=true/err 空掩盖不完整升级）
+    s = s + ",\"upgrade_error\":" + json.encode(meta_get_on(db, "upgrade_error"))
     s = s + ",\"data_dir\":" + json.encode(data_dir())
     s = s + "}"
     return s
@@ -801,14 +1030,9 @@ pub fn migrate_legacy_at(legacy_path str) str {
                 reason = "missing id"
             }
             if reason == "" {
-                var q1 str = idtxt.sub(0, 1)
-                if q1 == "\"" {
-                    reason = "id not an integer"
-                }
-            }
-            if reason == "" {
-                var hasdot bool = idtxt.contains(".")
-                if hasdot {
+                // 严格整数字面量（SD-15/T-20）：字符串（带引号）、布尔（true
+                // 会被 SQLite 当 TRUE 静默转 1）、小数（带点）一律报告
+                if is_int_literal(idtxt) == false {
                     reason = "id not an integer"
                 }
             }
@@ -827,18 +1051,58 @@ pub fn migrate_legacy_at(legacy_path str) str {
                 }
             }
             if reason == "" {
-                // tags 缺省容忍为 []；存在但非数组 → 坏项
-                var ttj str = json.encode(json.get(it, "tags"))
+                // body（SD-15/T-20）：缺省容忍为空（批准的缺字段策略）；存在但
+                // 非字符串（如对象）→ 坏项，不得静默转空正文
+                var bj str = json.encode(json.get(it, "body"))
+                if bj != "null" {
+                    if bj.sub(0, 1) != "\"" {
+                        reason = "body not a string"
+                    }
+                }
+            }
+            if reason == "" {
+                // tags（SD-15/T-20）：缺省容忍为 []；存在须为数组且每个元素
+                // 都是字符串（[7,null] 类元素不得静默导入）
+                var tags_v2 = json.get(it, "tags")
+                var ttj str = json.encode(tags_v2)
                 if ttj != "null" {
                     if ttj.sub(0, 1) != "[" {
                         reason = "tags not an array"
+                    } else {
+                        var tn int = json.len(tags_v2)
+                        for gi in 0..tn {
+                            var el = json.get_at(tags_v2, gi)
+                            var elj str = json.encode(el)
+                            if elj.sub(0, 1) != "\"" {
+                                reason = "tags element not a string"
+                            }
+                        }
+                    }
+                }
+            }
+            if reason == "" {
+                var fv str = json.encode(json.get(it, "folder"))
+                if fv != "null" {
+                    if fv.sub(0, 1) != "\"" {
+                        reason = "folder not a string"
+                    }
+                }
+            }
+            if reason == "" {
+                var pv2 str = json.encode(json.get(it, "pinned"))
+                if pv2 != "null" {
+                    if pv2 != "true" {
+                        if pv2 != "false" {
+                            reason = "pinned not a boolean"
+                        }
                     }
                 }
             }
         }
         // 报告与插入平级（F-R4-02）：null/类型错也进报告，绝不静默跳过。
-        // snippet = 整项 json.encode（纯 ASCII，任意字节截断安全）；超长省略
-        // 内容而非非边界 sub（长中文/emoji 坏项不再 panic）。
+        // snippet 保持字符串契约（F-R5-04）：诊断文本经 json.encode 再入报告
+        // （此前裸拼对象导致 API as_string 后为空）；超长省略内容而非非边界
+        // sub（长中文/emoji 坏项不再 panic）。
         if reason != "" {
             var sep str = ""
             if corrupted.len() > 0 {
@@ -846,9 +1110,9 @@ pub fn migrate_legacy_at(legacy_path str) str {
             }
             var snip str = json.encode(it)
             if snip.len() > 400 {
-                snip = "\"\""
+                snip = ""
             }
-            corrupted = corrupted + sep + "{\"index\":" + json.encode(i) + ",\"reason\":" + json.encode(reason) + ",\"snippet\":" + snip + "}"
+            corrupted = corrupted + sep + "{\"index\":" + json.encode(i) + ",\"reason\":" + json.encode(reason) + ",\"snippet\":" + json.encode(snip) + "}"
         } else {
             var seq int = next_counter_on(db)
             var title str = json.as_string(json.get(it, "title"))
@@ -911,15 +1175,15 @@ fn next_counter_on(db SqliteDb) int {
     return v
 }
 
-/// 事务内幂等重放（SD-09/T-14）：
+/// 事务内幂等重放（SD-09/T-14；r5/T-18 修正 F-R5-02）：
 /// - rid 未命中 → ""
-/// - 命中且 kind/目标/意图 全匹配（或旧行通配）→ 原样返回存储的原收据与文档
-///   快照——后续文档变更不得改写历史 receipt（update-1 rev2 → update-2 rev3 →
-///   重放 update-1 仍 rev2）
-/// - 命中但 kind/目标/意图 不一致 → request_conflict 信封（ok=false），
-///   绝不能以 ok=true 确认一个未执行的新操作
-/// 旧版行（升级导入/前 schema）intent/rev/doc_json 为空 → 通配：同目标同 kind
-/// 即重放，rev 回退存储值/1，doc 现读。
+/// - 规范行（intent 以 v2c| 开头，含 kind/目标/内容/期望修订的完整意图）：
+///   完全匹配 → 原样返回存储的原收据与文档快照——后续文档变更不得改写
+///   历史 receipt（update-1 rev2 → update-2 rev3 → 重放 update-1 仍 rev2）；
+///   不匹配 → request_conflict，绝不以 ok=true 确认未执行的新操作。
+/// - 旧行（intent 空：升级导入的旧收据 / v1 三列请求行）：类型/意图/原修订
+///   不可完整恢复（t18 决策制品）→ 一律 request_conflict。绝不通配确认、
+///   绝不编造 rev1；原收据经 read_receipt 仍可查询，旧对象保持不变。
 fn replay_in_txn(db SqliteDb, rid str, kind str, note_id str, intent str) str {
     if rid == "" {
         return ""
@@ -931,26 +1195,25 @@ fn replay_in_txn(db SqliteDb, rid str, kind str, note_id str, intent str) str {
     }
     var row = rows[0]
     var s_note str = row[0]
-    var s_kind str = row[1]
     var s_rev str = row[2]
     var s_doc str = row[3]
     var s_intent str = row[4]
-    var kind_ok bool = s_kind == kind || s_kind == ""
-    var target_ok bool = note_id == "" || s_note == note_id
-    var intent_ok bool = s_intent == "" || s_intent == intent
-    if kind_ok == false || target_ok == false || intent_ok == false {
-        return "{\"ok\":false,\"err_code\":\"request_conflict\",\"err_detail\":\"same request_id used for a different operation/target/content\",\"doc\":{\"schema_version\":1,\"note_id\":\"\",\"revision\":0,\"title\":\"\",\"body\":\"\",\"tags\":[],\"color\":\"\",\"pinned\":false,\"state\":\"\",\"folder\":\"\",\"created_at\":\"\",\"updated_at\":\"\",\"legacy_id\":0,\"seq\":0},\"receipt\":{\"schema_version\":1,\"request_id\":\"\",\"note_id\":\"\",\"revision\":0,\"status\":\"\"}}"
+    if s_intent == "" {
+        return request_conflict_envelope("legacy request replay not confirmable: original intent was not persisted; the original receipt remains queryable and the stored object is untouched")
+    }
+    if s_intent != intent {
+        return request_conflict_envelope("same request_id used for a different operation/target/content")
+    }
+    var rev_unknown bool = s_rev == "" || s_rev == "0"
+    if rev_unknown {
+        return request_conflict_envelope("legacy request has no recoverable original revision; refusing to fabricate a receipt")
     }
     var doc str = s_doc
     if doc == "" {
         doc = load_doc_json_on(db, s_note)
     }
-    var rev_txt str = s_rev
-    if rev_txt == "" || rev_txt == "0" {
-        rev_txt = "1"
-    }
     var rc str = "{\"schema_version\":1,\"request_id\":" + json.encode(rid)
-    rc = rc + ",\"note_id\":" + json.encode(s_note) + ",\"revision\":" + rev_txt + ",\"status\":\"committed\"}"
+    rc = rc + ",\"note_id\":" + json.encode(s_note) + ",\"revision\":" + s_rev + ",\"status\":\"committed\"}"
     return "{\"ok\":true,\"err_code\":\"\",\"note\":" + doc + ",\"receipt\":" + rc + ",\"replayed\":true}"
 }
 

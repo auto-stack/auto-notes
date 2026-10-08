@@ -396,6 +396,31 @@ pub fn update_note(id int, expected_revision int, title str, body str, request_i
     return json.as_bool(v_ok)
 }
 
+/// 条件更新（结构化结果版，SD-14/T-19）：UI 需要 err_code 区分「明确拒绝」
+/// （revision_conflict/request_conflict——请求未执行）与「传输层未知结果」
+/// （err_code 空——可能已提交，需按未确认提交裁决）。
+pub fn update_note_r(id int, expected_revision int, title str, body str, request_id str) RepoResult {
+    var nid str = repository.nid_of(id)
+    var rid str = request_id
+    if rid == "" {
+        rid = repository.ui_request_id("ui-upd")
+    }
+    var js str = repository.repo_update(nid, expected_revision, title, body, rid)
+    return repo_result_of(js)
+}
+
+/// 读取单个文档（结构化结果版，SD-14/T-19）：未确认提交裁决时取服务器
+/// 当前 revision/内容对比（?Note 的 unwrap 在两侧生成码里非既证原语，
+/// 走 RepoResult 信封与既有解析路径同构）。
+pub fn get_note_r(id int) RepoResult {
+    var js str = repository.repo_get(repository.nid_of(id))
+    if js == "" {
+        return repo_result_of("{\"ok\":false,\"err_code\":\"not_found\"}")
+    }
+    var env_js str = "{\"ok\":true,\"err_code\":\"\",\"note\":" + js + ",\"receipt\":{\"schema_version\":1,\"request_id\":\"\",\"note_id\":\"\",\"revision\":0,\"status\":\"\"}}"
+    return repo_result_of(env_js)
+}
+
 pub fn delete_note(id int) bool {
     var js str = repository.repo_trash(repository.nid_of(id))
     var it = json.parse(js)

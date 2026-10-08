@@ -376,6 +376,277 @@ print('[S14] [valid,null,valid] -> migrated=2, corrupted=1(null entry) ✓')
 # → setup 同目录 → GET /api/v1/notes；证据由执行记录留存。
 log "[S10 crash] 外部驱动：kill 后端 → 重启（NOTES_TEST_MODE=1）→ setup 同目录 → GET /api/v1/notes"
 
+# ═══════════════════════════════════════════════════════════
+# r5 附加门（Phase 4 / T-17 / T-18 / T-20）：升级权威元数据与失败边界、
+# 请求意图规范编码与旧行裁决、迁移严格类型。负例来自
+# docs/plans/evidence/001-r4-recheck-20261008/（F-R5-01..04）。
+# ═══════════════════════════════════════════════════════════
+WEDGE="tests/probe/evidence/v1/wedge-snapshot"
+
+wedge_into() { # wedge_into <dst_dir> — 旧 Phase1 树就位（manifest/notes/receipts/journal）
+  local dst="$1"
+  rm -rf "$dst"
+  mkdir -p "$dst"
+  cp "$WEDGE/manifest.json" "$dst/"
+  cp -r "$WEDGE/notes" "$dst/notes"
+  cp -r "$WEDGE/receipts" "$dst/receipts"
+  cp -r "$WEDGE/journal" "$dst/journal"
+}
+
+# ── S15（V-17/T-17）：manifest 权威元数据 + trashed 不复活 + 旧收据裁决 ──
+D15="$work/s15-upg"; D15W="$work_win/s15-upg"
+wedge_into "$D15/data"
+setup "$D15W/data" "$D15W/nope.json" > /dev/null
+python - "$D15/data/manifest.json" <<'PYEOF'
+import json, sys
+p = sys.argv[1]
+m = json.load(open(p, encoding='utf8'))
+m['entries'][0].update({'tags': ['saved-tag', 'important'], 'pinned': True,
+                        'folder': 'saved-folder', 'state': 'trashed'})
+open(p, 'w', encoding='utf8').write(json.dumps(m, ensure_ascii=False))
+PYEOF
+before_h=$(find "$D15/data/manifest.json" "$D15/data/notes" "$D15/data/receipts" "$D15/data/journal" -type f | sort | xargs md5sum | md5sum | cut -d' ' -f1)
+curl -s -m 10 "$BASE/api/v1/notes/n-1" -o "$OUT/s15-doc.json"
+curl -s -m 10 "$BASE/api/v1/notes" -o "$OUT/s15-active.json"
+assert_py "S15 manifest-authority metadata merged" "
+d=json.load(open(OUT+'/s15-doc.json'))['doc']
+assert d['tags']==['saved-tag','important'] and d['pinned'] is True, d
+assert d['folder']=='saved-folder' and d['state']=='trashed' and d['revision']==2, d
+a=json.load(open(OUT+'/s15-active.json'))
+assert a==[], a
+print('[S15] manifest tags/pinned/folder/trashed authoritative; trashed not in active ✓')
+" | tee -a "$SUM"
+# 旧收据（d-2=update rev2）复用必须拒绝；对象与原树保持
+payload "$work/p15c.json" <<'JSONEOF'
+{"request_id":"d-2","title":"hijack","body":"x","folder":""}
+JSONEOF
+curl -s -m 10 -X POST "$BASE/api/v1/notes" -H "Content-Type: application/json" --data-binary @"$work/p15c.json" -o "$OUT/s15-reuse-create.json"
+payload "$work/p15u.json" <<'JSONEOF'
+{"expected_revision":2,"title":"h2","body":"y","request_id":"d-2"}
+JSONEOF
+curl -s -m 10 -X PUT "$BASE/api/v1/notes/n-1" -H "Content-Type: application/json" --data-binary @"$work/p15u.json" -o "$OUT/s15-reuse-update.json"
+curl -s -m 10 "$BASE/api/v1/notes/n-1" -o "$OUT/s15-after.json"
+assert_py "S15 legacy receipt reuse rejected both ways" "
+c=json.load(open(OUT+'/s15-reuse-create.json'))
+u=json.load(open(OUT+'/s15-reuse-update.json'))
+d=json.load(open(OUT+'/s15-after.json'))['doc']
+assert c['ok']==False and c['err_code']=='request_conflict', c
+assert u['ok']==False and u['err_code']=='request_conflict', u
+assert d['title']=='doc1-updated' and d['revision']==2, d
+print('[S15] legacy d-2 reuse → request_conflict; object untouched ✓ (F-R5-02)')
+" | tee -a "$SUM"
+after_h=$(find "$D15/data/manifest.json" "$D15/data/notes" "$D15/data/receipts" "$D15/data/journal" -type f | sort | xargs md5sum | md5sum | cut -d' ' -f1)
+if [ "$before_h" != "$after_h" ]; then fail "S15 legacy source modified!"; else log "[S15] legacy source untouched ✓"; fi
+if [ -f "$D15/data/legacy-backup/manifest.json" ]; then log "[S15] legacy-backup present ✓"; else fail "S15 backup missing"; fi
+OUT="$OUT" D15="$D15" python -c "
+import json, os, sqlite3
+db = sqlite3.connect(os.environ['D15']+'/data/inbox.db')
+rows = db.execute('SELECT intent, rev, kind FROM requests').fetchall()
+assert all(r[0]=='' for r in rows) and len(rows)==2, rows
+assert all(r[2] in ('create','update') for r in rows), rows
+assert all(r[1] > 0 for r in rows), rows
+print('[S15] legacy request rows: kind/rev recovered, intent empty (unverifiable) ✓')
+" || fail "S15 legacy request rows shape"
+# 误写标记恢复（r4 缺陷库形态）：模拟实体元数据错误导入 + upgraded=1 +
+# legacy corrupted_r1 残留 → 打开时按权威规则重跑回收，无重复
+OUT="$OUT" D15="$D15" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D15']+'/data/inbox.db')
+db.execute(\"UPDATE notes SET tags_json='[]', pinned=0, state='active', folder='' WHERE note_id='n-1'\")
+db.execute(\"INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')\")
+db.execute('INSERT OR REPLACE INTO meta(k,v) VALUES(\'corrupted_r1\',\'["legacy upgrade",[{"index":0,"reason":"entity unreadable"}]]\')')
+db.commit(); db.close()
+print('r4-style mis-marked state injected')
+"
+curl -s -m 10 "$BASE/api/v1/notes/n-1" -o "$OUT/s15-merge.json"
+curl -s -m 10 "$BASE/api/v1/notes/n-1" -o "$OUT/s15-merge2.json"
+OUT="$OUT" D15="$D15" python -c "
+import json, os, sqlite3
+OUT = os.environ['OUT']
+d=json.load(open(OUT+'/s15-merge.json'))['doc']
+assert d['tags']==['saved-tag','important'] and d['state']=='trashed' and d['revision']==2 and d['pinned'] is True, d
+d2=json.load(open(OUT+'/s15-merge2.json'))['doc']
+assert d2['tags']==d['tags'] and d2['revision']==2, d2
+db = sqlite3.connect(os.environ['D15']+'/data/inbox.db')
+n = db.execute('SELECT COUNT(*) FROM notes').fetchone()[0]
+err = db.execute(\"SELECT v FROM meta WHERE k='upgrade_error'\").fetchone()
+assert n==1, n
+assert (err is None) or (err[0]==''), err
+print('[S15] mis-marked DB repaired on open: authority recovered, idempotent ✓')
+" || fail "S15 merge idempotency"
+
+# ── S16（T-17）：升级失败边界——备份为文件 / 缺实体 / manifest={} ──
+D16="$work/s16-bound"; D16W="$work_win/s16-bound"
+wedge_into "$D16/data"
+touch "$D16/data/legacy-backup"
+setup "$D16W/data" "$D16W/nope.json" > /dev/null
+curl -s -m 10 "$BASE/api/v1/notes" -o "$OUT/s16-bak.json"
+curl -s -m 10 "$BASE/api/v1/status" -o "$OUT/s16-bak-status.json"
+assert_py "S16 backup blocked -> explicit failure" "
+l=json.load(open(OUT+'/s16-bak.json'))
+s=json.loads(json.load(open(OUT+'/s16-bak-status.json')))
+assert l==[], l
+assert s['upgrade_error']!='', s
+print('[S16] backup path as file → no silent success ✓')
+" | tee -a "$SUM"
+rm -f "$D16/data/legacy-backup"
+curl -s -m 10 "$BASE/api/v1/notes" -o "$OUT/s16-retry.json"
+assert_py "S16 retry after unblock succeeds" "
+l=json.load(open(OUT+'/s16-retry.json'))
+assert len(l)==1 and l[0]['note_id']=='n-1', l
+print('[S16] retry after removing backup blocker ✓')
+" | tee -a "$SUM"
+# 缺唯一实体
+D16b="$work/s16-miss"; D16bW="$work_win/s16-miss"
+wedge_into "$D16b/data"
+rm "$D16b/data/notes/n-1.r2.json"
+setup "$D16bW/data" "$D16bW/nope.json" > /dev/null
+curl -s -m 10 "$BASE/api/v1/notes" -o "$OUT/s16-miss.json"
+curl -s -m 10 "$BASE/api/v1/status" -o "$OUT/s16-miss-status.json"
+assert_py "S16 missing entity -> explicit, repairable" "
+l=json.load(open(OUT+'/s16-miss.json'))
+s=json.loads(json.load(open(OUT+'/s16-miss-status.json')))
+assert l==[], l
+assert 'entity missing' in s['upgrade_error'], s
+print('[S16] missing entity → explicit error (not corrupted-then-done) ✓')
+" | tee -a "$SUM"
+cp "$WEDGE/notes/n-1.r2.json" "$D16b/data/notes/n-1.r2.json"
+curl -s -m 10 "$BASE/api/v1/notes" -o "$OUT/s16-fix.json"
+assert_py "S16 retry after restoring entity" "
+l=json.load(open(OUT+'/s16-fix.json'))
+assert len(l)==1 and l[0]['note_id']=='n-1', l
+print('[S16] entity restored → upgrade succeeds ✓')
+" | tee -a "$SUM"
+# manifest={}
+D16c="$work/s16-empty"; D16cW="$work_win/s16-empty"
+mkdir -p "$D16c/data/notes"
+echo '{}' > "$D16c/data/manifest.json"
+cp "$WEDGE/notes/n-1.r2.json" "$D16c/data/notes/"
+setup "$D16cW/data" "$D16cW/nope.json" > /dev/null
+curl -s -m 10 "$BASE/api/v1/notes" -o "$OUT/s16-empty.json"
+curl -s -m 10 "$BASE/api/v1/status" -o "$OUT/s16-empty-status.json"
+assert_py "S16 manifest {} rejected" "
+l=json.load(open(OUT+'/s16-empty.json'))
+s=json.loads(json.load(open(OUT+'/s16-empty-status.json')))
+assert l==[], l
+assert 'entries' in s['upgrade_error'], s
+print('[S16] manifest {} → explicit error, not empty success ✓')
+" | tee -a "$SUM"
+
+# ── S17（V-18/T-18）：管道歧义意图 + 旧行裁决 + v2 行版本化迁移 ──
+D17="$work/s17-intent"; D17W="$work_win/s17-intent"
+mkdir -p "$D17/data"
+setup "$D17W/data" "$D17W/nope.json" > /dev/null
+payload "$work/p17a.json" <<'JSONEOF'
+{"request_id":"rid-pipe","title":"a|b","body":"c","folder":""}
+JSONEOF
+curl -s -m 10 -X POST "$BASE/api/v1/notes" -H "Content-Type: application/json" --data-binary @"$work/p17a.json" -o "$OUT/s17-a.json"
+payload "$work/p17b.json" <<'JSONEOF'
+{"expected_revision":1,"title":"a","body":"b|c","request_id":"rid-pipe"}
+JSONEOF
+curl -s -m 10 -X PUT "$BASE/api/v1/notes/n-1" -H "Content-Type: application/json" --data-binary @"$work/p17b.json" -o "$OUT/s17-b.json"
+payload "$work/p17r.json" <<'JSONEOF'
+{"request_id":"rid-pipe","title":"a|b","body":"c","folder":""}
+JSONEOF
+curl -s -m 10 -X POST "$BASE/api/v1/notes" -H "Content-Type: application/json" --data-binary @"$work/p17r.json" -o "$OUT/s17-r.json"
+assert_py "S17 delimiter intent conflict + identical retry replay" "
+a=json.load(open(OUT+'/s17-a.json'))
+b=json.load(open(OUT+'/s17-b.json'))
+r=json.load(open(OUT+'/s17-r.json'))
+assert a['ok'], a
+assert b['ok']==False and b['err_code']=='request_conflict', b
+assert r['ok'] and r.get('replayed'), r
+print('[S17] a|b/c vs a/b|c → conflict; identical retry → replay ✓ (F-R5-02)')
+" | tee -a "$SUM"
+# 旧三列行（无 rev）不得假成功
+OUT="$OUT" D17="$D17" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D17']+'/data/inbox.db')
+db.execute(\"INSERT INTO notes(note_id, legacy_id, revision, title, body, tags_json, color, pinned, state, folder, seq, created_at, updated_at) VALUES('n-9', 9, 3, 't3', 'b3', '[]', '', 0, 'active', '', 9, '', '')\")
+db.execute(\"INSERT INTO requests(request_id, note_id, kind, rev, doc_json, intent) VALUES('old3', 'n-9', 'update', 0, '', '')\")
+db.commit(); db.close()
+print('legacy 3-col row injected')
+"
+payload "$work/p17o.json" <<'JSONEOF'
+{"expected_revision":3,"title":"x","body":"y","request_id":"old3"}
+JSONEOF
+curl -s -m 10 -X PUT "$BASE/api/v1/notes/n-9" -H "Content-Type: application/json" --data-binary @"$work/p17o.json" -o "$OUT/s17-old3.json"
+curl -s -m 10 "$BASE/api/v1/notes/n-9" -o "$OUT/s17-old3-after.json"
+assert_py "S17 legacy 3-col replay rejected, no fabricated receipt" "
+r=json.load(open(OUT+'/s17-old3.json'))
+d=json.load(open(OUT+'/s17-old3-after.json'))['doc']
+assert r['ok']==False and r['err_code']=='request_conflict', r
+assert d['title']=='t3' and d['revision']==3, d
+print('[S17] rev-less legacy row → conflict (no rev1 fabrication) ✓')
+" | tee -a "$SUM"
+# r4 管道行版本化迁移：降 schema_v + 管道意图 → 迁移后同内容重放/异内容冲突
+OUT="$OUT" D17="$D17" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D17']+'/data/inbox.db')
+row = db.execute(\"SELECT doc_json FROM requests WHERE request_id='rid-pipe'\").fetchone()
+assert row and row[0], row
+db.execute(\"UPDATE requests SET intent='create|a|b|c|[]' WHERE request_id='rid-pipe'\")
+db.execute(\"UPDATE meta SET v='2' WHERE k='schema_v'\")
+db.commit(); db.close()
+print('pipe intent + schema_v=2 injected')
+"
+curl -s -m 10 "$BASE/api/v1/notes" -o /dev/null
+payload "$work/p17m.json" <<'JSONEOF'
+{"request_id":"rid-pipe","title":"a|b","body":"c","folder":""}
+JSONEOF
+curl -s -m 10 -X POST "$BASE/api/v1/notes" -H "Content-Type: application/json" --data-binary @"$work/p17m.json" -o "$OUT/s17-mig.json"
+payload "$work/p17x.json" <<'JSONEOF'
+{"expected_revision":1,"request_id":"rid-pipe","title":"a|b","body":"CHANGED","folder":""}
+JSONEOF
+nid17=$(jq_get "$OUT/s17-a.json" "d['doc']['note_id']")
+curl -s -m 10 -X PUT "$BASE/api/v1/notes/$nid17" -H "Content-Type: application/json" --data-binary @"$work/p17x.json" -o "$OUT/s17-migx.json"
+assert_py "S17 v2 pipe row migrated to canonical intent" "
+m=json.load(open(OUT+'/s17-mig.json'))
+x=json.load(open(OUT+'/s17-migx.json'))
+assert m['ok'] and m.get('replayed'), m
+assert x['ok']==False and x['err_code']=='request_conflict', x
+print('[S17] migrated pipe row: same intent replays, changed content conflicts ✓')
+" | tee -a "$SUM"
+
+# ── S18（V-20/T-20）：迁移严格类型 + snippet 字符串契约 ──
+D18="$work/s18-types"; D18W="$work_win/s18-types"; mkdir -p "$D18/data"
+python - "$D18/notes-types.json" <<'PYEOF'
+import json, sys
+items = [
+    {"id": 0, "title": "valid-0", "body": "ok", "folder": "", "pinned": False, "tags": []},
+    {"id": True, "title": "bool-id", "body": "x", "tags": []},
+    {"id": 5, "title": "obj-body", "body": {"text": "nested"}, "tags": []},
+    {"id": 6, "title": "bad-tags", "body": "x", "tags": [7, None]},
+    {"id": 9, "title": "合法中文项：多行\n与 emoji 🎉", "body": "正文保持", "folder": "", "pinned": False, "tags": ["中文"]},
+]
+open(sys.argv[1], 'wb').write(json.dumps(items, ensure_ascii=False).encode('utf-8'))
+PYEOF
+setup "$D18W/data" "$D18W/notes-types.json" > /dev/null
+curl -s -m 15 -X POST "$BASE/api/v1/migrate" -o "$OUT/s18-migrate.json"
+curl -s -m 10 "$BASE/api/v1/notes" -o "$OUT/s18-list.json"
+assert_py "S18 strict types reported; later valid item salvaged" "
+m=json.load(open(OUT+'/s18-migrate.json'))
+assert m['migrated']==2, m
+assert len(m['corrupted'])==3, m
+reasons=sorted(c['reason'] for c in m['corrupted'])
+assert reasons==['body not a string','id not an integer','tags element not a string'], reasons
+assert all(isinstance(c['snippet'],str) for c in m['corrupted']), [type(c['snippet']).__name__ for c in m['corrupted']]
+l=json.load(open(OUT+'/s18-list.json'))
+assert any('合法中文项' in n['title'] for n in l), l
+print('[S18] bool-id/obj-body/tags-elements reported; chinese item migrated; snippets are strings ✓ (F-R5-04)')
+" | tee -a "$SUM"
+if [ -f "$D18/data/corrupted/report-r1.json" ]; then
+  OUT="$OUT" D18="$D18" python -c "
+import json, os
+rep=json.load(open(os.environ['D18']+'/data/corrupted/report-r1.json', encoding='utf8'))
+assert all(isinstance(c['snippet'],str) for c in rep['corrupted']), rep
+print('[S18] persisted report snippets are strings ✓')
+"
+else
+  fail "S18 report file missing"
+fi
+FAILS=$(wc -l < "$OUT/.fails" | tr -d ' ')
+
 FAILS=$(wc -l < "$OUT/.fails" | tr -d ' ')
 log "== battery done; fails=$FAILS; artifacts in $OUT"
 if [ "$FAILS" -gt 0 ]; then

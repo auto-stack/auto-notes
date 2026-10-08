@@ -30,7 +30,7 @@ widget EditorPanel() {
         EditTitle(str), EditBody(str),
         ShowTagInput, TagInputChanged(str), AddTag, RemoveTag(str),
         SaveDraft, TogglePinActive, DeleteArmed, DeleteCancelled, DeleteConfirmed,
-        DiscardDraft, RecoverDraft, DiscardRecovery
+        DiscardDraft, RecoverDraft, RecoverDraft2, DiscardRecovery, DiscardRecovery2
     }
 
     model {
@@ -46,7 +46,8 @@ widget EditorPanel() {
             col {
                 style: "shrink-0 gap-2 px-8 pt-6 pb-3 border-b border-border"
 
-                // 恢复槽（SD-10）：冲突导航存下的未保存草稿，可恢复/放弃
+                // 恢复槽（SD-10/SD-14 双槽）：冲突导航/恢复保全的未保存草稿，
+                // 各自可恢复/放弃；Recover 时当前草稿入另一槽，两份都可恢复。
                 if .store.has_recovery {
                     row {
                         style: "items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10"
@@ -59,6 +60,23 @@ widget EditorPanel() {
                         }
                         button {
                             onclick: .DiscardRecovery
+                            style: ghost_btn
+                            text "Dismiss" { style: "text-xs" }
+                        }
+                    }
+                }
+                if .store.has_recovery2 {
+                    row {
+                        style: "items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10"
+                        icon (name: "alert-triangle", size: 13, style: "text-amber-600")
+                        text "Unsaved draft kept aside (2nd)" { style: "text-xs text-amber-700" }
+                        button {
+                            onclick: .RecoverDraft2
+                            style: pill_btn
+                            text "Recover" { style: "text-xs" }
+                        }
+                        button {
+                            onclick: .DiscardRecovery2
                             style: ghost_btn
                             text "Dismiss" { style: "text-xs" }
                         }
@@ -211,6 +229,8 @@ widget EditorPanel() {
         .DeleteConfirmed -> { store.DeleteConfirmed() }
         .DiscardDraft -> { store.DiscardDraft() }
         .RecoverDraft -> { store.RecoverDraft() }
+        .RecoverDraft2 -> { store.RecoverDraft2() }
         .DiscardRecovery -> { store.DiscardRecovery() }
+        .DiscardRecovery2 -> { store.DiscardRecovery2() }
     }
 }
