@@ -17,11 +17,11 @@ needs_fix 文档提交）之后。工作树：`D:/autostack/auto-os/apps/015-not
 
 | 门 | 命令 | 证据 |
 |---|---|---|
-| battery | `NOTES_TEST_MODE=1` 实例（动态隔离目录、无 seed）+ `bash tests/probe/run_v1_battery.sh <独立输出目录>` | [battery-summary.txt](battery-summary.txt) / [battery-full.log](battery-full.log) |
-| Vue 全套 | `python tests/probe/evidence/r5-work/run_vue_suite.py`（动态双端口 + seeded 净库） | [vue-playwright.log](vue-playwright.log)（24 passed） |
-| VM 原套件 | `python tests/probe/evidence/r5-work/run_vm_suite.py`（`auto run -r vm -B <动态>` + 私有 AUTOUI_MCP_PORT） | [vm-suite.log](vm-suite.log)（19 passed）/ [vm-suite-result.json](vm-suite-result.json) |
-| VM 负例 | `python tests/probe/evidence/r5-work/run_vm_negative.py`（真实 MCP 驱动 + HTTP 外部写者 + fault 注入） | [vm-negative-result.json](vm-negative-result.json) |
-| 后端负例 | `python tests/probe/evidence/r5-work/verify_backend_scratch.py`（升级/意图/严格类型全负例） | [scratch-summary.json](scratch-summary.json)（fails=0） |
+| battery | `NOTES_TEST_MODE=1` 实例（动态隔离目录、无 seed）+ `bash tests/probe/run_v1_battery.sh <独立输出目录>` | [battery-summary.txt](battery-summary.txt)（完整 stdout 落本地 battery-full.log，`*.log` 按仓规不入库，可由命令再生） |
+| Vue 全套 | `python tests/probe/evidence/r5-work/run_vue_suite.py`（动态双端口 + seeded 净库） | vue-playwright.log（本地产物，同上）；关键行：`24 passed` |
+| VM 原套件 | `python tests/probe/evidence/r5-work/run_vm_suite.py`（`auto run -r vm -B <动态>` + 私有 AUTOUI_MCP_PORT） | [vm-suite-result.json](vm-suite-result.json)（suite_exit=0，19 passed）/ [vm-suite.log](vm-suite.log)（本地产物） |
+| VM 负例 | `python tests/probe/evidence/r5-work/run_vm_negative.py`（真实 MCP 驱动 + HTTP 外部写者 + fault 注入） | [vm-negative-result.json](vm-negative-result.json)（fails=[]，13 断言全过） |
+| 后端负例 | `python tests/probe/evidence/r5-work/verify_backend_scratch.py`（升级/意图/严格类型全负例） | [scratch-summary.json](scratch-summary.json)（fails=0，36 断言） |
 
 运行纪律：单实例单用途（seeded/电池/负例互不混跑）；动态端口；VM 用私有
 MCP 端口隔离；`PYTHONUTF8=1`；每轮净库目录；进程用后即杀。
