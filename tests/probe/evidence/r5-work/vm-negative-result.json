@@ -1,0 +1,215 @@
+{
+  "command": [
+    "D:/autostack/auto-lang/target/debug/auto.exe",
+    "run",
+    "-r",
+    "vm",
+    "-B",
+    "2007"
+  ],
+  "mcp_port": 2006,
+  "backend_port": 2007,
+  "run_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\r5-vm-1791459377320336400",
+  "pid": 11968,
+  "mcp_ready": true,
+  "negative_results": {
+    "r5_vm_1": {
+      "after_conflict": {
+        "conflict": "true",
+        "dirty": "true",
+        "draft_request_id": "ui-edit-1",
+        "draft_revision": "1",
+        "draft_title": "VM precious recovery draft",
+        "has_pend": "true",
+        "has_prev": "false",
+        "has_recovery": "false",
+        "has_recovery2": "false",
+        "pend_title": "VM precious recovery draft",
+        "rec2_title": "",
+        "rec_title": ""
+      },
+      "after_nav": {
+        "conflict": "false",
+        "dirty": "false",
+        "draft_request_id": "",
+        "draft_revision": "1",
+        "draft_title": "Shopping List",
+        "has_pend": "false",
+        "has_prev": "false",
+        "has_recovery": "true",
+        "has_recovery2": "false",
+        "pend_title": "VM precious recovery draft",
+        "rec2_title": "",
+        "rec_title": "VM precious recovery draft"
+      },
+      "after_recover": {
+        "conflict": "true",
+        "dirty": "true",
+        "draft_request_id": "ui-edit-1",
+        "draft_revision": "1",
+        "draft_title": "VM precious recovery draft",
+        "has_pend": "false",
+        "has_prev": "false",
+        "has_recovery": "false",
+        "has_recovery2": "true",
+        "pend_title": "VM precious recovery draft",
+        "rec2_title": "VM new shopping draft",
+        "rec_title": "VM precious recovery draft"
+      },
+      "after_recover2": {
+        "conflict": "true",
+        "dirty": "true",
+        "draft_request_id": "",
+        "draft_revision": "1",
+        "draft_title": "VM new shopping draft",
+        "has_pend": "false",
+        "has_prev": "false",
+        "has_recovery": "true",
+        "has_recovery2": "false",
+        "pend_title": "VM precious recovery draft",
+        "rec2_title": "VM new shopping draft",
+        "rec_title": "VM precious recovery draft"
+      }
+    },
+    "r5_vm_2": {
+      "fresh_load": {
+        "conflict": "false",
+        "dirty": "false",
+        "draft_request_id": "",
+        "draft_revision": "2",
+        "draft_title": "VM ext bump",
+        "has_pend": "false",
+        "has_prev": "false",
+        "has_recovery": "true",
+        "has_recovery2": "false",
+        "pend_title": "VM new shopping draft",
+        "rec2_title": "VM new shopping draft",
+        "rec_title": "VM precious recovery draft"
+      },
+      "after_conflict": {
+        "conflict": "true",
+        "dirty": "true",
+        "draft_request_id": "ui-edit-3",
+        "draft_revision": "2",
+        "draft_title": "VM stale local edit",
+        "has_pend": "true",
+        "has_prev": "false",
+        "has_recovery": "true",
+        "has_recovery2": "false",
+        "pend_title": "VM stale local edit",
+        "rec2_title": "VM new shopping draft",
+        "rec_title": "VM precious recovery draft"
+      },
+      "after_discard": {
+        "conflict": "false",
+        "dirty": "false",
+        "draft_request_id": "",
+        "draft_revision": "3",
+        "draft_title": "VM ext bump 2",
+        "has_pend": "false",
+        "has_prev": "false",
+        "has_recovery": "true",
+        "has_recovery2": "false",
+        "pend_title": "VM stale local edit",
+        "rec2_title": "VM new shopping draft",
+        "rec_title": "VM precious recovery draft"
+      },
+      "server": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 3,
+          "title": "VM ext bump 2",
+          "body": "external 2",
+          "tags": [
+            "intro",
+            "seed"
+          ],
+          "color": "",
+          "pinned": true,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      }
+    },
+    "r5_vm_3": {
+      "after_fault": {
+        "conflict": "true",
+        "dirty": "true",
+        "draft_request_id": "ui-edit-4",
+        "draft_revision": "3",
+        "draft_title": "VM unconfirmed C1",
+        "has_pend": "true",
+        "has_prev": "false",
+        "has_recovery": "true",
+        "has_recovery2": "false",
+        "pend_title": "VM unconfirmed C1",
+        "rec2_title": "VM new shopping draft",
+        "rec_title": "VM precious recovery draft"
+      },
+      "after_edit_save": {
+        "conflict": "false",
+        "dirty": "false",
+        "draft_request_id": "",
+        "draft_revision": "5",
+        "draft_title": "VM unconfirmed C1 EDITED C2",
+        "has_pend": "false",
+        "has_prev": "false",
+        "has_recovery": "true",
+        "has_recovery2": "false",
+        "pend_title": "VM unconfirmed C1 EDITED C2",
+        "rec2_title": "VM new shopping draft",
+        "rec_title": "VM precious recovery draft"
+      },
+      "server_final": {
+        "schema_version": 1,
+        "note_id": "n-1",
+        "revision": 5,
+        "title": "VM unconfirmed C1 EDITED C2",
+        "body": "external 2",
+        "tags": [
+          "intro",
+          "seed"
+        ],
+        "color": "",
+        "pinned": true,
+        "state": "active",
+        "folder": "",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 1,
+        "seq": 1
+      },
+      "after_retry": {
+        "conflict": "false",
+        "dirty": "false",
+        "draft_request_id": "",
+        "draft_revision": "5",
+        "draft_title": "VM unconfirmed C1 EDITED C2",
+        "has_pend": "false",
+        "has_prev": "false",
+        "has_recovery": "true",
+        "has_recovery2": "false",
+        "pend_title": "VM unconfirmed C1 EDITED C2",
+        "rec2_title": "VM new shopping draft",
+        "rec_title": "VM precious recovery draft"
+      }
+    }
+  },
+  "fails": []
+}

@@ -1,0 +1,6 @@
+{
+  "backend_exe_sha256": "9d5635785dc9acac0eb53873d3b479ccc90cb821245ad3d66f952d11aed4d9d1",
+  "cli": "auto 0.1.0+v0.4.2-2785-ga6e108f60 (D:/autostack/auto-lang/target/debug/auto.exe)",
+  "auto_down": "96f095bfc41a8686331c5ccd3ce17b685147fcc1 (pinned gitlink == actual)",
+  "auto_lang_main": "578794d9cc73d8b5b875617b2be3b2a5ee7634a6"
+}
