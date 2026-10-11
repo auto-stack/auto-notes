@@ -1,0 +1,28 @@
+Evidence: D:\autostack\auto-os\apps\015-notes\.auto\r5-vm-1791748845611707500
+[PASS] R5-VM-1 conflict kept dirty
+[PASS] R5-VM-1 stashed to slot A
+[PASS] R5-VM-1 recover shows OLD stashed draft (not self-overwrite)
+[PASS] R5-VM-1 current draft preserved in slot B
+[PASS] R5-VM-1 second slot recoverable back
+[PASS] R5-VM-2 welcome fresh load after recovery flow
+[PASS] R5-VM-2 stale save conflicts
+[PASS] R5-VM-2 discard shows latest server title
+[PASS] R5-VM-3 fault keeps draft dirty
+[PASS] R5-VM-3 faulted commit actually landed server-side
+[PASS] R5-VM-3 adjudicated new intent saved
+[PASS] R5-VM-3 server final = C2 at adopted revision
+[PASS] R5-VM-3 retry idempotent still Saved
+VM negatives done. fails = 0 []
+ to completion (waited 49.7227ms)
+[VM-PARKED] handler_NavTree_SelectNote parked (event SelectNote, wait HttpRequest(4)) — UI stays interactive
+[VM-PARKED] handler_NavTree_SelectNote resumed to completion (waited 51.6879ms)
+[VM-PARKED] handler_NavTree_SelectNote parked (event SelectNote, wait HttpRequest(5)) — UI stays interactive
+[VM-PARKED] handler_NavTree_SelectNote resumed to completion (waited 50.8687ms)
+[VM-PARKED] handler_EditorPanel_SaveDraft parked (event SaveDraft, wait HttpRequest(8)) — UI stays interactive
+[VM-PARKED] handler_EditorPanel_SaveDraft resumed to completion (waited 35.436ms)
+[VM-PARKED] handler_EditorPanel_DiscardDraft parked (event DiscardDraft, wait HttpRequest(10)) — UI stays interactive
+[VM-PARKED] handler_EditorPanel_DiscardDraft resumed to completion (waited 34.4002ms)
+[VM-PARKED] handler_EditorPanel_SaveDraft parked (event SaveDraft, wait HttpRequest(11)) — UI stays interactive
+[VM-PARKED] handler_EditorPanel_SaveDraft resumed to completion (waited 81.9156ms)
+[VM-PARKED] handler_EditorPanel_SaveDraft parked (event SaveDraft, wait HttpRequest(13)) — UI stays interactive
+[VM-PARKED] handler_EditorPanel_SaveDraft resumed to completion (waited 131.9605ms)

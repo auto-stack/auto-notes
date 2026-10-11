@@ -1,0 +1,17 @@
+Evidence: D:\autostack\auto-os\apps\015-notes\.auto\r5-vm-1791749013753380900
+[FAIL] IND-VM-1 existing B draft preserved {'conflict': 'true', 'dirty': 'true', 'draft_request_id': 'ui-edit-1', 'draft_revision': '1', 'draft_title': 'VM precious A', 'has_pend': 'false', 'has_prev': 'false', 'has_recovery': 'false', 'has_recovery2': 'true', 'pend_title': 'VM precious B', 'rec2_title': 'VM precious C', 'rec_title': 'VM precious A'}
+[FAIL] IND-VM-2 recovered new intent can save {'conflict': 'true', 'dirty': 'true', 'draft_request_id': 'ui-edit-3', 'draft_revision': '1', 'draft_title': 'VM C2 new draft', 'has_pend': 'false', 'has_prev': 'false', 'has_recovery': 'false', 'has_recovery2': 'false', 'pend_title': 'VM C1 unconfirmed', 'rec2_title': 'VM precious C', 'rec_title': 'VM C2 new draft'}
+VM negatives done. fails = 2 ['IND-VM-1 existing B draft preserved', 'IND-VM-2 recovered new intent can save']
+to completion (waited 82.8238ms)
+[VM-PARKED] handler_NavTree_SelectNote parked (event SelectNote, wait HttpRequest(7)) — UI stays interactive
+[VM-PARKED] handler_NavTree_SelectNote resumed to completion (waited 18.4899ms)
+[VM-PARKED] handler_EditorPanel_DiscardDraft parked (event DiscardDraft, wait HttpRequest(8)) — UI stays interactive
+[VM-PARKED] handler_EditorPanel_DiscardDraft resumed to completion (waited 18.9343ms)
+[VM-PARKED] handler_EditorPanel_SaveDraft parked (event SaveDraft, wait HttpRequest(9)) — UI stays interactive
+[VM-PARKED] handler_EditorPanel_SaveDraft resumed to completion (waited 139.1377ms)
+[VM-PARKED] handler_NavTree_SelectNote parked (event SelectNote, wait HttpRequest(11)) — UI stays interactive
+[VM-PARKED] handler_NavTree_SelectNote resumed to completion (waited 56.1794ms)
+[VM-PARKED] handler_EditorPanel_SaveDraft parked (event SaveDraft, wait HttpRequest(12)) — UI stays interactive
+[VM-PARKED] handler_EditorPanel_SaveDraft resumed to completion (waited 17.7895ms)
+[VM-PARKED] handler_EditorPanel_SaveDraft parked (event SaveDraft, wait HttpRequest(13)) — UI stays interactive
+[VM-PARKED] handler_EditorPanel_SaveDraft resumed to completion (waited 18.7083ms)

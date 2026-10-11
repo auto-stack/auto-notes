@@ -1,0 +1,59 @@
+---------------------------
+AutoNexus / Auto CLI
+---------------------------
+Loaded port: windows_ninja
+port NAME: windows_ninja
+all index: {"default": "git@gitee.com:auto-stack/auto-index.git"}
+used index: ["default"]
+19:55:48 [INFO] loading index store from C:/Users/zhaop/.auto/auto-man/index/default
+setting port builder: windows_ninja ninja, at build
+19:55:48 [WARN] Failed to initialize AutoCache: SQLite error: unable to open database file
+  Backend API server port: 17819
+  Frontend dev server port: 17818
+19:55:48 [INFO] Downloading deps
+19:55:48 [INFO] download done!
+19:55:48 [INFO] --- pac: notes ---
+
+╭──────────┬──────┬───────────────┬──────╮
+│[94m [39m[94mname[39m[94m    [39m[94m [39m│[94m [39m[94mkind[39m[94m [39m│[94m [39m[94mat[39m[94m           [39m[94m [39m│[94m [39m[94mdirs[39m[94m [39m│
+├──────────┼──────┼───────────────┼──────┤
+│ stylekit │ Dep  │ deps/stylekit │      │
+╰──────────┴──────┴───────────────┴──────╯
+19:55:48 [INFO] Linking targets with dependencies
+19:55:48 [INFO] Scanning targets for srcs and incs, only major targets and their deps are scanned
+19:55:48 [INFO] --- pac: notes ---
+
+╭──────┬──────┬────┬──────╮
+│[94m [39m[94mname[39m[94m [39m│[94m [39m[94mkind[39m[94m [39m│[94m [39m[94mat[39m[94m [39m│[94m [39m[94mdirs[39m[94m [39m│
+╰──────┴──────┴────┴──────╯
+Generating Vue project (backend: vue, gen-only)
+19:55:48 [INFO] Downloading deps
+19:55:48 [INFO] download done!
+19:55:48 [INFO] --- pac: notes ---
+
+╭──────────┬──────┬───────────────┬──────╮
+│[94m [39m[94mname[39m[94m    [39m[94m [39m│[94m [39m[94mkind[39m[94m [39m│[94m [39m[94mat[39m[94m           [39m[94m [39m│[94m [39m[94mdirs[39m[94m [39m│
+├──────────┼──────┼───────────────┼──────┤
+│ stylekit │ Dep  │ deps/stylekit │      │
+╰──────────┴──────┴───────────────┴──────╯
+19:55:48 [INFO] Linking targets with dependencies
+19:55:48 [INFO] Scanning targets for srcs and incs, only major targets and their deps are scanned
+Warning: Failed to compile D:\autostack\auto-os\apps\015-notes\src/front\types.at: No widget or store declarations found in input file
+Warning: Failed to compile dep file D:\autostack\auto-os\apps\015-notes\deps\stylekit\src\front\styles.at: No widget or store declarations found in input file
+
+▶ Regenerating source files...
+Regenerating source files...
+  ✓ Regenerated App.vue
+  ✓ Regenerated main.ts
+  ✓ Regenerated src/assets/index.css
+  ✓ Regenerated tsconfig.json
+  ✓ Regenerated tailwind.config.cjs
+  ✓ Regenerated index.html
+  ✓ Updated package.json
+  ✓ Store composable: D:\autostack\auto-os\apps\015-notes\gen\front\vue\src\stores\useNotesStore.ts
+  ✓ Regenerated 2 components
+
+▶ Generating API client...
+  ✓ Generated TypeScript client: dist/src/lib/api.ts
+  ✓ Generated Rust server: 015-notes-back/
+✓ Generation complete (3 component(s)); npm steps skipped (--gen-only)
