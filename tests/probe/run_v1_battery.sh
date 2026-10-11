@@ -454,7 +454,7 @@ import os, sqlite3
 db = sqlite3.connect(os.environ['D15']+'/data/inbox.db')
 db.execute(\"UPDATE notes SET tags_json='[]', pinned=0, state='active', folder='' WHERE note_id='n-1'\")
 db.execute(\"INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')\")
-db.execute('INSERT OR REPLACE INTO meta(k,v) VALUES(\'corrupted_r1\',\'["legacy upgrade",[{"index":0,"reason":"entity unreadable"}]]\')')
+db.execute('INSERT OR REPLACE INTO meta(k,v) VALUES(?,?)', ('corrupted_r1', '["legacy upgrade",[{"index":0,"reason":"entity unreadable"}]]'))
 db.commit(); db.close()
 print('r4-style mis-marked state injected')
 "
@@ -647,6 +647,100 @@ else
 fi
 FAILS=$(wc -l < "$OUT/.fails" | tr -d ' ')
 
+# ── S19（V-17/T-22/T-23 r6）：混合库冲突恒定 + 修复保护 + 非法实体拒绝 ──
+# F-R6-01：SQLite 已有确认数据 + 旧树在 + 未 upgraded → 恒 upgrade_conflict，
+# 重复读取/重启不得绕过；F-R6-02：r4 凭据修复只回收可证明匹配行，确认 rev3
+# 不回退、凭据清理后不再重导；F-R6-03：{} 实体不得导成空 ID 空成功。
+D19="$work/s19-mixed"; D19W="$work_win/s19-mixed"; mkdir -p "$D19/data"
+setup "$D19W/data" "$D19W/nope.json" > /dev/null
+payload "$work/p19new.json" <<'JSONEOF'
+{"request_id":"s19-current","title":"已确认的新数据","body":"不得覆盖","folder":""}
+JSONEOF
+curl -s -m 10 -X POST "$BASE/api/v1/notes" -H "Content-Type: application/json" --data-binary @"$work/p19new.json" -o "$OUT/s19-create.json"
+# 旧树就地并入（不删 inbox.db——wedge_into 的 rm -rf 会抹掉刚创建的库）
+cp "$WEDGE/manifest.json" "$D19/data/"
+cp -r "$WEDGE/notes" "$D19/data/notes"
+cp -r "$WEDGE/receipts" "$D19/data/receipts"
+cp -r "$WEDGE/journal" "$D19/data/journal"
+OUT="$OUT" D19="$D19" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D19']+'/data/inbox.db')
+db.execute(\"DELETE FROM meta WHERE k='upgraded'\")
+db.commit(); db.close()
+print('upgraded cleared (mixed state)')
+"
+for k in 1 2 3; do
+  curl -s -m 10 "$BASE/api/v1/notes" -o "$OUT/s19-list-$k.json"
+done
+D19="$D19" assert_py "S19a mixed DB conflict constant, new data preserved" "
+import sqlite3, os
+for k in (1,2,3):
+    l=json.load(open(OUT+'/s19-list-%d.json'%k))
+    assert all(n['title']=='已确认的新数据' for n in l), (k,l)
+db = sqlite3.connect(os.environ['D19']+'/data/inbox.db')
+rows = db.execute('SELECT title, revision FROM notes').fetchall()
+assert rows==[('已确认的新数据', 1)], rows
+err = db.execute(\"SELECT v FROM meta WHERE k='upgrade_error'\").fetchone()
+assert err and 'already contains notes' in err[0], err
+print('[S19a] mixed DB: 3 reads -> conflict persists, confirmed data untouched ✓')
+" | tee -a "$SUM"
+# S19b: r4 凭据修复保护确认 rev3
+D19b="$work/s19-repair"; D19bW="$work_win/s19-repair"
+wedge_into "$D19b/data"
+setup "$D19bW/data" "$D19bW/nope.json" > /dev/null
+curl -s -m 10 "$BASE/api/v1/notes" -o /dev/null
+payload "$work/p19u.json" <<'JSONEOF'
+{"expected_revision":2,"request_id":"s19-confirm","title":"升级后确认保存的新正文","body":"必须保留 rev3"}
+JSONEOF
+curl -s -m 10 -X PUT "$BASE/api/v1/notes/n-1" -H "Content-Type: application/json" --data-binary @"$work/p19u.json" -o "$OUT/s19-confirm.json"
+OUT="$OUT" D19b="$D19b" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D19b']+'/data/inbox.db')
+db.execute('INSERT OR REPLACE INTO meta(k,v) VALUES(?,?)', ('corrupted_r1', '[\"legacy upgrade\",[{\"index\":0}]]'))
+db.commit(); db.close()
+print('r4 credential injected')
+"
+curl -s -m 10 "$BASE/api/v1/notes/n-1" -o "$OUT/s19-after-repair.json"
+curl -s -m 10 "$BASE/api/v1/notes/n-1" -o "$OUT/s19-after-repair2.json"
+D19b="$D19b" assert_py "S19b repair protects confirmed rev3, credential cleared" "
+a=json.load(open(OUT+'/s19-after-repair.json'))['doc']
+b=json.load(open(OUT+'/s19-after-repair2.json'))['doc']
+assert a['revision']==3 and a['title']=='升级后确认保存的新正文', a
+assert b['revision']==3 and b['title']==a['title'], b
+import sqlite3, os
+db = sqlite3.connect(os.environ['D19b']+'/data/inbox.db')
+cr = db.execute(\"SELECT v FROM meta WHERE k='corrupted_r1'\").fetchone()
+assert cr is None, cr
+print('[S19b] repair: confirmed rev3 preserved across reads; credential cleared ✓')
+" | tee -a "$SUM"
+# S19c: {} 实体不得空成功
+D19c="$work/s19-badent"; D19cW="$work_win/s19-badent"
+wedge_into "$D19c/data"
+echo '{}' > "$D19c/data/notes/n-1.r2.json"
+setup "$D19cW/data" "$D19cW/nope.json" > /dev/null
+curl -s -m 10 "$BASE/api/v1/notes" -o "$OUT/s19-badent-list.json"
+curl -s -m 10 "$BASE/api/v1/status" -o "$OUT/s19-badent-status.json"
+D19c="$D19c" assert_py "S19c malformed entity rejected, not completed" "
+l=json.load(open(OUT+'/s19-badent-list.json'))
+s=json.loads(json.load(open(OUT+'/s19-badent-status.json')))
+assert l==[], l
+assert s['upgrade_error']!='' and 'invalid' in s['upgrade_error'], s
+import sqlite3, os
+db = sqlite3.connect(os.environ['D19c']+'/data/inbox.db')
+up = db.execute(\"SELECT v FROM meta WHERE k='upgraded'\").fetchone()
+n = db.execute('SELECT COUNT(*) FROM notes').fetchone()[0]
+assert (up is None) or (up[0]!='1'), up
+assert n==0, n
+print('[S19c] {} entity: explicit error, rollback, not completed ✓')
+" | tee -a "$SUM"
+# 修正后可重试
+cp "$WEDGE/notes/n-1.r2.json" "$D19c/data/notes/n-1.r2.json"
+curl -s -m 10 "$BASE/api/v1/notes" -o "$OUT/s19-badent-fix.json"
+assert_py "S19c retry after restoring entity succeeds" "
+l=json.load(open(OUT+'/s19-badent-fix.json'))
+assert len(l)==1 and l[0]['note_id']=='n-1' and l[0]['revision']==2, l
+print('[S19c] entity restored -> upgrade succeeds ✓')
+" | tee -a "$SUM"
 FAILS=$(wc -l < "$OUT/.fails" | tr -d ' ')
 log "== battery done; fails=$FAILS; artifacts in $OUT"
 if [ "$FAILS" -gt 0 ]; then

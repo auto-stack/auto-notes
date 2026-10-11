@@ -156,7 +156,14 @@ try:
                   server_after_c1)
             edit('VM unconfirmed C1 EDITED C2')
             click('Save')
-            s7 = state()
+            # 裁决链（get_note_r+retry）在 handler 内多跳 HTTP——autoui_state 可能
+            # 在 handler park 期间应答，轮询到 dirty 清零再断言（读竞态非产品失败）。
+            s7 = {}
+            for _ in range(40):
+                s7 = state()
+                if s7.get('dirty') == 'false':
+                    break
+                time.sleep(0.25)
             check('R5-VM-3 adjudicated new intent saved',
                   s7.get('dirty') == 'false' and s7.get('draft_title') == 'VM unconfirmed C1 EDITED C2', s7)
             server_final = call('GET', '/api/v1/notes/n-1')['doc']

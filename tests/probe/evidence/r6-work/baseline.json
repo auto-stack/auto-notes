@@ -1,0 +1,6 @@
+{
+  "backend_exe_sha256": "cc422c9a0d4011f6899a2d0d314e121d3d11aae42293931763b91462ecc6fde2",
+  "cli": "auto 0.1.0+v0.4.2-2785-ga6e108f60 (D:/autostack/auto-lang/target/debug/auto.exe)",
+  "auto_lang_main": "c64b71353e740bf84246de8bd612f692cba04db1 (review-era; fresh gates rerun)",
+  "auto_down": "96f095bfc41a8686331c5ccd3ce17b685147fcc1 (pin=actual)"
+}

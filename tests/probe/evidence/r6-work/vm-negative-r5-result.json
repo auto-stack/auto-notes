@@ -1,0 +1,185 @@
+{
+  "command": [
+    "D:/autostack/auto-lang/target/debug/auto.exe",
+    "run",
+    "-r",
+    "vm",
+    "-B",
+    "9528"
+  ],
+  "mcp_port": 9527,
+  "backend_port": 9528,
+  "run_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\r5-vm-1791754045910200000",
+  "pid": 36288,
+  "mcp_ready": true,
+  "negative_results": {
+    "full_slots_recover": {
+      "before": {
+        "conflict": "false",
+        "dirty": "true",
+        "draft_request_id": "",
+        "draft_revision": "1",
+        "draft_title": "VM precious C",
+        "has_pend": "false",
+        "has_prev": "false",
+        "has_recovery": "true",
+        "has_recovery2": "true",
+        "pend_title": "VM precious B",
+        "rec2_title": "VM precious B",
+        "rec_title": "VM precious A"
+      },
+      "after": {
+        "conflict": "false",
+        "dirty": "true",
+        "draft_request_id": "",
+        "draft_revision": "1",
+        "draft_title": "VM precious C",
+        "has_pend": "false",
+        "has_prev": "false",
+        "has_recovery": "true",
+        "has_recovery2": "true",
+        "pend_title": "VM precious B",
+        "rec2_title": "VM precious B",
+        "rec_title": "VM precious A"
+      },
+      "b_preserved": true
+    },
+    "changed_intent_recovery": {
+      "committed": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-2",
+          "revision": 3,
+          "title": "VM C1 unconfirmed",
+          "body": "Build a markdown editor with live preview.",
+          "tags": [
+            "ideas",
+            "seed"
+          ],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 2,
+          "seq": 2
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      },
+      "edited": {
+        "conflict": "true",
+        "dirty": "true",
+        "draft_request_id": "ui-edit-4",
+        "draft_revision": "2",
+        "draft_title": "VM C2 new draft",
+        "has_pend": "true",
+        "has_prev": "false",
+        "has_recovery": "false",
+        "has_recovery2": "false",
+        "pend_title": "VM C1 unconfirmed",
+        "rec2_title": "VM precious B",
+        "rec_title": "VM precious A"
+      },
+      "stashed": {
+        "conflict": "false",
+        "dirty": "false",
+        "draft_request_id": "",
+        "draft_revision": "1",
+        "draft_title": "Recipe: Pasta",
+        "has_pend": "false",
+        "has_prev": "false",
+        "has_recovery": "false",
+        "has_recovery2": "false",
+        "pend_title": "VM C2 new draft",
+        "rec2_title": "VM precious B",
+        "rec_title": "VM precious A"
+      },
+      "restored": {
+        "conflict": "false",
+        "dirty": "false",
+        "draft_request_id": "",
+        "draft_revision": "1",
+        "draft_title": "Recipe: Pasta",
+        "has_pend": "false",
+        "has_prev": "false",
+        "has_recovery": "false",
+        "has_recovery2": "false",
+        "pend_title": "VM C2 new draft",
+        "rec2_title": "VM precious B",
+        "rec_title": "VM precious A"
+      },
+      "retry1": {
+        "conflict": "false",
+        "dirty": "false",
+        "draft_request_id": "",
+        "draft_revision": "1",
+        "draft_title": "Recipe: Pasta",
+        "has_pend": "false",
+        "has_prev": "false",
+        "has_recovery": "false",
+        "has_recovery2": "false",
+        "pend_title": "VM C2 new draft",
+        "rec2_title": "VM precious B",
+        "rec_title": "VM precious A"
+      },
+      "retry2": {
+        "conflict": "false",
+        "dirty": "false",
+        "draft_request_id": "",
+        "draft_revision": "1",
+        "draft_title": "Recipe: Pasta",
+        "has_pend": "false",
+        "has_prev": "false",
+        "has_recovery": "false",
+        "has_recovery2": "false",
+        "pend_title": "VM C2 new draft",
+        "rec2_title": "VM precious B",
+        "rec_title": "VM precious A"
+      },
+      "server": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-2",
+          "revision": 4,
+          "title": "VM C2 new draft",
+          "body": "Build a markdown editor with live preview.",
+          "tags": [
+            "ideas",
+            "seed"
+          ],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 2,
+          "seq": 2
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      }
+    }
+  },
+  "fails": []
+}

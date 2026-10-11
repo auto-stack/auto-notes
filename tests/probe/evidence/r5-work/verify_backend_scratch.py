@@ -322,6 +322,31 @@ with Server('m1') as s:
     mig2 = s.call('POST', '/api/v1/migrate')['value']
     check('M1 retry idempotent', mig2['skipped_existing'] is True, mig2)
 
+# ═══ U9/U10 (r6/T-23): entity path safety + identity mismatch ═══
+with Server('u9') as s:
+    (s.data / 'manifest.json').write_text(json.dumps({
+        'schema_version': 1, 'counter': 3,
+        'entries': [{'note_id': 'n-9', 'revision': '2', 'file': '../escape.json', 'state': 'active',
+                     'folder': '', 'tags': [], 'pinned': False, 'seq': '9', 'legacy_id': '9'}],
+    }), encoding='utf8')
+    (s.data / 'notes').mkdir(exist_ok=True)
+    shutil.copy(WEDGE / 'notes' / 'n-1.r2.json', s.data / 'notes' / 'escape.json')
+    lst = s.call('GET', '/api/v1/notes')['value']
+    st = status(s)
+    check('U9 path-unsafe fid rejected', lst == [] and 'path unsafe' in st.get('upgrade_error', ''), (lst, st))
+
+with Server('u10') as s:
+    (s.data / 'manifest.json').write_text(json.dumps({
+        'schema_version': 1, 'counter': 3,
+        'entries': [{'note_id': 'n-9', 'revision': '2', 'file': 'n-1.r2.json', 'state': 'active',
+                     'folder': '', 'tags': [], 'pinned': False, 'seq': '9', 'legacy_id': '9'}],
+    }), encoding='utf8')
+    (s.data / 'notes').mkdir(exist_ok=True)
+    shutil.copy(WEDGE / 'notes' / 'n-1.r2.json', s.data / 'notes' / 'n-1.r2.json')
+    lst = s.call('GET', '/api/v1/notes')['value']
+    st = status(s)
+    check('U10 identity mismatch rejected', lst == [] and 'does not match' in st.get('upgrade_error', ''), (lst, st))
+
 print()
 print('R5 backend verify done. fails =', len(fails), fails)
 results_summary = {'fails': fails, 'run': str(RUN)}

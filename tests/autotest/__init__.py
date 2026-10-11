@@ -221,6 +221,12 @@ class McpAdapter:
                 snap = self._call("autoui_snapshot")
                 state = self._call("autoui_state")
                 if "tree:" in snap and len(state) > 20 and "button" in snap:
+                    # PLAN-066 弱门补强（r6 实证）：静态壳（New note/筛选按钮）先于
+                    # App_Init 渲染——wait_ready 曾在 Init 仍 park 于 list_notes 时
+                    # 放行，T0/T1 连锁失败。draft_title 非空 = Init 已装载首条。
+                    if "draft_title" not in state or 'draft_title: ""' in state:
+                        time.sleep(1.0)
+                        continue
                     return True
             except Exception:
                 pass

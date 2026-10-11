@@ -1,0 +1,443 @@
+{
+  "full_slots_recover": {
+    "before": {
+      "draft_id": 9,
+      "draft_title": "precious-C",
+      "draft_body": "base",
+      "draft_revision": 1,
+      "draft_request_id": "",
+      "dirty": true,
+      "conflict": false,
+      "has_recovery": true,
+      "rec_title": "precious-A",
+      "rec_request_id": "ui-edit-1",
+      "has_recovery2": true,
+      "rec2_title": "precious-B",
+      "rec2_request_id": "ui-edit-2",
+      "has_pend": false,
+      "pend_title": "precious-B",
+      "has_prev": false,
+      "prev_title": ""
+    },
+    "after": {
+      "draft_id": 9,
+      "draft_title": "precious-C",
+      "draft_body": "base",
+      "draft_revision": 1,
+      "draft_request_id": "",
+      "dirty": true,
+      "conflict": false,
+      "has_recovery": true,
+      "rec_title": "precious-A",
+      "rec_request_id": "ui-edit-1",
+      "has_recovery2": true,
+      "rec2_title": "precious-B",
+      "rec2_request_id": "ui-edit-2",
+      "has_pend": false,
+      "pend_title": "precious-B",
+      "has_prev": false,
+      "prev_title": ""
+    },
+    "second": {
+      "draft_id": 9,
+      "draft_title": "precious-C",
+      "draft_body": "base",
+      "draft_revision": 1,
+      "draft_request_id": "",
+      "dirty": true,
+      "conflict": false,
+      "has_recovery": true,
+      "rec_title": "precious-A",
+      "rec_request_id": "ui-edit-1",
+      "has_recovery2": true,
+      "rec2_title": "precious-B",
+      "rec2_request_id": "ui-edit-2",
+      "has_pend": false,
+      "pend_title": "precious-B",
+      "has_prev": false,
+      "prev_title": ""
+    },
+    "visible_title": "precious-C",
+    "b_preserved": true
+  },
+  "c1_commit": {
+    "ok": true,
+    "err_code": "",
+    "err_detail": "",
+    "doc": {
+      "schema_version": 1,
+      "note_id": "n-10",
+      "revision": 2,
+      "title": "C1-unconfirmed",
+      "body": "base",
+      "tags": [],
+      "color": "",
+      "pinned": false,
+      "state": "active",
+      "folder": "",
+      "created_at": "",
+      "updated_at": "",
+      "legacy_id": 10,
+      "seq": 10
+    },
+    "receipt": {
+      "schema_version": 1,
+      "request_id": "ui-edit-3",
+      "note_id": "n-10",
+      "revision": 2,
+      "status": "committed"
+    },
+    "replayed": false
+  },
+  "recovered_changed_intent": {
+    "edited": {
+      "draft_id": 10,
+      "draft_title": "C2-new-draft",
+      "draft_body": "base",
+      "draft_revision": 1,
+      "draft_request_id": "ui-edit-3",
+      "dirty": true,
+      "conflict": false,
+      "has_recovery": false,
+      "rec_title": "",
+      "rec_request_id": "",
+      "has_recovery2": false,
+      "rec2_title": "",
+      "rec2_request_id": "",
+      "has_pend": true,
+      "pend_title": "C1-unconfirmed",
+      "has_prev": false,
+      "prev_title": ""
+    },
+    "stashed": {
+      "draft_id": 11,
+      "draft_title": "Probe-E",
+      "draft_body": "base",
+      "draft_revision": 1,
+      "draft_request_id": "",
+      "dirty": false,
+      "conflict": false,
+      "has_recovery": false,
+      "rec_title": "",
+      "rec_request_id": "",
+      "has_recovery2": false,
+      "rec2_title": "",
+      "rec2_request_id": "",
+      "has_pend": false,
+      "pend_title": "C2-new-draft",
+      "has_prev": false,
+      "prev_title": "C1-unconfirmed"
+    },
+    "restored": {
+      "draft_id": 11,
+      "draft_title": "Probe-E",
+      "draft_body": "base",
+      "draft_revision": 1,
+      "draft_request_id": "",
+      "dirty": false,
+      "conflict": false,
+      "has_recovery": false,
+      "rec_title": "",
+      "rec_request_id": "",
+      "has_recovery2": false,
+      "rec2_title": "",
+      "rec2_request_id": "",
+      "has_pend": false,
+      "pend_title": "C2-new-draft",
+      "has_prev": false,
+      "prev_title": "C1-unconfirmed"
+    },
+    "retry1": {
+      "draft_id": 11,
+      "draft_title": "Probe-E",
+      "draft_body": "base",
+      "draft_revision": 1,
+      "draft_request_id": "",
+      "dirty": false,
+      "conflict": false,
+      "has_recovery": false,
+      "rec_title": "",
+      "rec_request_id": "",
+      "has_recovery2": false,
+      "rec2_title": "",
+      "rec2_request_id": "",
+      "has_pend": false,
+      "pend_title": "C2-new-draft",
+      "has_prev": false,
+      "prev_title": "C1-unconfirmed"
+    },
+    "retry2": {
+      "draft_id": 11,
+      "draft_title": "Probe-E",
+      "draft_body": "base",
+      "draft_revision": 1,
+      "draft_request_id": "",
+      "dirty": false,
+      "conflict": false,
+      "has_recovery": false,
+      "rec_title": "",
+      "rec_request_id": "",
+      "has_recovery2": false,
+      "rec2_title": "",
+      "rec2_request_id": "",
+      "has_pend": false,
+      "pend_title": "C2-new-draft",
+      "has_prev": false,
+      "prev_title": "C1-unconfirmed"
+    },
+    "server": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-10",
+        "revision": 3,
+        "title": "C2-new-draft",
+        "body": "base",
+        "tags": [],
+        "color": "",
+        "pinned": false,
+        "state": "active",
+        "folder": "",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 10,
+        "seq": 10
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "",
+        "note_id": "",
+        "revision": 0,
+        "status": ""
+      },
+      "replayed": false
+    }
+  },
+  "requests": [
+    {
+      "payload": {
+        "expected_revision": 1,
+        "title": "precious-A",
+        "body": "base",
+        "request_id": "ui-edit-1"
+      },
+      "result": {
+        "ok": false,
+        "err_code": "revision_conflict",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "",
+          "revision": 0,
+          "title": "",
+          "body": "",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 0,
+          "seq": 0
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      }
+    },
+    {
+      "payload": {
+        "expected_revision": 1,
+        "title": "precious-A",
+        "body": "base",
+        "request_id": "ui-edit-1"
+      },
+      "result": {
+        "ok": false,
+        "err_code": "revision_conflict",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "",
+          "revision": 0,
+          "title": "",
+          "body": "",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 0,
+          "seq": 0
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      }
+    },
+    {
+      "payload": {
+        "expected_revision": 1,
+        "title": "precious-B",
+        "body": "base",
+        "request_id": "ui-edit-2"
+      },
+      "result": {
+        "ok": false,
+        "err_code": "revision_conflict",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "",
+          "revision": 0,
+          "title": "",
+          "body": "",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 0,
+          "seq": 0
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      }
+    },
+    {
+      "payload": {
+        "expected_revision": 1,
+        "title": "precious-B",
+        "body": "base",
+        "request_id": "ui-edit-2"
+      },
+      "result": {
+        "ok": false,
+        "err_code": "revision_conflict",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "",
+          "revision": 0,
+          "title": "",
+          "body": "",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 0,
+          "seq": 0
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      }
+    },
+    {
+      "payload": {
+        "expected_revision": 1,
+        "title": "C2-new-draft",
+        "body": "base",
+        "request_id": "ui-edit2-4"
+      },
+      "result": {
+        "ok": false,
+        "err_code": "revision_conflict",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "",
+          "revision": 0,
+          "title": "",
+          "body": "",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 0,
+          "seq": 0
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      }
+    },
+    {
+      "payload": {
+        "expected_revision": 2,
+        "title": "C2-new-draft",
+        "body": "base",
+        "request_id": "ui-edit2-4"
+      },
+      "result": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-10",
+          "revision": 3,
+          "title": "C2-new-draft",
+          "body": "base",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 10,
+          "seq": 10
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "ui-edit2-4",
+          "note_id": "n-10",
+          "revision": 3,
+          "status": "committed"
+        },
+        "replayed": false
+      }
+    }
+  ],
+  "oracle_failures": []
+}

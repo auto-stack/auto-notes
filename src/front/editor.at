@@ -82,6 +82,15 @@ widget EditorPanel() {
                         }
                     }
                 }
+                // 满槽显式提示（SD-19/F-R6-04）：Stash/Recover 被容量阻止时可见，
+                // 用户可 Dismiss 释放一个槽后重试。
+                if .store.stash_blocked {
+                    row {
+                        style: "items-center gap-2 px-2 py-1 rounded-md bg-destructive/10"
+                        icon (name: "alert-triangle", size: 13, style: "text-destructive")
+                        text "Recovery slots full - dismiss an existing draft to free a slot" { style: "text-xs text-destructive" }
+                    }
+                }
 
                 row {
                     style: "items-center gap-2"

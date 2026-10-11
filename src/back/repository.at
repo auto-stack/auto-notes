@@ -362,96 +362,61 @@ pub fn open_repository() str {
     return ""
 }
 
-/// Phase 1 JSON 布局 → SQLite 安全升级（SD-07/T-12；r5/T-17 修正 F-R5-01）。
-/// 元数据权威规则与旧 load_doc 一致：实体文件提供 title/body(blocks→换行
-/// 连接)/color/时间戳；manifest entry 覆盖 tags/pinned/state/folder/revision/
-/// seq/legacy_id——旧 repo_set_meta 只写 manifest，manifest 是元数据唯一权威。
-/// 失败边界（F-R5-01：不得空成功、不得不可重试）：
-///   * 备份不可用（legacy-backup 被普通文件占据/拷贝失败/校验不过）→ 显式
-///     错误，不完成；
-///   * manifest 不可读或缺 entries 数组（含 {}）→ 显式错误，不完成；
-///   * manifest 引用实体缺失/不可读 → ROLLBACK 显式失败（upgrade_incomplete），
-///     修复旧实体后重试即可——绝不记 corrupted 后置 upgraded 宣告完成；
-///   * 未升级库已有 notes 且旧树并存 → upgrade_conflict，不静默忽略任一侧；
-///   * r4 缺陷库已误写 upgraded（upgrade_error 在案或 legacy-upgrade
-///     corrupted_r1 残留）且旧树仍在 → 清标记按正确规则重跑（合并式导入对
-///     已导入行做权威元数据回收）。
-/// 成功：全量导入且备份校验通过后才在事务内置 upgraded；正常/硬杀/重试幂等；
-/// 原旧树不改动（源 hash 保持），备份保持。
+/// Phase 1 JSON 布局 → SQLite 安全升级（SD-07/T-12；r6/T-22/T-23 修正 F-R6-01/02/03）。
+/// 元数据权威规则与旧 load_doc 一致：实体提供 title/body(blocks→换行连接)/color/
+/// 时间戳；manifest entry 覆盖 tags/pinned/state/folder/revision/seq/legacy_id。
+///
+/// 入口裁决（SD-17，F-R6-01/02）：
+///   * 修复凭据只有一种：meta.corrupted_r1 含 "legacy upgrade"（r4 缺陷库标记）。
+///     upgrade_error 永不授予合并资格——冲突/普通 I/O 错误在前提消失前必须
+///     原样复现，重复读取/重启不得绕过。
+///   * 未升级（upgraded≠1）+ 旧树在 + 库内已有 notes → upgrade_conflict（恒定，
+///     不因错误记录或重读改变）；库为空才进入全新升级。
+///   * 已升级 + 凭据在 + 旧树在 → repair_legacy_merge：只对"可证明与实体导入
+///     产物一致"的行回收权威元数据（行 revision/title/body 与实体完全一致），
+///     更高修订/同修订异文一律跳过保护；成功清除凭据（完成代际），后续读取/
+///     编辑不得再次重导；失败保持凭据可重试。
+///   * 已升级 + 凭据在 + 旧树不在 → 凭据失效，清除并记录代际，不再重导。
+///
+/// 实体/清单严格校验（SD-18，F-R6-03）：note_id 非空且与 entry 身份一致、
+/// legacy_id/revision 严格整数字面量、title 字符串、blocks 数组且每块 text 字符串、
+/// tags 数组元素字符串、pinned 布尔、file 路径无分隔符/穿越；任一违反 →
+/// ROLLBACK + 显式错误（upgrade_incomplete 可修复重试），绝不导成空 ID/空正文
+/// 后置完成。备份先行且校验结果；原件不动。
 fn upgrade_if_legacy(db SqliteDb) str {
     var mpath str = data_dir() + "/manifest.json"
     var has_legacy bool = fs_exists(mpath)
     var upgraded str = meta_get_on(db, "upgraded")
-    // 修复证据独立于 upgraded 标记：r4 缺陷库可能 upgraded=1（误写成功），
-    // 部分导入也可能标记已清。upgrade_error 在案或 legacy-upgrade
-    // corrupted_r1 残留 = 本库曾有未完成的旧树导入，允许按正确规则重跑
-    // （合并式导入对已导入行做权威元数据回收，重试安全）。
-    var need_repair bool = false
-    if meta_get_on(db, "upgrade_error") != "" {
-        need_repair = true
-    }
-    if need_repair == false {
-        var cr1 str = meta_get_on(db, "corrupted_r1")
-        if cr1.contains("legacy upgrade") {
-            need_repair = true
-        }
+    var repair_marker bool = false
+    var cr1 str = meta_get_on(db, "corrupted_r1")
+    if cr1.contains("legacy upgrade") {
+        repair_marker = true
     }
     if upgraded == "1" {
-        if need_repair == false {
+        if repair_marker == false {
             return ""
         }
         if has_legacy == false {
+            db.exec("DELETE FROM meta WHERE k='corrupted_r1'")
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('repair_generation','1')")
             return ""
         }
-        db.exec("DELETE FROM meta WHERE k='upgraded'")
-        db.exec("DELETE FROM meta WHERE k='upgrade_error'")
-    } else {
-        if has_legacy == false {
-            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')")
-            return ""
-        }
-        if need_repair == false {
-            var cnt_rows List<List<str>> = db.query("SELECT COUNT(*) FROM notes")
-            if cnt_rows.len() > 0 {
-                if parse_int(cnt_rows[0][0]) > 0 {
-                    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','legacy tree present but repository already contains notes')")
-                    return "upgrade_conflict"
-                }
-            }
-        } else {
-            db.exec("DELETE FROM meta WHERE k='upgrade_error'")
+        return repair_legacy_merge(db)
+    }
+    if has_legacy == false {
+        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')")
+        return ""
+    }
+    var cnt_rows List<List<str>> = db.query("SELECT COUNT(*) FROM notes")
+    if cnt_rows.len() > 0 {
+        if parse_int(cnt_rows[0][0]) > 0 {
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','legacy tree present but repository already contains notes')")
+            return "upgrade_conflict"
         }
     }
-    // 备份先行且必须真实可用（F-R5-01：备份结果不得忽略）
-    var bak str = data_dir() + "/legacy-backup"
-    if fs_mkdir(bak) == false {
-        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','legacy-backup not usable (exists as a regular file?)')")
-        return "storage_unwritable"
-    }
-    if fs_copy(mpath, bak + "/manifest.json") == false {
-        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','backup copy failed: manifest.json')")
-        return "storage_unwritable"
-    }
-    if fs_exists(data_dir() + "/notes") {
-        if fs_copy(data_dir() + "/notes", bak + "/notes") == false {
-            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','backup copy failed: notes/')")
-            return "storage_unwritable"
-        }
-    }
-    if fs_exists(data_dir() + "/receipts") {
-        if fs_copy(data_dir() + "/receipts", bak + "/receipts") == false {
-            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','backup copy failed: receipts/')")
-            return "storage_unwritable"
-        }
-    }
-    if fs_exists(data_dir() + "/journal") {
-        if fs_copy(data_dir() + "/journal", bak + "/journal") == false {
-            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','backup copy failed: journal/')")
-            return "storage_unwritable"
-        }
-    }
-    if fs_exists(bak + "/manifest.json") == false {
-        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','backup verification failed: manifest.json missing')")
+    var bakerr str = legacy_backup_tree()
+    if bakerr != "" {
+        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(bakerr) + ")")
         return "storage_unwritable"
     }
     var begin int = db.exec("BEGIN IMMEDIATE")
@@ -476,111 +441,45 @@ fn upgrade_if_legacy(db SqliteDb) str {
     for i in 0..en {
         var e = json.get_at(entries, i)
         var fid str = json.as_string(json.get(e, "file"))
-        var epath str = data_dir() + "/notes/" + fid
-        if fs_exists(epath) == false {
+        if valid_legacy_file(fid) == false {
             db.exec("ROLLBACK")
-            var emsg str = "entity missing: " + fid
-            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(emsg) + ")")
+            var pmsg str = "entity path unsafe: " + fid
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(pmsg) + ")")
             return "upgrade_incomplete"
         }
-        var eraw str = fs_read(epath)
-        if json.is_valid(eraw) == false {
+        var entry_nid str = json.as_string(json.get(e, "note_id"))
+        if fs_exists(data_dir() + "/notes/" + fid) == false {
             db.exec("ROLLBACK")
-            var umsg str = "entity unreadable: " + fid
-            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(umsg) + ")")
+            var mmsg str = "entity missing: " + fid
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(mmsg) + ")")
+            return "upgrade_incomplete"
+        }
+        var eraw str = fs_read(data_dir() + "/notes/" + fid)
+        var verr str = validate_legacy_entity(eraw, entry_nid)
+        if verr != "" {
+            db.exec("ROLLBACK")
+            var vmsg str = "entity invalid: " + fid + ": " + verr
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(vmsg) + ")")
             return "upgrade_incomplete"
         }
         var it = json.parse(eraw)
         var nid str = json.as_string(json.get(it, "note_id"))
         var title str = json.as_string(json.get(it, "title"))
-        // blocks → body（多块以换行符连接；v1 只产生 text 块）
-        var blocks = json.get(it, "blocks")
-        var bn int = json.len(blocks)
-        var body str = ""
-        var bj int = 0
-        for b in 0..bn {
-            var blk = json.get_at(blocks, b)
-            var tv = json.get(blk, "text")
-            if bj > 0 {
-                body = body + "
-"
-            }
-            body = body + json.as_string(tv)
-            bj = bj + 1
-        }
+        var body str = legacy_entity_body(eraw)
         var color str = json.as_string(json.get(it, "color"))
         var cr str = json.as_string(json.get(it, "created_at"))
         var up str = json.as_string(json.get(it, "updated_at"))
-        // 实体值打底，manifest entry 覆盖（旧 load_doc 权威规则）；manifest
-        // 缺键时回退实体值。旧 manifest 的 revision/seq/legacy_id 是字符串。
-        var rev int = json.as_int(json.get(it, "revision"))
-        var mev = json.get(e, "revision")
-        var mej str = json.encode(mev)
-        if mej != "null" {
-            if mej.sub(0, 1) == "\"" {
-                rev = parse_int(json.as_string(mev))
-            } else {
-                rev = json.as_int(mev)
-            }
-        }
-        var tags_v = json.get(it, "tags")
-        var tags_json str = json.encode(tags_v)
-        var mtv = json.get(e, "tags")
-        if json.encode(mtv) != "null" {
-            tags_json = json.encode(mtv)
-        }
-        var pin int = 0
-        if json.encode(json.get(it, "pinned")) == "true" {
-            pin = 1
-        }
-        var mpv = json.get(e, "pinned")
-        if json.as_bool(mpv) {
-            pin = 1
-        } else {
-            if json.encode(mpv) != "null" {
-                pin = 0
-            }
-        }
-        var state str = json.as_string(json.get(it, "state"))
-        var msv = json.get(e, "state")
-        if json.encode(msv) != "null" {
-            state = json.as_string(msv)
-        }
-        var folder str = json.as_string(json.get(it, "folder"))
-        var mfv = json.get(e, "folder")
-        if json.encode(mfv) != "null" {
-            folder = json.as_string(mfv)
-        }
-        var seq int = json.as_int(json.get(it, "seq"))
-        var mqv = json.get(e, "seq")
-        var mqj str = json.encode(mqv)
-        if mqj != "null" {
-            if mqj.sub(0, 1) == "\"" {
-                seq = parse_int(json.as_string(mqv))
-            } else {
-                seq = json.as_int(mqv)
-            }
-        }
-        var leg int = json.as_int(json.get(it, "legacy_id"))
-        var mlv = json.get(e, "legacy_id")
-        var mlj str = json.encode(mlv)
-        if mlj != "null" {
-            if mlj.sub(0, 1) == "\"" {
-                leg = parse_int(json.as_string(mlv))
-            } else {
-                leg = json.as_int(mlv)
-            }
-        }
-        // 幂等合并导入：行已存在（部分导入/r4 缺陷库重跑）→ 权威值回收；
-        // 否则插入。两路同用事务门禁，重试不重复。
-        var ex List<List<str>> = db.query("SELECT note_id FROM notes WHERE note_id=" + sql_str(nid))
-        var sql str = ""
-        if ex.len() > 0 {
-            sql = "UPDATE notes SET legacy_id=" + json.encode(leg) + ", revision=" + json.encode(rev) + ", title=" + sql_str(title) + ", body=" + sql_str(body) + ", tags_json=" + sql_str(tags_json) + ", pinned=" + json.encode(pin) + ", state=" + sql_str(state) + ", folder=" + sql_str(folder) + ", seq=" + json.encode(seq) + " WHERE note_id=" + sql_str(nid)
-        } else {
-            sql = "INSERT INTO notes(note_id, legacy_id, revision, title, body, tags_json, color, pinned, state, folder, seq, created_at, updated_at) VALUES(" + sql_str(nid) + ", " + json.encode(leg) + ", " + json.encode(rev) + ", " + sql_str(title) + ", " + sql_str(body) + ", " + sql_str(tags_json) + ", " + sql_str(color) + ", " + json.encode(pin) + ", " + sql_str(state) + ", " + sql_str(folder) + ", " + json.encode(seq) + ", " + sql_str(cr) + ", " + sql_str(up) + ")"
-        }
-        var ins int = db.exec(sql)
+        var ejson str = json.encode(e)
+        var auth str = entry_authority_json(eraw, ejson)
+        var au = json.parse(auth)
+        var rev int = json.as_int(json.get(au, "rev"))
+        var tags_json str = json.as_string(json.get(au, "tags_json"))
+        var pin int = json.as_int(json.get(au, "pin"))
+        var state str = json.as_string(json.get(au, "state"))
+        var folder str = json.as_string(json.get(au, "folder"))
+        var seq int = json.as_int(json.get(au, "seq"))
+        var leg int = json.as_int(json.get(au, "leg"))
+        var ins int = db.exec("INSERT INTO notes(note_id, legacy_id, revision, title, body, tags_json, color, pinned, state, folder, seq, created_at, updated_at) VALUES(" + sql_str(nid) + ", " + json.encode(leg) + ", " + json.encode(rev) + ", " + sql_str(title) + ", " + sql_str(body) + ", " + sql_str(tags_json) + ", " + sql_str(color) + ", " + json.encode(pin) + ", " + sql_str(state) + ", " + sql_str(folder) + ", " + json.encode(seq) + ", " + sql_str(cr) + ", " + sql_str(up) + ")")
         if ins < 0 {
             db.exec("ROLLBACK")
             var imsg str = "entity import failed: " + fid
@@ -606,10 +505,385 @@ fn upgrade_if_legacy(db SqliteDb) str {
             }
         }
     }
-    // receipts → requests：只映射 status=committed 的旧收据。kind 按旧协议
-    // 规则恢复（create=rev1 / update=rev≥2；journal/receipts 有界调查见
-    // t18 决策制品）；intent 留空 = 不可验证旧行：重放一律 request_conflict，
-    // 绝不通配确认新操作或编造收据（F-R5-02）。原收据经 read_receipt 仍可查。
+    import_legacy_receipts(db)
+    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')")
+    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','')")
+    db.exec("DELETE FROM meta WHERE k='corrupted_r1'")
+    var commit int = db.exec("COMMIT")
+    if commit < 0 {
+        return "storage_unwritable"
+    }
+    return ""
+}
+
+/// r4 缺陷库修复（SD-17，F-R6-02）：upgraded=1 + corrupted_r1 legacy 标记 + 旧树在。
+/// 合并式回收：manifest 引用的每个实体经严格校验后——
+///   * 行不存在（r4 跳过的坏实体）→ 补导完整行；
+///   * 行与实体导入产物可证明一致（revision/title/body 全等）→ 回收 manifest
+///     权威元数据；
+///   * 行有更高修订或不同内容（用户已确认新写入）→ 跳过保护，绝不回退。
+/// 收据补导 INSERT OR IGNORE；成功清除凭据（完成代际），后续读取/编辑不再重导；
+/// 失败 ROLLBACK 保持凭据，显式可重试。
+fn repair_legacy_merge(db SqliteDb) str {
+    var mpath str = data_dir() + "/manifest.json"
+    var bakerr str = legacy_backup_tree()
+    if bakerr != "" {
+        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(bakerr) + ")")
+        return "storage_unwritable"
+    }
+    var begin int = db.exec("BEGIN IMMEDIATE")
+    if begin < 0 {
+        return "second_writer"
+    }
+    var raw str = fs_read(mpath)
+    if json.is_valid(raw) == false {
+        db.exec("ROLLBACK")
+        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','manifest unreadable')")
+        return "storage_unwritable"
+    }
+    var m = json.parse(raw)
+    var entries = json.get(m, "entries")
+    var etxt str = json.encode(entries)
+    if etxt.sub(0, 1) != "[" {
+        db.exec("ROLLBACK")
+        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','manifest entries missing or not an array')")
+        return "storage_unwritable"
+    }
+    var en int = json.len(entries)
+    for i in 0..en {
+        var e = json.get_at(entries, i)
+        var fid str = json.as_string(json.get(e, "file"))
+        if valid_legacy_file(fid) == false {
+            db.exec("ROLLBACK")
+            var pmsg str = "entity path unsafe: " + fid
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(pmsg) + ")")
+            return "upgrade_incomplete"
+        }
+        var entry_nid str = json.as_string(json.get(e, "note_id"))
+        if fs_exists(data_dir() + "/notes/" + fid) == false {
+            db.exec("ROLLBACK")
+            var mmsg str = "entity missing: " + fid
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(mmsg) + ")")
+            return "upgrade_incomplete"
+        }
+        var eraw str = fs_read(data_dir() + "/notes/" + fid)
+        var verr str = validate_legacy_entity(eraw, entry_nid)
+        if verr != "" {
+            db.exec("ROLLBACK")
+            var vmsg str = "entity invalid: " + fid + ": " + verr
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(vmsg) + ")")
+            return "upgrade_incomplete"
+        }
+        var it = json.parse(eraw)
+        var nid str = json.as_string(json.get(it, "note_id"))
+        var title str = json.as_string(json.get(it, "title"))
+        var body str = legacy_entity_body(eraw)
+        var color str = json.as_string(json.get(it, "color"))
+        var cr str = json.as_string(json.get(it, "created_at"))
+        var up str = json.as_string(json.get(it, "updated_at"))
+        var erev int = json.as_int(json.get(it, "revision"))
+        var ejson str = json.encode(e)
+        var auth str = entry_authority_json(eraw, ejson)
+        var au = json.parse(auth)
+        var rev int = json.as_int(json.get(au, "rev"))
+        var tags_json str = json.as_string(json.get(au, "tags_json"))
+        var pin int = json.as_int(json.get(au, "pin"))
+        var state str = json.as_string(json.get(au, "state"))
+        var folder str = json.as_string(json.get(au, "folder"))
+        var seq int = json.as_int(json.get(au, "seq"))
+        var leg int = json.as_int(json.get(au, "leg"))
+        var ex List<List<str>> = db.query("SELECT revision, title, body FROM notes WHERE note_id=" + sql_str(nid))
+        if ex.len() < 1 {
+            var ins int = db.exec("INSERT INTO notes(note_id, legacy_id, revision, title, body, tags_json, color, pinned, state, folder, seq, created_at, updated_at) VALUES(" + sql_str(nid) + ", " + json.encode(leg) + ", " + json.encode(rev) + ", " + sql_str(title) + ", " + sql_str(body) + ", " + sql_str(tags_json) + ", " + sql_str(color) + ", " + json.encode(pin) + ", " + sql_str(state) + ", " + sql_str(folder) + ", " + json.encode(seq) + ", " + sql_str(cr) + ", " + sql_str(up) + ")")
+            if ins < 0 {
+                db.exec("ROLLBACK")
+                var imsg str = "entity import failed: " + fid
+                db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(imsg) + ")")
+                return "storage_unwritable"
+            }
+        } else {
+            var row0 = ex[0]
+            var row_rev int = parse_int(row0[0])
+            var proven bool = row_rev == erev
+            if proven {
+                if row0[1] != title {
+                    proven = false
+                }
+            }
+            if proven {
+                if row0[2] != body {
+                    proven = false
+                }
+            }
+            if proven {
+                db.exec("UPDATE notes SET legacy_id=" + json.encode(leg) + ", revision=" + json.encode(rev) + ", tags_json=" + sql_str(tags_json) + ", pinned=" + json.encode(pin) + ", state=" + sql_str(state) + ", folder=" + sql_str(folder) + ", seq=" + json.encode(seq) + " WHERE note_id=" + sql_str(nid))
+            }
+        }
+    }
+    var c_v = json.get(m, "counter")
+    var cj str = json.encode(c_v)
+    if cj != "null" {
+        var counter int = 0
+        if cj.sub(0, 1) == "\"" {
+            counter = parse_int(json.as_string(c_v))
+        } else {
+            counter = json.as_int(c_v)
+        }
+        var cur str = meta_get_on(db, "counter")
+        if cur == "" {
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('counter'," + json.encode(counter) + ")")
+        } else {
+            if counter > parse_int(cur) {
+                db.exec("UPDATE meta SET v=" + json.encode(counter) + " WHERE k='counter'")
+            }
+        }
+    }
+    import_legacy_receipts(db)
+    db.exec("DELETE FROM meta WHERE k='corrupted_r1'")
+    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('repair_generation','1')")
+    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','')")
+    var commit int = db.exec("COMMIT")
+    if commit < 0 {
+        return "storage_unwritable"
+    }
+    return ""
+}
+
+/// 旧树备份（两路升级共用）：备份目录不可用/拷贝失败/校验缺失 → 显式错误。
+fn legacy_backup_tree() str {
+    var mpath str = data_dir() + "/manifest.json"
+    var bak str = data_dir() + "/legacy-backup"
+    if fs_mkdir(bak) == false {
+        return "legacy-backup not usable (exists as a regular file?)"
+    }
+    if fs_copy(mpath, bak + "/manifest.json") == false {
+        return "backup copy failed: manifest.json"
+    }
+    if fs_exists(data_dir() + "/notes") {
+        if fs_copy(data_dir() + "/notes", bak + "/notes") == false {
+            return "backup copy failed: notes/"
+        }
+    }
+    if fs_exists(data_dir() + "/receipts") {
+        if fs_copy(data_dir() + "/receipts", bak + "/receipts") == false {
+            return "backup copy failed: receipts/"
+        }
+    }
+    if fs_exists(data_dir() + "/journal") {
+        if fs_copy(data_dir() + "/journal", bak + "/journal") == false {
+            return "backup copy failed: journal/"
+        }
+    }
+    if fs_exists(bak + "/manifest.json") == false {
+        return "backup verification failed: manifest.json missing"
+    }
+    return ""
+}
+
+/// 实体 file 字段路径安全：非空、无目录分隔符、无穿越。
+fn valid_legacy_file(fid str) bool {
+    if fid == "" {
+        return false
+    }
+    if fid.contains("/") {
+        return false
+    }
+    if fid.contains("\\") {
+        return false
+    }
+    if fid.contains("..") {
+        return false
+    }
+    return true
+}
+
+/// 旧实体严格校验（SD-18）：语法、身份（note_id 非空且与 entry 一致）、
+/// legacy_id/revision 严格整数字面量、title/blocks(每块 text)/tags(每元素)/
+/// folder/state 类型、pinned 布尔；缺字段容忍（与迁移缺字段策略一致）。
+/// 返回错误消息，"" = 通过。
+fn validate_legacy_entity(eraw str, entry_note_id str) str {
+    if json.is_valid(eraw) == false {
+        return "entity unreadable"
+    }
+    var it = json.parse(eraw)
+    var nidv = json.get(it, "note_id")
+    if json.encode(nidv) == "null" {
+        return "entity missing note_id"
+    }
+    var nid str = json.as_string(nidv)
+    if nid == "" {
+        return "entity missing note_id"
+    }
+    if entry_note_id != "" {
+        if nid != entry_note_id {
+            return "entry note_id does not match entity note_id"
+        }
+    }
+    var legj str = json.encode(json.get(it, "legacy_id"))
+    if is_int_literal(legj) == false {
+        return "entity legacy_id not an integer"
+    }
+    var revj str = json.encode(json.get(it, "revision"))
+    if is_int_literal(revj) == false {
+        return "entity revision not an integer"
+    }
+    var tj str = json.encode(json.get(it, "title"))
+    if tj.sub(0, 1) != "\"" {
+        return "entity title not a string"
+    }
+    var bjson str = json.encode(json.get(it, "blocks"))
+    if bjson != "null" {
+        if bjson.sub(0, 1) != "[" {
+            return "entity blocks not an array"
+        }
+        var blocks = json.get(it, "blocks")
+        var bn int = json.len(blocks)
+        for b in 0..bn {
+            var blk = json.get_at(blocks, b)
+            var txtj str = json.encode(json.get(blk, "text"))
+            if txtj.sub(0, 1) != "\"" {
+                return "entity block text not a string"
+            }
+        }
+    }
+    var tagsj str = json.encode(json.get(it, "tags"))
+    if tagsj != "null" {
+        if tagsj.sub(0, 1) != "[" {
+            return "entity tags not an array"
+        }
+        var tags = json.get(it, "tags")
+        var tn int = json.len(tags)
+        for g in 0..tn {
+            var el = json.get_at(tags, g)
+            var elj str = json.encode(el)
+            if elj.sub(0, 1) != "\"" {
+                return "entity tags element not a string"
+            }
+        }
+    }
+    var pinj str = json.encode(json.get(it, "pinned"))
+    if pinj != "null" {
+        if pinj != "true" {
+            if pinj != "false" {
+                return "entity pinned not a boolean"
+            }
+        }
+    }
+    var fj str = json.encode(json.get(it, "folder"))
+    if fj != "null" {
+        if fj.sub(0, 1) != "\"" {
+            return "entity folder not a string"
+        }
+    }
+    var sj str = json.encode(json.get(it, "state"))
+    if sj != "null" {
+        if sj.sub(0, 1) != "\"" {
+            return "entity state not a string"
+        }
+    }
+    return ""
+}
+
+/// 实体正文：blocks → 换行连接（v1 只产生 text 块；已校验后调用）。
+fn legacy_entity_body(eraw str) str {
+    var it = json.parse(eraw)
+    var blocks = json.get(it, "blocks")
+    var bn int = json.len(blocks)
+    var body str = ""
+    var bj int = 0
+    for b in 0..bn {
+        var blk = json.get_at(blocks, b)
+        var tv = json.get(blk, "text")
+        if bj > 0 {
+            body = body + "
+"
+        }
+        body = body + json.as_string(tv)
+        bj = bj + 1
+    }
+    return body
+}
+
+/// manifest entry 权威元数据包络（两路升级共用）：实体值打底、entry 覆盖
+/// （revision/seq/legacy_id 接受整数字面量或字符串数字——旧 manifest 为字符串）。
+/// 返回 {"rev":N,"tags_json":"...","pin":0/1,"state":"..","folder":"..","seq":N,"leg":N}。
+fn entry_authority_json(eraw str, ejson str) str {
+    var it = json.parse(eraw)
+    var e = json.parse(ejson)
+    var rev int = json.as_int(json.get(it, "revision"))
+    var tags_json str = json.encode(json.get(it, "tags"))
+    if tags_json == "null" {
+        tags_json = "[]"
+    }
+    var pin int = 0
+    if json.encode(json.get(it, "pinned")) == "true" {
+        pin = 1
+    }
+    var state str = json.as_string(json.get(it, "state"))
+    var folder str = json.as_string(json.get(it, "folder"))
+    var seq int = json.as_int(json.get(it, "seq"))
+    var leg int = json.as_int(json.get(it, "legacy_id"))
+    var mev = json.get(e, "revision")
+    var mej str = json.encode(mev)
+    if mej != "null" {
+        if mej.sub(0, 1) == "\"" {
+            rev = parse_int(json.as_string(mev))
+        } else {
+            rev = json.as_int(mev)
+        }
+    }
+    var mtv = json.get(e, "tags")
+    if json.encode(mtv) != "null" {
+        tags_json = json.encode(mtv)
+    }
+    var mpv = json.get(e, "pinned")
+    if json.as_bool(mpv) {
+        pin = 1
+    } else {
+        if json.encode(mpv) != "null" {
+            pin = 0
+        }
+    }
+    var msv = json.get(e, "state")
+    if json.encode(msv) != "null" {
+        state = json.as_string(msv)
+    }
+    var mfv = json.get(e, "folder")
+    if json.encode(mfv) != "null" {
+        folder = json.as_string(mfv)
+    }
+    var mqv = json.get(e, "seq")
+    var mqj str = json.encode(mqv)
+    if mqj != "null" {
+        if mqj.sub(0, 1) == "\"" {
+            seq = parse_int(json.as_string(mqv))
+        } else {
+            seq = json.as_int(mqv)
+        }
+    }
+    var mlv = json.get(e, "legacy_id")
+    var mlj str = json.encode(mlv)
+    if mlj != "null" {
+        if mlj.sub(0, 1) == "\"" {
+            leg = parse_int(json.as_string(mlv))
+        } else {
+            leg = json.as_int(mlv)
+        }
+    }
+    var s str = "{\"rev\":" + json.encode(rev)
+    s = s + ",\"tags_json\":" + json.encode(tags_json)
+    s = s + ",\"pin\":" + json.encode(pin)
+    s = s + ",\"state\":" + json.encode(state)
+    s = s + ",\"folder\":" + json.encode(folder)
+    s = s + ",\"seq\":" + json.encode(seq)
+    s = s + ",\"leg\":" + json.encode(leg) + "}"
+    return s
+}
+
+/// 旧收据 → requests（两路升级共用）：只导入 committed；kind 按旧协议规则
+/// 恢复（create=rev1 / update=rev≥2）；intent 留空 = 不可验证旧行，重放一律
+/// request_conflict（F-R5-02/F-R6-06 裁决）。INSERT OR IGNORE 幂等。
+fn import_legacy_receipts(db SqliteDb) {
     var rdir str = data_dir() + "/receipts"
     if fs_exists(rdir) {
         var names List<str> = fs.dir_names(rdir)
@@ -635,13 +909,6 @@ fn upgrade_if_legacy(db SqliteDb) str {
             }
         }
     }
-    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')")
-    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','')")
-    var commit int = db.exec("COMMIT")
-    if commit < 0 {
-        return "storage_unwritable"
-    }
-    return ""
 }
 
 // ═══════════════════════════════════════════════════════════
