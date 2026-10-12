@@ -5,10 +5,10 @@ status: execution_done
 feature_name: "可靠 Inbox、稳定标识与恢复"
 author: [Codex]
 created_at: 2026-10-04T00:00:00Z
-updated_at: 2026-10-12
-plan_revision: 7
-current_step: 34
-total_steps: 34
+updated_at: 2026-10-13
+plan_revision: 8
+current_step: 35
+total_steps: 35
 created: 2026-10-04
 base_branch: v0.6-dev
 base_commit: 28d5157b7ed8d4f49e55f835bf8a365d2f97a89a
@@ -24,9 +24,13 @@ touched_goals: ["auto-notes/first-real-release"]
 
 r7 work（2026-10-12）：Phase 6 T-28–T-33 已实现并采证——清单+实体共同验证（双向身份/十进制串容忍/布尔杂字符拒绝）、修复必需写入失败出口（凭据保留可重试）、未知意图链 prev2（链上匹配才采纳）、稳定动作目标（id 重定位/draft_id 绑定）、满槽全状态原位、注入独立脚本+故障控制。复审 5 API+4 Vue 断言原样转绿并入库；新增 R7 VM 驱动 7 断言；全套门终态全绿（battery exit0、scratch 38/38、Vue 24/24、VM 19/19、VM 负例 13/13、R7 VM 7/7、独立×3 exit0、双控制 pass，二进制 5c187b2a）。34/34 任务按证据闭合，execution_done；AC-01..04 留 review。canonical 未动、未推送。详见 §9 与 [r7-work](evidence/001-r7-work/README.md)。
 
+r8 integration work（2026-10-13）：为兼容 AutoLang v0.6 候选的严格 JSON public face，Notes 将 bool 读取改为与 `true` 比较，并以 `json.parse` 的 null sentinel 校验 JSON 根；未扩大公开 API。候选 CLI 重建后 API battery `fails=0`、Vue 24/24、VM 19/19、R7 VM 三场景 `fails=[]`、API oracle 6/6。证据、SHA 与 wrapper 编码边界见 [r8-recheck](evidence/001-r8-recheck-20261013/README.md)。T-34 完成后实现任务 35/35、`execution_done`；AC 最终裁决仍须独立 review。
+
 2026-10-12 修订6独立 final review：交付 f0a3cab、实现1757a90，结论 **needs_fix**。上轮 API3/Vue2/VM2 示例均转绿，fresh build、后端38/38、Vue24/24、VM19/19、VM负例13/13通过；battery exit0仍含S15注入 SyntaxError，不能算该场景通过。新增实际反例确认清单身份/类型未验证、修复 UPDATE 失败假完成、连续未知响应丢祖先、筛选刷新/恢复操作错目标、满槽搜索状态漂移。详见[当前复审](evidence/001-r6-recheck-20261012/README.md)。
 
 按用户原“有问题激活计划001并追加phase”授权推进的 Phase 6（T-28–T-33）已实现并采证：六项发现（F-R7-01..06）全部修复，复审 5 API+4 Vue 断言原样转绿并入库，新增 R7 VM 驱动 7 断言，全套门终态全绿（battery exit0、scratch 38/38、Vue 24/24、VM 19/19、VM 负例 13/13、独立×3 exit0、注入控制+断言传播双控制 pass，二进制 5c187b2a）。34/34 任务按证据闭合，**execution_done**；T-26 决策 A 保持闭合；AC-01..04 终验留 review。next=同树独立 final review；canonical/发布/归档仍为merge门。
+
+2026-10-13 r8 integration recheck：AutoLang v0.6 候选的公开 JSON API 保持严格声明；Notes 适配只在 .at 源使用 `json.parse`、`json.get` 与布尔恒等判断。T-34 完成后 35/35 work tasks 为 execution_done，AC-01–05 终验需 revision-bound independent review。
 
 Phase5 work原申报及当时execution_done28/28为历史，见[输入计划原文](evidence/001-r6-recheck-20261012/plan-input-r6.md)、§9与[r6-work证据](evidence/001-r6-work/README.md)。当前源码未修改，未合入、推送或更新父仓gitlink；同一app检出和既有他仓WIP保留。
 
@@ -167,7 +171,8 @@ T-00先行；T-01→T-02→T-03→T-04顺序实施。T-00输出能力报告，T-
 | SD-15 | modify | docs/specs/notes/durable-inbox.md | boolean ID/错body/tags元素静默导入 → 完整类型校验与字符串损坏报告，保留原件/后续合法项 | F-R5-04，AC-03 |
 | SD-16 | modify | docs/specs/notes/durable-inbox.md | canonical留r3、归档后延后沉淀 → work准备实际Spec diff、review验证、merge发布并闭合索引/计数 | F-R5-05，AC-01–05 |
 
-任务owner_stage=work；全部T-00–T-33属实现/其回归合同。独立final review和merge-owned关闭门另在§6/8显式记录，不将未执行操作打勾或将代码正确性推迟到merge。Phase4/5当前未闭合项由Phase6对应任务修复/补验；T-20的严格notes.json迁移实现保留通过。
+任务owner_stage=work；T-00–T-34属实现/其回归合同，执行完成不替代独立 final review。
+Phase4/5当时未闭合项已由Phase6对应任务修复/补验；T-20严格notes.json迁移实现保留通过。
 
 - [x] T-17: 旧存储完整、安全升级（owner_stage=work）。核对Phase1已提交repo_set_meta/load_doc，合并manifest权威state/pinned/folder/tags/revision，保留实体正文/ID及请求记录；严格校验manifest/实体/路径/备份结果，损坏或不完整升级不得空成功后不可重试，已误写upgraded标记也须安全恢复。已有SQLite与旧树并存、ID冲突先给保全/显式错误策略，不静默忽略任一已保存数据。验证wedge-snapshot正常正文、manifest-only标签/置顶/folder/trash（活动列表不得复活）、备份路径为文件、缺唯一实体/补回重试、manifest={}、正常/硬杀/幂等升级；源hash与备份保持。覆盖AC-01/03/05、F-R5-01，重验T-12/T-02/T-07。
   [✅ 已闭合 2026-10-12（经 T-28/T-29 r7 复核）] 升级权威/失败边界/身份校验漏分支全部关闭：independent-api 5 断言 + battery S15/S16/S19。
@@ -247,6 +252,22 @@ SD-07–22 原意继续保留，SD-21 按已决 A。新增 SD-23–28 全部 mod
   [✅ 已完成 2026-10-12] S15/S19b 注入迁独立脚本 inject_legacy_marker.py（后置读回校验 + INJECT_CONTROL 自检 + battery `|| fail`）；注入失败控制 CONTROL PASSED、复审 battery-control pass=true；复审 5 API+4 Vue 断言原样转绿并入库；VM 侧 R7 驱动 7 断言；fresh gen/build + 终态全套门（battery exit0、scratch 38/38、Vue 24/24、VM 19/19、VM 负例 13/13、独立×3 exit0，二进制 5c187b2a）；r6 README 链接修复；计数 34/34、§0/§8/索引一致；Spec 稿 spec-delta-r7-implementation.md（决策 A 已反映）。证据 [r7-work/README](evidence/001-r7-work/README.md)。
 
 
+### Phase 7：AutoLang 严格 JSON public face 集成复核
+
+AutoLang v0.6 候选继续严格执行 `stdlib/auto/json.at` 的公开类型，不为 Notes 扩大 ABI。
+此次只修正 Notes 对既有 `json.as_bool`（公开签名为 int）和未公开/未验证
+`json.is_valid` 的调用；布尔值以 `value == true` 判定，JSON 根用 `json.parse(raw)`
+与解析 `"null"` 的结果比较。invalid 与 literal null 同为不可承载 manifest/entity 的
+状态，后续 schema/身份校验仍负责结构错误的明确拒绝。
+
+- [x] T-34: 严格 JSON API 跨仓适配与原合同回归（owner_stage=work）。保持公开 AutoLang
+  ABI 不变；更新 `src/back/db.at` 和 `src/back/repository.at` 的布尔读取与根验证，
+  不手改生成 Rust。用 PLAN-775 候选 CLI 重建 Notes generated backend，随后依序通过
+  API battery S0–S19、Vue/Playwright 24/24、VM 正常套件 19/19、R7 VM 1–3（`fails=[]`）
+  与独立 API oracle 6/6；保留 CLI、依赖 manifest 和结果 SHA；核对 `Cargo.toml` 恢复
+  到本地常规 AutoLang 路径。覆盖 AC-01–05 的现有门，不替代原 AC 或最终 review。
+  [✅ 已完成 2026-10-13] 证据 [001-r8-recheck-20261013](evidence/001-r8-recheck-20261013/README.md)。
+
 ## 6. 测试设计
 
 当前Phase6不变量仍是确认数据/身份完整、失败可重试、草稿与真实目标保全。先复放当前独立输入，补同类成功/失败出口和实际VM代表性路径，不声称全部组合或硬件掉电。每项owner_stage=work，独立final review另行执行。
@@ -259,6 +280,7 @@ SD-07–22 原意继续保留，SD-21 按已决 A。新增 SD-23–28 全部 mod
 | V-31 | AC-04/05,T-31 | 筛选后当前改名消失→点击另一条；恢复筛选外草稿后pin/tag/delete | 稳定ID选中/操作，双方服务器检查无错对象；不越界 |
 | V-32 | AC-04/05,T-32 | A/B满+C冲突 dirty，search/folder/tag/select/new/两Recover | 内容、query/filter/active与服务器原位，无副作用，显式释放后可继续 |
 | V-33 | 全部AC,T-33 | 正常注入、注入故意失败、assert故意失败、修复commit全门与链接/Spec | fixture真实变更；任一必需步骤失败均非零；AC映射无漏项/矛盾 |
+| V-34 | AC-01–05,T-34 | 严格 JSON public face，重建后端，API/Vue/VM/R7 VM/API oracle | 公开 ABI 不变；battery 0 failure、Vue 24/24、VM 19/19、R7 `fails=[]`、oracle 6/6 |
 
 此前Phase5/4矩阵仍适用，下面原失败输入现已通过的事实与当前全文不变量验收分开记录。
 
@@ -311,20 +333,32 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
 
 2026-10-05 修订2历史复审：AC-01 partial；AC-02/03/04 fail；AC-05 pass。修订3历史再次复审（f8dc027）：AC-01 fail（旧确认数据升级不可见，新SQLite硬杀恢复pass）；AC-02 fail（原收据/意图重放及UIrid）；AC-03 fail（null/报告I/O/Unicode）；AC-04 fail（双客户端冲突后Tag丢草稿，事务并发部分pass）；AC-05 pass（当前基本CRUD/空启动/soft-delete）。后续改动所有AC须重新验，不继承本勾选为新commit的通过证据。
 
+2026-10-13 修订8执行完成，AC-01–05 状态待独立 final review；r7/r8 work 测试不能代替按 AC 逐项复验。
+
 
 修订4本次再次复审（80770cc）：AC-01/02/03/04 fail，AC-05基础CRUD pass。Vue21/21、VM19/19、battery成功不覆盖本轮新增反例，见独立证据。
 
 ## 8. 执行步骤与交接
 
-当前交接：Phase6、NOTES-001:r7、**executing 11/34**。next=work(T-28/T-29，随后T-30–T-32，T-33全门/关闭)；修复提交后同树独立final review，通过才reviewed→merge。保留T-26决策A以及未受影响11项，17项原任务重开；完整映射见当前复审报告。实际树D:/autostack/auto-os/apps/015-notes/v0.6-dev，不创建第二实现/复审树。canonical仍r3，当前r6实现稿未获发布通过；发布SD-07–28、派生索引、归档及恢复收据为merge-owned pending。未推送/未动父仓gitlink，历史外部授权阻塞保留。
+此前的 Phase6/NOTES-001:r7 “executing 11/34”交接为历史记录，已由本 revision 替代。
+当前交接：Phase7、NOTES-001:r8、**execution_done 35/35**；T-34 的跨仓运行证据已冻结，
+AC-01–05 和所有旧任务由独立 final review 按当前 Notes/AutoLang commit 复验后才可
+转 reviewed→merge。实际树 `D:/autostack/auto-os/apps/015-notes`、分支 `v0.6-dev`；
+既有 untracked evidence 与 ignored 构建产物保留。canonical 仍 r3，待复审通过后发布
+SD-07–28 的实际 Spec、派生索引、归档及恢复收据。未推送/未动父仓 gitlink。
 
-显式merge-owned关闭门：发布已复审的SD-07–28实际canonical Spec、刷新派生记录/归档索引、复核work已关闭任务及完成计数、归档引用及恢复收据；实际完成前保留pending，禁止再把规范沉淀延后到未定“下批”。关闭门不是推迟实现正确性的通道。本轮不修实现、不修改canonical、不合入或外部发布；历史pass/next=merge不覆盖本次needs_fix。
+显式 merge-owned 关闭门：独立 review 通过后发布 SD-07–28 的实际 canonical Spec、刷新
+派生记录/归档索引、复核 work 已关闭任务及完成计数、归档引用及恢复收据；该门仍
+pending，不能以本次 work 完成为由提前发布。原 Phase6 review 记录保留于 §9，不能
+替代对 revision 8 和本次跨仓适配的复核。
 
 第二计划接入附件事务，扩展中断测试；当前阶段先对纯文本提交给出可复现证据。
 
 新需求不得在执行中无限追加；发现必要遗漏先更新计划并讨论，不直接删验收项。知识系统/安装服务/AI等未交付依赖必须写明接口级与真实集成的差别。
 
 ## 9. 复审记录
+
+- stage: work | plan_id=NOTES-001 | plan_revision=8 | outcome=execution_done（T-34 完成；累计 35/35；不声称 AC 最终复审通过） | repository=D:/autostack/auto-os/apps/015-notes | branch=v0.6-dev | base_commit=61e83f81eff06165b18e776081d7b66a78dbd036 | code_commit=c978e02（严格 JSON public API 适配+收据） | dependency_revision=AutoLang plan-775-dev `8bc11d2fc8ef35d384e9061a07bec4d9efdddf46`；CLI SHA256=`71F7052A81B0760A28B64DF4050C1ABA149FDBDD8362D88973D7D9F32EB8109E` | task_ids=T-34 | evidence=[r8-recheck](evidence/001-r8-recheck-20261013/README.md)：battery S0–S19 fails=0、Vue 24/24、VM 19/19、R7 VM 1–3 fails=[]、API oracle 6/6 | limitation=Vue/VM child process 返回 0，外层 wrapper 仅在 GBK 不可编码的 Unicode 状态行打印后返回 1；原始结果日志已保存 | next_responsible_role=independent final review，按 AC-01–05 和全部原任务核验 revision 8
 
 - stage: work | plan_id=NOTES-001 | plan_revision=7 | outcome=pass（T-28–T-33 完成；重开任务按 r7 证据映射闭合；execution_done 34/34；AC 终验归 review） | worktree_path=D:/autostack/auto-os/apps/015-notes | branch=v0.6-dev | base_commit=a2af202（r6-recheck needs_fix 文档提交） | code_commit=7c5fd8f（实现+测试+计划闭合单提交） | dependency_revisions=CLI auto 0.1.0+v0.4.2-2785-ga6e108f60；AutoLang main 897eb349 线；AutoDown 96f095b（pin=实际） | task_ids=T-28, T-29, T-30, T-31, T-32, T-33（+重开 T-01/02/04/07/09/11/12/15/16/17/19/21/22/23/24/25/27 按 r7 证据映射闭合） | evidence=[r7-work/](evidence/001-r7-work/README.md)（终态二进制 SHA256=5c187b2a…：battery S0–S19 exit0、scratch 38/38、Vue 24/24、VM 19/19、VM 负例 13/13、R7 VM 7/7、独立 API/UI exit0、双控制 pass） | spec_delta=SD-23..28 实现绑定稿 [spec-delta-r7-implementation.md](evidence/001-r7-work/spec-delta-r7-implementation.md)（SD-07..22 有效绑定延续；canonical 未动）；T-26 决策 A 维持 | blockers=无 | next_responsible_role=独立 final review（同树验证）→ merge
 
