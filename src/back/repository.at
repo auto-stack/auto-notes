@@ -21,6 +21,14 @@ use auto.env
 use auto.sqlite
 use auto.json
 
+// Invalid raw JSON and the literal `null` both cannot carry an app manifest or
+// entity. In the embedded runtime json.parse uses JsonValue null as its
+// failure sentinel; comparing parsed values keeps this check on the verified
+// public face.
+fn has_non_null_json_root(raw str) bool {
+    return json.parse(raw) != json.parse("null")
+}
+
 pub fn data_dir() str {
     var ov str = env.get("NOTES_DATA_DIR")
     var base str = ov
@@ -424,7 +432,7 @@ fn upgrade_if_legacy(db SqliteDb) str {
         return "second_writer"
     }
     var raw str = fs_read(mpath)
-    if json.is_valid(raw) == false {
+    if has_non_null_json_root(raw) == false {
         db.exec("ROLLBACK")
         db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','manifest unreadable')")
         return "storage_unwritable"
@@ -549,7 +557,7 @@ fn repair_legacy_merge(db SqliteDb) str {
         return "second_writer"
     }
     var raw str = fs_read(mpath)
-    if json.is_valid(raw) == false {
+    if has_non_null_json_root(raw) == false {
         db.exec("ROLLBACK")
         db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','manifest unreadable')")
         return "storage_unwritable"
@@ -743,7 +751,7 @@ fn valid_legacy_file(fid str) bool {
 /// folder/state 类型、pinned 布尔；缺字段容忍（与迁移缺字段策略一致）。
 /// 返回错误消息，"" = 通过。
 fn validate_legacy_entity(eraw str, entry_note_id str) str {
-    if json.is_valid(eraw) == false {
+    if has_non_null_json_root(eraw) == false {
         return "entity unreadable"
     }
     var it = json.parse(eraw)
@@ -977,7 +985,7 @@ fn entry_authority_json(eraw str, ejson str) str {
         tags_json = json.encode(mtv)
     }
     var mpv = json.get(e, "pinned")
-    if json.as_bool(mpv) {
+    if mpv == true {
         pin = 1
     } else {
         if json.encode(mpv) != "null" {
@@ -1031,7 +1039,7 @@ fn import_legacy_receipts(db SqliteDb) str {
         for k in 0..rn {
             var name str = names[k]
             var rraw str = fs_read(rdir + "/" + name)
-            if json.is_valid(rraw) {
+            if has_non_null_json_root(rraw) {
                 var rit = json.parse(rraw)
                 var rid str = json.as_string(json.get(rit, "request_id"))
                 var rnid str = json.as_string(json.get(rit, "note_id"))
@@ -1390,7 +1398,7 @@ pub fn migrate_legacy_at(legacy_path str) str {
     if cpok == false {
         return "{\"attempted\":true,\"migrated\":0,\"skipped_existing\":false,\"saved\":false,\"err\":\"storage_unwritable\",\"backup_file\":\"\",\"corrupted\":[]}"
     }
-    var valid bool = json.is_valid(raw)
+    var valid bool = has_non_null_json_root(raw)
     var rows_json str = "[]"
     var pre_corrupted str = ""
     var top_bad str = ""
@@ -1763,7 +1771,7 @@ fn salvage_objects(raw str) str {
                             } else {
                                 if c2 == 125 {
                                     var piece str = raw.sub(open_b, kb + 1)
-                                    if json.is_valid(piece) {
+                                    if has_non_null_json_root(piece) {
                                         close_c = k
                                         close_b = kb
                                         stop2 = true

@@ -41,7 +41,7 @@ fn note_doc_of(doc_json str) NoteDocument {
     var v_rev = json.get(it, "revision")
     var n_rev int = json.as_int(v_rev)
     var v_pin = json.get(it, "pinned")
-    var n_pin bool = json.as_bool(v_pin)
+    var n_pin bool = v_pin == true
     var v_tags = json.get(it, "tags")
     var v_tags_json str = json.encode(v_tags)
     var n_tags List<str> = str_list_of(v_tags_json)
@@ -85,7 +85,7 @@ fn note_doc_of(doc_json str) NoteDocument {
 fn repo_result_of(js str) RepoResult {
     var it = json.parse(js)
     var v_ok = json.get(it, "ok")
-    var okb bool = json.as_bool(v_ok)
+    var okb bool = v_ok == true
     var v_ec = json.get(it, "err_code")
     var ec str = json.as_string(v_ec)
     var v_doc = json.get(it, "note")
@@ -110,7 +110,7 @@ fn repo_result_of(js str) RepoResult {
         status: st,
     }
     var v_rep = json.get(it, "replayed")
-    var rep bool = json.as_bool(v_rep)
+    var rep bool = v_rep == true
     var r RepoResult = RepoResult {
         ok: okb,
         err_code: ec,
@@ -125,13 +125,13 @@ fn repo_result_of(js str) RepoResult {
 fn migration_report_of(js str) MigrationReport {
     var it = json.parse(js)
     var v_att = json.get(it, "attempted")
-    var att bool = json.as_bool(v_att)
+    var att bool = v_att == true
     var v_mig = json.get(it, "migrated")
     var mig int = json.as_int(v_mig)
     var v_skip = json.get(it, "skipped_existing")
-    var skip bool = json.as_bool(v_skip)
+    var skip bool = v_skip == true
     var v_saved = json.get(it, "saved")
-    var saved bool = json.as_bool(v_saved)
+    var saved bool = v_saved == true
     var v_err = json.get(it, "err")
     var err str = json.as_string(v_err)
     var v_bak = json.get(it, "backup_file")
@@ -306,7 +306,7 @@ fn note_from_json_str(doc_json str) Note {
         t = "Just now"
     }
     var v_pin = json.get(it, "pinned")
-    var n_pin bool = json.as_bool(v_pin)
+    var n_pin bool = v_pin == true
     var v_tags = json.get(it, "tags")
     var v_tags_json str = json.encode(v_tags)
     var n_tags List<str> = str_list_of(v_tags_json)
@@ -329,7 +329,7 @@ fn note_from_json_str(doc_json str) Note {
 fn note_of_result(js str) ?Note {
     var it = json.parse(js)
     var v_ok = json.get(it, "ok")
-    var okb bool = json.as_bool(v_ok)
+    var okb bool = v_ok == true
     if okb {
         var v_doc = json.get(it, "note")
         var docjs str = json.encode(v_doc)
@@ -393,7 +393,7 @@ pub fn update_note(id int, expected_revision int, title str, body str, request_i
     var js str = repository.repo_update(nid, expected_revision, title, body, rid)
     var it = json.parse(js)
     var v_ok = json.get(it, "ok")
-    return json.as_bool(v_ok)
+    return v_ok == true
 }
 
 /// 条件更新（结构化结果版，SD-14/T-19）：UI 需要 err_code 区分「明确拒绝」
@@ -425,7 +425,7 @@ pub fn delete_note(id int) bool {
     var js str = repository.repo_trash(repository.nid_of(id))
     var it = json.parse(js)
     var v_ok = json.get(it, "ok")
-    return json.as_bool(v_ok)
+    return v_ok == true
 }
 
 pub fn toggle_pin(id int) ?Note {
@@ -436,7 +436,7 @@ pub fn toggle_pin(id int) ?Note {
     }
     var cur = json.parse(cur_js)
     var v_pin = json.get(cur, "pinned")
-    var pb bool = json.as_bool(v_pin)
+    var pb bool = v_pin == true
     var want bool = true
     if pb {
         want = false

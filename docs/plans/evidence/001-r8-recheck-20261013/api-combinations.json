@@ -1,0 +1,318 @@
+{
+  "results": {
+    "valid-control": {
+      "patch": {},
+      "response": {
+        "http": 200,
+        "value": [
+          {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "doc1-updated",
+            "body": "body two",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          }
+        ]
+      },
+      "status": {
+        "loaded": true,
+        "err": "",
+        "counter": 3,
+        "entries": 1,
+        "max_legacy_id": 1,
+        "migrated": "",
+        "upgrade_error": "",
+        "data_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-r6-20261012\\api-combinations-1791835317868854700\\valid-control"
+      },
+      "db": {
+        "notes": [
+          [
+            "n-1",
+            1,
+            2,
+            "doc1-updated",
+            "[]",
+            ""
+          ]
+        ],
+        "meta": [
+          [
+            "counter",
+            "3"
+          ],
+          [
+            "schema_v",
+            "3"
+          ],
+          [
+            "upgrade_error",
+            ""
+          ],
+          [
+            "upgraded",
+            "1"
+          ]
+        ]
+      },
+      "source_unchanged": true
+    },
+    "manifest-identity": {
+      "patch": {
+        "legacy_id": "7"
+      },
+      "response": {
+        "http": 200,
+        "value": []
+      },
+      "status": {
+        "loaded": true,
+        "err": "",
+        "counter": 1,
+        "entries": 0,
+        "max_legacy_id": 0,
+        "migrated": "",
+        "upgrade_error": "manifest entry invalid: n-1.r2.json: manifest legacy_id does not match entity legacy_id",
+        "data_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-r6-20261012\\api-combinations-1791835317868854700\\manifest-identity"
+      },
+      "db": {
+        "notes": [],
+        "meta": [
+          [
+            "schema_v",
+            "3"
+          ],
+          [
+            "upgrade_error",
+            "manifest entry invalid: n-1.r2.json: manifest legacy_id does not match entity legacy_id"
+          ]
+        ]
+      },
+      "source_unchanged": true
+    },
+    "manifest-types": {
+      "patch": {
+        "revision": true,
+        "tags": [
+          7,
+          null
+        ],
+        "folder": 42,
+        "pinned": 1
+      },
+      "response": {
+        "http": 200,
+        "value": []
+      },
+      "status": {
+        "loaded": true,
+        "err": "",
+        "counter": 1,
+        "entries": 0,
+        "max_legacy_id": 0,
+        "migrated": "",
+        "upgrade_error": "manifest entry invalid: n-1.r2.json: manifest revision not an integer",
+        "data_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-r6-20261012\\api-combinations-1791835317868854700\\manifest-types"
+      },
+      "db": {
+        "notes": [],
+        "meta": [
+          [
+            "schema_v",
+            "3"
+          ],
+          [
+            "upgrade_error",
+            "manifest entry invalid: n-1.r2.json: manifest revision not an integer"
+          ]
+        ]
+      },
+      "source_unchanged": true
+    },
+    "manifest-revision": {
+      "patch": {
+        "revision": "2oops"
+      },
+      "response": {
+        "http": 200,
+        "value": []
+      },
+      "status": {
+        "loaded": true,
+        "err": "",
+        "counter": 1,
+        "entries": 0,
+        "max_legacy_id": 0,
+        "migrated": "",
+        "upgrade_error": "manifest entry invalid: n-1.r2.json: manifest revision not an integer",
+        "data_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-r6-20261012\\api-combinations-1791835317868854700\\manifest-revision"
+      },
+      "db": {
+        "notes": [],
+        "meta": [
+          [
+            "schema_v",
+            "3"
+          ],
+          [
+            "upgrade_error",
+            "manifest entry invalid: n-1.r2.json: manifest revision not an integer"
+          ]
+        ]
+      },
+      "source_unchanged": true
+    },
+    "repair-update-failure": {
+      "before": {
+        "notes": [
+          [
+            "n-1",
+            1,
+            2,
+            "doc1-updated",
+            "[]",
+            ""
+          ]
+        ],
+        "meta": [
+          [
+            "corrupted_r1",
+            "legacy upgrade incomplete"
+          ],
+          [
+            "counter",
+            "3"
+          ],
+          [
+            "schema_v",
+            "3"
+          ],
+          [
+            "upgrade_error",
+            ""
+          ],
+          [
+            "upgraded",
+            "1"
+          ]
+        ]
+      },
+      "response": {
+        "http": 200,
+        "value": []
+      },
+      "after": {
+        "notes": [
+          [
+            "n-1",
+            1,
+            2,
+            "doc1-updated",
+            "[]",
+            ""
+          ]
+        ],
+        "meta": [
+          [
+            "corrupted_r1",
+            "legacy upgrade incomplete"
+          ],
+          [
+            "counter",
+            "3"
+          ],
+          [
+            "schema_v",
+            "3"
+          ],
+          [
+            "upgrade_error",
+            "repair update failed: n-1"
+          ],
+          [
+            "upgraded",
+            "1"
+          ]
+        ]
+      },
+      "status": {
+        "loaded": true,
+        "err": "",
+        "counter": 3,
+        "entries": 1,
+        "max_legacy_id": 1,
+        "migrated": "",
+        "upgrade_error": "repair update failed: n-1",
+        "data_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-r6-20261012\\api-combinations-1791835317868854700\\repair-update-failure"
+      },
+      "retry": {
+        "response": {
+          "http": 200,
+          "value": [
+            {
+              "schema_version": 1,
+              "note_id": "n-1",
+              "revision": 2,
+              "title": "doc1-updated",
+              "body": "body two",
+              "tags": [
+                "authority"
+              ],
+              "color": "",
+              "pinned": false,
+              "state": "active",
+              "folder": "authority-folder",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": 1,
+              "seq": 1
+            }
+          ]
+        },
+        "db": {
+          "notes": [
+            [
+              "n-1",
+              1,
+              2,
+              "doc1-updated",
+              "[\"authority\"]",
+              "authority-folder"
+            ]
+          ],
+          "meta": [
+            [
+              "counter",
+              "3"
+            ],
+            [
+              "repair_generation",
+              "1"
+            ],
+            [
+              "schema_v",
+              "3"
+            ],
+            [
+              "upgrade_error",
+              ""
+            ],
+            [
+              "upgraded",
+              "1"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "oracle_failures": []
+}
