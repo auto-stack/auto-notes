@@ -8,12 +8,14 @@ No generated Rust or AutoLang declaration was edited in the Notes repository.
 ## Revisions and build input
 
 - Notes source: branch `v0.6-dev`, base HEAD `61e83f81eff06165b18e776081d7b66a78dbd036`.
-- AutoLang candidate: branch `plan-775-dev`, final source HEAD
+- AutoLang runtime source used: branch `plan-775-dev`, HEAD
   `8bc11d2fc8ef35d384e9061a07bec4d9efdddf46`.
 - Runtime changes used by the Notes build are in AutoLang commits
   `924273fa5` (VM task-owned SQLite handle cleanup) and `b1230e767`
   (verified generic `json.encode[T]` adapter). The later `8bc11d2fc` commit
-  changes only the Plan 394 test harness.
+  changes only the Plan 394 test harness. A later docs-only commit
+  `6011bc0e4` records the SQLite VM handle lifetime and does not change the
+  runtime tested here.
 - CLI used by the VM scenario: `D:/autostack/.wt/lang-775/auto-lang/target/debug/auto.exe`,
   SHA-256 `71F7052A81B0760A28B64DF4050C1ABA149FDBDD8362D88973D7D9F32EB8109E`.
 - The ignored local `rust-workspace/Cargo.toml` was restored after generation to
