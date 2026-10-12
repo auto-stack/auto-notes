@@ -463,14 +463,22 @@ fn upgrade_if_legacy(db SqliteDb) str {
             return "upgrade_incomplete"
         }
         var it = json.parse(eraw)
+        var ejson0 str = json.encode(e)
+        var entity_lid int = json.as_int(json.get(it, "legacy_id"))
+        var eerr str = validate_legacy_entry(ejson0, entity_lid)
+        if eerr != "" {
+            db.exec("ROLLBACK")
+            var emsg str = "manifest entry invalid: " + fid + ": " + eerr
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(emsg) + ")")
+            return "upgrade_incomplete"
+        }
         var nid str = json.as_string(json.get(it, "note_id"))
         var title str = json.as_string(json.get(it, "title"))
         var body str = legacy_entity_body(eraw)
         var color str = json.as_string(json.get(it, "color"))
         var cr str = json.as_string(json.get(it, "created_at"))
         var up str = json.as_string(json.get(it, "updated_at"))
-        var ejson str = json.encode(e)
-        var auth str = entry_authority_json(eraw, ejson)
+        var auth str = entry_authority_json(eraw, ejson0)
         var au = json.parse(auth)
         var rev int = json.as_int(json.get(au, "rev"))
         var tags_json str = json.as_string(json.get(au, "tags_json"))
@@ -505,7 +513,12 @@ fn upgrade_if_legacy(db SqliteDb) str {
             }
         }
     }
-    import_legacy_receipts(db)
+    var ferr str = import_legacy_receipts(db)
+    if ferr != "" {
+        db.exec("ROLLBACK")
+        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(ferr) + ")")
+        return "storage_unwritable"
+    }
     db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')")
     db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','')")
     db.exec("DELETE FROM meta WHERE k='corrupted_r1'")
@@ -575,6 +588,15 @@ fn repair_legacy_merge(db SqliteDb) str {
             return "upgrade_incomplete"
         }
         var it = json.parse(eraw)
+        var ejson0 str = json.encode(e)
+        var entity_lid int = json.as_int(json.get(it, "legacy_id"))
+        var eerr str = validate_legacy_entry(ejson0, entity_lid)
+        if eerr != "" {
+            db.exec("ROLLBACK")
+            var emsg str = "manifest entry invalid: " + fid + ": " + eerr
+            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(emsg) + ")")
+            return "upgrade_incomplete"
+        }
         var nid str = json.as_string(json.get(it, "note_id"))
         var title str = json.as_string(json.get(it, "title"))
         var body str = legacy_entity_body(eraw)
@@ -582,8 +604,7 @@ fn repair_legacy_merge(db SqliteDb) str {
         var cr str = json.as_string(json.get(it, "created_at"))
         var up str = json.as_string(json.get(it, "updated_at"))
         var erev int = json.as_int(json.get(it, "revision"))
-        var ejson str = json.encode(e)
-        var auth str = entry_authority_json(eraw, ejson)
+        var auth str = entry_authority_json(eraw, ejson0)
         var au = json.parse(auth)
         var rev int = json.as_int(json.get(au, "rev"))
         var tags_json str = json.as_string(json.get(au, "tags_json"))
@@ -616,7 +637,13 @@ fn repair_legacy_merge(db SqliteDb) str {
                 }
             }
             if proven {
-                db.exec("UPDATE notes SET legacy_id=" + json.encode(leg) + ", revision=" + json.encode(rev) + ", tags_json=" + sql_str(tags_json) + ", pinned=" + json.encode(pin) + ", state=" + sql_str(state) + ", folder=" + sql_str(folder) + ", seq=" + json.encode(seq) + " WHERE note_id=" + sql_str(nid))
+                var upd int = db.exec("UPDATE notes SET legacy_id=" + json.encode(leg) + ", revision=" + json.encode(rev) + ", tags_json=" + sql_str(tags_json) + ", pinned=" + json.encode(pin) + ", state=" + sql_str(state) + ", folder=" + sql_str(folder) + ", seq=" + json.encode(seq) + " WHERE note_id=" + sql_str(nid))
+                if upd < 0 {
+                    db.exec("ROLLBACK")
+                    var umsg str = "repair update failed: " + nid
+                    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(umsg) + ")")
+                    return "storage_unwritable"
+                }
             }
         }
     }
@@ -638,10 +665,24 @@ fn repair_legacy_merge(db SqliteDb) str {
             }
         }
     }
-    import_legacy_receipts(db)
-    db.exec("DELETE FROM meta WHERE k='corrupted_r1'")
-    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('repair_generation','1')")
-    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','')")
+    var rerr str = import_legacy_receipts(db)
+    if rerr != "" {
+        db.exec("ROLLBACK")
+        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(rerr) + ")")
+        return "storage_unwritable"
+    }
+    var delc int = db.exec("DELETE FROM meta WHERE k='corrupted_r1'")
+    var genw int = db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('repair_generation','1')")
+    var clrw int = db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','')")
+    if delc < 0 {
+        if genw < 0 {
+            if clrw < 0 {
+                db.exec("ROLLBACK")
+                db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','repair credential update failed')")
+                return "storage_unwritable"
+            }
+        }
+    }
     var commit int = db.exec("COMMIT")
     if commit < 0 {
         return "storage_unwritable"
@@ -784,6 +825,105 @@ fn validate_legacy_entity(eraw str, entry_note_id str) str {
     return ""
 }
 
+/// 清单整数字段校验（SD-23/T-28）：缺失(null)容忍；整数或历史合法十进制
+/// 字符串接受；布尔/含杂字符字符串（如 "2oops"）/其他类型拒绝。
+fn valid_int_field(j str) bool {
+    if j == "null" {
+        return true
+    }
+    if is_int_literal(j) {
+        return true
+    }
+    var n int = j.len()
+    if n >= 3 {
+        if j.sub(0, 1) == "\"" {
+            if j.sub(n - 1, n) == "\"" {
+                var inner str = j.sub(1, n - 1)
+                if is_int_literal(inner) {
+                    return true
+                }
+            }
+        }
+    }
+    return false
+}
+
+/// 清单字段类型 + 与实体双向身份校验（SD-23/T-28）：在权威合并前调用。
+/// 返回错误消息，"" = 通过。
+fn validate_legacy_entry(ejson str, entity_legacy_id int) str {
+    var e = json.parse(ejson)
+    var nj str = json.encode(json.get(e, "note_id"))
+    if nj != "null" {
+        if nj.sub(0, 1) != "\"" {
+            return "manifest note_id not a string"
+        }
+    }
+    var lg str = json.encode(json.get(e, "legacy_id"))
+    if lg != "null" {
+        if valid_int_field(lg) == false {
+            return "manifest legacy_id not an integer"
+        }
+        var ev = json.get(e, "legacy_id")
+        var lgj str = json.encode(ev)
+        var lid int = 0
+        if lgj.sub(0, 1) == "\"" {
+            lid = parse_int(json.as_string(ev))
+        } else {
+            lid = json.as_int(ev)
+        }
+        if lid != entity_legacy_id {
+            return "manifest legacy_id does not match entity legacy_id"
+        }
+    }
+    var rv str = json.encode(json.get(e, "revision"))
+    if rv != "null" {
+        if valid_int_field(rv) == false {
+            return "manifest revision not an integer"
+        }
+    }
+    var sq str = json.encode(json.get(e, "seq"))
+    if sq != "null" {
+        if valid_int_field(sq) == false {
+            return "manifest seq not an integer"
+        }
+    }
+    var tj str = json.encode(json.get(e, "tags"))
+    if tj != "null" {
+        if tj.sub(0, 1) != "[" {
+            return "manifest tags not an array"
+        }
+        var tags = json.get(e, "tags")
+        var tn int = json.len(tags)
+        for g in 0..tn {
+            var el = json.get_at(tags, g)
+            if json.encode(el).sub(0, 1) != "\"" {
+                return "manifest tags element not a string"
+            }
+        }
+    }
+    var fj str = json.encode(json.get(e, "folder"))
+    if fj != "null" {
+        if fj.sub(0, 1) != "\"" {
+            return "manifest folder not a string"
+        }
+    }
+    var sj str = json.encode(json.get(e, "state"))
+    if sj != "null" {
+        if sj.sub(0, 1) != "\"" {
+            return "manifest state not a string"
+        }
+    }
+    var pj str = json.encode(json.get(e, "pinned"))
+    if pj != "null" {
+        if pj != "true" {
+            if pj != "false" {
+                return "manifest pinned not a boolean"
+            }
+        }
+    }
+    return ""
+}
+
 /// 实体正文：blocks → 换行连接（v1 只产生 text 块；已校验后调用）。
 fn legacy_entity_body(eraw str) str {
     var it = json.parse(eraw)
@@ -883,7 +1023,7 @@ fn entry_authority_json(eraw str, ejson str) str {
 /// 旧收据 → requests（两路升级共用）：只导入 committed；kind 按旧协议规则
 /// 恢复（create=rev1 / update=rev≥2）；intent 留空 = 不可验证旧行，重放一律
 /// request_conflict（F-R5-02/F-R6-06 裁决）。INSERT OR IGNORE 幂等。
-fn import_legacy_receipts(db SqliteDb) {
+fn import_legacy_receipts(db SqliteDb) str {
     var rdir str = data_dir() + "/receipts"
     if fs_exists(rdir) {
         var names List<str> = fs.dir_names(rdir)
@@ -903,12 +1043,16 @@ fn import_legacy_receipts(db SqliteDb) {
                         if rrev < 2 {
                             kindx = "create"
                         }
-                        db.exec("INSERT OR IGNORE INTO requests(request_id, note_id, kind, rev, doc_json, intent) VALUES(" + sql_str(rid) + ", " + sql_str(rnid) + ", " + sql_str(kindx) + ", " + json.encode(rrev) + ", '', '')")
+                        var iri int = db.exec("INSERT OR IGNORE INTO requests(request_id, note_id, kind, rev, doc_json, intent) VALUES(" + sql_str(rid) + ", " + sql_str(rnid) + ", " + sql_str(kindx) + ", " + json.encode(rrev) + ", '', '')")
+                        if iri < 0 {
+                            return "receipt import failed: " + rid
+                        }
                     }
                 }
             }
         }
     }
+    return ""
 }
 
 // ═══════════════════════════════════════════════════════════

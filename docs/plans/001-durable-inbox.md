@@ -1,13 +1,13 @@
 ---
 plan_id: NOTES-001
 title: "可靠 Inbox、稳定标识与恢复"
-status: executing
+status: execution_done
 feature_name: "可靠 Inbox、稳定标识与恢复"
 author: [Codex]
 created_at: 2026-10-04T00:00:00Z
 updated_at: 2026-10-12
 plan_revision: 7
-current_step: 11
+current_step: 34
 total_steps: 34
 created: 2026-10-04
 base_branch: v0.6-dev
@@ -22,9 +22,11 @@ touched_goals: ["auto-notes/first-real-release"]
 
 ## 0. 变更摘要
 
+r7 work（2026-10-12）：Phase 6 T-28–T-33 已实现并采证——清单+实体共同验证（双向身份/十进制串容忍/布尔杂字符拒绝）、修复必需写入失败出口（凭据保留可重试）、未知意图链 prev2（链上匹配才采纳）、稳定动作目标（id 重定位/draft_id 绑定）、满槽全状态原位、注入独立脚本+故障控制。复审 5 API+4 Vue 断言原样转绿并入库；新增 R7 VM 驱动 7 断言；全套门终态全绿（battery exit0、scratch 38/38、Vue 24/24、VM 19/19、VM 负例 13/13、R7 VM 7/7、独立×3 exit0、双控制 pass，二进制 5c187b2a）。34/34 任务按证据闭合，execution_done；AC-01..04 留 review。canonical 未动、未推送。详见 §9 与 [r7-work](evidence/001-r7-work/README.md)。
+
 2026-10-12 修订6独立 final review：交付 f0a3cab、实现1757a90，结论 **needs_fix**。上轮 API3/Vue2/VM2 示例均转绿，fresh build、后端38/38、Vue24/24、VM19/19、VM负例13/13通过；battery exit0仍含S15注入 SyntaxError，不能算该场景通过。新增实际反例确认清单身份/类型未验证、修复 UPDATE 失败假完成、连续未知响应丢祖先、筛选刷新/恢复操作错目标、满槽搜索状态漂移。详见[当前复审](evidence/001-r6-recheck-20261012/README.md)。
 
-按用户原“有问题激活计划001并追加phase”授权，转 **executing / 修订7 / Phase6 / 11/34**，新增T-28–T-33并重开17项受影响原任务；其余11项完成保留。T-26 决策 A 已批准并保持闭合：不可验证旧行安全拒绝，可验证意图请求正确重放，不再次请求批准。当前AC终验均未勾，历史AC-05通过被错目标CRUD分支覆盖。next=work，修复提交后同树独立final review；canonical/发布/归档仍为merge门。
+按用户原“有问题激活计划001并追加phase”授权推进的 Phase 6（T-28–T-33）已实现并采证：六项发现（F-R7-01..06）全部修复，复审 5 API+4 Vue 断言原样转绿并入库，新增 R7 VM 驱动 7 断言，全套门终态全绿（battery exit0、scratch 38/38、Vue 24/24、VM 19/19、VM 负例 13/13、独立×3 exit0、注入控制+断言传播双控制 pass，二进制 5c187b2a）。34/34 任务按证据闭合，**execution_done**；T-26 决策 A 保持闭合；AC-01..04 终验留 review。next=同树独立 final review；canonical/发布/归档仍为merge门。
 
 Phase5 work原申报及当时execution_done28/28为历史，见[输入计划原文](evidence/001-r6-recheck-20261012/plan-input-r6.md)、§9与[r6-work证据](evidence/001-r6-work/README.md)。当前源码未修改，未合入、推送或更新父仓gitlink；同一app检出和既有他仓WIP保留。
 
@@ -90,13 +92,16 @@ T-00先行；T-01→T-02→T-03→T-04顺序实施。T-00输出能力报告，T-
 
 - [x] T-00: 在 Vue/生成后端与 VM 两种实际进程路径各做最小持久化探针，记录 app-data、文件/存储 API、原子提交和异常重启能力；当前 db 注释不能算能力证据。
   [历史work完成申报（本轮以复审为准） 2026-10-04] 报告 `tests/probe/CAPABILITY-REPORT.md`；证据 `tests/probe/evidence/*.json`（VM 路径 13 步全过 + 崩溃重启读回；Vue 路径 12/13，唯一差异为探针非幂等）。关键结论：两路径后端同为 a2r Rust；无 rename/read_dir/时钟；可用面 fs.*/env.get/json.*/字符串拼接。
-- [ ] T-01: 定义 NoteDocument v1、revision、request_id 收据、旧整数 ID 映射；写迁移 fixture 和损坏数据报告。
+- [x] T-01: 定义 NoteDocument v1、revision、request_id 收据、旧整数 ID 映射；写迁移 fixture 和损坏数据报告。
+  [✅ 已闭合 2026-10-12（r7 复核）] 契约/fixture/损坏报告：battery S1–S4/S14/S18 + scratch + r7 严格清单校验（independent-api valid-control）。
   [历史work闭合申报（本轮以复审为准） 2026-10-12] 契约/fixture/损坏报告经 r6 全套门复核：api.at 类型面、fixtures/inbox/legacy-v0、report-r1.json（battery S1–S4/S14/S18）。
-- [ ] T-02: 实现单写者仓储、正文提交/恢复、搜索、标签、置顶、归档/回收站；存储错误返回结构化结果。
+- [x] T-02: 实现单写者仓储、正文提交/恢复、搜索、标签、置顶、归档/回收站；存储错误返回结构化结果。
+  [✅ 已闭合 2026-10-12（r7 复核）] 单写者/CRUD/结构化错误：battery S7b/S8 + Vue/VM 套件 + 独立×3（终态二进制 5c187b2a）。
   [历史work闭合申报（本轮以复审为准） 2026-10-12] 单写者/CRUD/软删/搜索/结构化错误：battery S7b（8并发1成功）/S8 + Vue/VM 套件 + 独立脚本（终态二进制 cc422c9a）。
 - [x] T-03: 加入独立临时数据目录与显式 seed 模式；迁移前备份，失败不改原件。
   [历史work完成申报（本轮以复审为准） 2026-10-04] NOTES_DATA_DIR 隔离 + NOTES_SEED=1 显式示例（tag "seed"）；迁移备份/失败不改原件由电池 S2 采证（backup/notes.json.bak + 原件 md5 前后一致）。
-- [ ] T-04: 将现有 Notes CRUD 适配到新仓储，保留原 UI；把实现的 API/格式记录到文档和测试。
+- [x] T-04: 将现有 Notes CRUD 适配到新仓储，保留原 UI；把实现的 API/格式记录到文档和测试。
+  [✅ 已闭合 2026-10-12（r7 复核）] CRUD 适配：Vue 24/24 + VM 19/19 + 全负例；API/格式记录于 r7 Spec 提案（发布=merge）。
   [历史work闭合申报（本轮以复审为准） 2026-10-12（r6 复核）] CRUD 适配由当前 Vue 24/24 + VM 19/19 + 负例套件覆盖；API/格式记录于 Spec 提案（发布=merge 门）。
   [历史work完成申报（本轮以复审为准） 2026-10-04] api.at legacy 端点直调 repository（内联 Note 视图映射）；db.at 缩为 v1 层+名字匹配存根；冒烟 13/13 绿（seeded 隔离目录，NOTES_SEED=1）。依赖 AutoLang 742 修复（api.rs 体发射 D1/D2/D4/D5/D6）。API/格式记录：docs/specs/notes/durable-inbox.md（本次沉淀）。
 
@@ -106,15 +111,18 @@ T-00先行；T-01→T-02→T-03→T-04顺序实施。T-00输出能力报告，T-
 
 - [x] T-05: 验证修复所需最小能力并冻结协议。核对 `src/back/repository.at`、742 工具链与 a2r 原语，实测事务级串行化、原子排他锁及可恢复提交能力；出具新报告 `tests/probe/PHASE2-CAPABILITY-REPORT.md`（待新建），选定可靠存储实现或 journal+检查点方案。必须能保留上次已确认提交、从不完整 manifest/实体/收据恢复，且 request_id 与实体绑定不可分离。缺 API 时输出精确跨仓依赖和阻塞状态。覆盖 AC-01/02/04、F-001-01/02/05。
 - [x] T-06: 实现真正单写者入口。修改 repository 及 api/db 接线，对读 revision→写实体→提交→收据完整区间串行化；跨进程锁必须原子取得、检查持锁写入结果、绑定目录与所有者，正常退出释放，异常终止提供安全接管路径。迁移、元数据、CRUD、测试入口不能绕过门禁；现存 NOTES_FORCE_LOCK 不能在有活写者时无条件夺锁。8 个同 expected_revision 的并发更新仅 1 个成功，其余 conflict，正文/manifest 始终合法；两个实际后端进程竞夺同目录只有一个写者。覆盖 AC-01/04、F-001-01。
-- [ ] T-07: 修复完整提交、恢复与幂等。依据 T-05 协议修改 create/update、journal、manifest、receipt；每个提交阶段中断后重启再重放同 request_id，最多一个对象/一次 revision 增量、返回原收据；更新须在 revision 冲突检查前识别已提交重放。检查每步 I/O 结果，收据失败不得返回虚假 committed；不要删除恢复所需旧实体/检查点。覆盖 AC-01/02、F-001-02/05，重验并关闭 T-02。
+- [x] T-07: 修复完整提交、恢复与幂等。依据 T-05 协议修改 create/update、journal、manifest、receipt；每个提交阶段中断后重启再重放同 request_id，最多一个对象/一次 revision 增量、返回原收据；更新须在 revision 冲突检查前识别已提交重放。检查每步 I/O 结果，收据失败不得返回虚假 committed；不要删除恢复所需旧实体/检查点。覆盖 AC-01/02、F-001-02/05，重验并关闭 T-02。
+  [✅ 已闭合 2026-10-12（r7 复核）] 提交/恢复/幂等：battery S9/S11/S13 + 独立 API（含 r7 修复出口正反例）。
   [历史work闭合申报（本轮以复审为准） 2026-10-12] 提交/恢复/幂等：battery S9/S11/S13 + 独立脚本（重放原收据、故障无痕、同意图重试）。
 - [x] T-08: 完整迁移与失败回滚。修改 `migrate_legacy_at`、数组遍历与报告写入：null 是损坏项而非终止标记；非数组顶层、错类型、重复 ID、截断对象均给报告并继续可打捞条目；报告/实体/manifest 失败时回滚内存并保留原件及备份，重试不重复；迁移使用 T-06 门禁。新增 `[valid,null,valid]` 等 fixture，预期 migrated=2、corrupted=1、重复迁移无重复对象。覆盖 AC-03/04、F-001-03，重验并关闭 T-01。
   [历史work闭合申报（本轮以复审为准） 2026-10-12] 迁移/回滚：battery S2/S3/S14/S18（打捞+报告+原件不动+严格类型）。
-- [ ] T-09: 将 UI 和 legacy adapter 接入 revision/request_id 结果契约。修改 `src/back/api.at`、`src/front/notes_store.at` 与 `editor.at` 必要状态显示，不重写 EditorPanel；保持 CRUD 视觉/基本交互。读取时保存 revision，提交使用该 revision 与稳定 request_id；失败/冲突保持本地草稿，保留当前服务器版本供恢复/选择，只有 durable 成功后才能清 dirty、切换草稿和显示 Saved。双客户端从同一版本编辑，A 保存后 B 的陈旧保存必须拒绝且双方内容可恢复。Vue/VM 均覆盖手动保存及切换/搜索/新建的自动 flush。覆盖 AC-02/04/05、F-001-04，重验并关闭 T-04。
+- [x] T-09: 将 UI 和 legacy adapter 接入 revision/request_id 结果契约。修改 `src/back/api.at`、`src/front/notes_store.at` 与 `editor.at` 必要状态显示，不重写 EditorPanel；保持 CRUD 视觉/基本交互。读取时保存 revision，提交使用该 revision 与稳定 request_id；失败/冲突保持本地草稿，保留当前服务器版本供恢复/选择，只有 durable 成功后才能清 dirty、切换草稿和显示 Saved。双客户端从同一版本编辑，A 保存后 B 的陈旧保存必须拒绝且双方内容可恢复。Vue/VM 均覆盖手动保存及切换/搜索/新建的自动 flush。覆盖 AC-02/04/05、F-001-04，重验并关闭 T-04。
+  [✅ 已闭合 2026-10-12（r7 复核）] UI revision/request_id 契约：Vue 24/24 + VM 19/19 + r7 稳定目标负例（filtered_navigation/filtered_recovery_pin）。
   [历史work闭合申报（本轮以复审为准） 2026-10-12] UI revision/request_id 契约：Vue 24/24（含 negatives-r4/r5）+ VM 套件/负例。
 - [x] T-10: 收紧请求标识与测试入口。对 `request_id` 做不透明安全编码或明确校验，拒绝空值/分隔符/路径穿越或保证不能逃出收据目录；实体/manifest 中的路径同样限定在仓储内。变更型 `/api/v1/test/*` 默认关闭，仅显式隔离测试模式可启用；移除 TEMP 调试接口并确保测试 setup 不能继承其他目录的持锁标记。负例 `../escaped`、反斜杠、空 ID 和同请求不同意图不得改错对象/目录。覆盖 AC-02/04/05、F-001-06。
   [历史work闭合申报（本轮以复审为准） 2026-10-12] rid 校验/测试门禁：battery S0 + GATE 负例（test-mode-disabled）。
-- [ ] T-11: 修订回归门、复审证据与规范增量。修改 `tests/probe/run_v1_battery.sh`，移除写死 wk/OUTDIR 不隔离及失败被 tee 掩盖的问题，断言失败必须非零退出；新增上述失败和真重启/双进程/双 UI 场景（fixture/spec 路径按实际新增登记）。在修复 commit 上运行完整 `tests` Playwright 套件和 Vue/VM 验收，按 AC 留可重现证据；提出 SD-02–SD-06 对应 Spec 修正，更新运行说明/依赖版本。所有 F 关闭后才翻 execution_done，独立复审通过后才归档；无需运行 AutoLang cargo 全量，除非独立依赖计划实际修改该仓。覆盖 AC-01–05 与 F-001-01–06。
+- [x] T-11: 修订回归门、复审证据与规范增量。修改 `tests/probe/run_v1_battery.sh`，移除写死 wk/OUTDIR 不隔离及失败被 tee 掩盖的问题，断言失败必须非零退出；新增上述失败和真重启/双进程/双 UI 场景（fixture/spec 路径按实际新增登记）。在修复 commit 上运行完整 `tests` Playwright 套件和 Vue/VM 验收，按 AC 留可重现证据；提出 SD-02–SD-06 对应 Spec 修正，更新运行说明/依赖版本。所有 F 关闭后才翻 execution_done，独立复审通过后才归档；无需运行 AutoLang cargo 全量，除非独立依赖计划实际修改该仓。覆盖 AC-01–05 与 F-001-01–06。
+  [✅ 已闭合 2026-10-12（r7 复核）] 回归门/采证：battery 失败传播（INJECT_CONTROL + 复审 battery-control pass）+ Vue/VM 门 + SD-02..28 提案稿。
   [历史work闭合申报（本轮以复审为准） 2026-10-12] 回归门/采证/Spec 增量：battery 重写（失败非零退出）+ Vue/VM 门 + SD-02..22 提案稿（canonical 发布=merge）。
 
 ### Phase 3：修复已提交，以下任务因本轮复审重新打开
@@ -133,15 +141,18 @@ T-00先行；T-01→T-02→T-03→T-04顺序实施。T-00输出能力报告，T-
 
 依赖：T-12/T-13/T-14 可独立修复仓储；T-15 依赖 T-14 的稳定收据契约；T-16 最后整体验证。保持 app 仓与纯.at范围；框架修改只能另立依赖计划。
 
-- [ ] T-12: 补齐 Phase 1→SQLite 安全升级。核对 `repository.at:open_repository`、旧 manifest/notes/*.json/receipts 布局与本仓冻结旧证据；实现事务化导入并保留旧副本，完整保留正文（旧blocks→body）、标签、状态、置顶、folder、note_id、revision、legacy_id 和请求映射。探测到旧已保存数据时不能静默创建空库；失败给结构化错误并保留原件，重启/重试不重复。验证：隔离复制旧提交的 wedge-snapshot，升级后 n-1 rev2/body two 可读，元数据/收据一致，再正常重启/硬杀读回；新增中文、多行、trash和损坏实体样本。覆盖 AC-01/03、F-R4-01，重验 T-02/T-07；不得再以“旧数据仅测试”为由缩减契约。
+- [x] T-12: 补齐 Phase 1→SQLite 安全升级。核对 `repository.at:open_repository`、旧 manifest/notes/*.json/receipts 布局与本仓冻结旧证据；实现事务化导入并保留旧副本，完整保留正文（旧blocks→body）、标签、状态、置顶、folder、note_id、revision、legacy_id 和请求映射。探测到旧已保存数据时不能静默创建空库；失败给结构化错误并保留原件，重启/重试不重复。验证：隔离复制旧提交的 wedge-snapshot，升级后 n-1 rev2/body two 可读，元数据/收据一致，再正常重启/硬杀读回；新增中文、多行、trash和损坏实体样本。覆盖 AC-01/03、F-R4-01，重验 T-02/T-07；不得再以“旧数据仅测试”为由缩减契约。
+  [✅ 已闭合 2026-10-12（经 T-28/T-29 r7 共同验证复核）] 升级：清单+实体共同验证、修复出口、权威元数据（independent-api 全部 5 断言 + battery S15/S16/S19）。
   [历史work闭合申报（本轮以复审为准） 2026-10-12（经 T-22 r6 重写复核）] 升级：manifest 权威合并 + 失败边界 + 修复凭据隔离（battery S15/S16/S19、独立 IND-API-1/2/3）。
 - [x] T-13: 完整迁移损坏报告及 Unicode 安全。修正 `migrate_legacy_at` 中 null 记录分支、snippet/salvage 中 char_at 与字节sub混用、报告COMMIT后写且忽略结果的问题。优先将损坏记录作为迁移事务内的可靠数据保存，外部报告输出按已验证协议保证可重试，不能先标 migrated 再丢掉报告；严格校验顶层数组及整数/标题/标签等类型。验证 `[valid,null,valid]`→migrated=2/corrupted=1、长中文/emoji坏项不panic且后项可迁、报告路径预建目录→失败/可恢复重试而非saved=true、原件hash不变；报告成功后重跑幂等。覆盖 AC-03、F-R4-02，重验 T-01/T-08。
   [历史work闭合申报（本轮以复审为准） 2026-10-12] 报告/Unicode/严格类型：battery S2/S3/S14/S18 + scratch M1。
 - [x] T-14: 持久请求意图与原收据。修改 requests schema（含已有SQLite的版本迁移）、`replay_in_txn`、create/update及返回结果：存实际目标/操作/规范化意图与提交revision/收据；完全相同请求返回原收据，后续文档变更不能改写历史receipt；同rid用于另一笔记/操作/内容明确失败，不能以ok=true为未执行的新操作确认。补 update 的COMMIT前/后注入与真重启；修改id序列时确保原子分配和错误可见。验证 update-1 rev2→update-2 rev3→重放update-1仍receipt.rev2；rid从createA复用于updateB拒绝、B不变；幂等重试无重复。覆盖 AC-02/04、F-R4-03，重验 T-02/T-07/T-10。
   [历史work闭合申报（本轮以复审为准） 2026-10-12] 持久意图/原收据：battery S6/S12/S13/S17 + scratch R1–R3（规范编码、迁移、旧行拒绝）。
-- [ ] T-15: 草稿意图、冲突恢复与动作保护。修改 `notes_store.at`/`editor.at` 及adapter必要结果契约：编辑意图分配并保存非空rid，响应丢失后相同意图重试复用；变更内容需明确新意图。所有标签、置顶、筛选、切换、新建动作不得在失败/冲突下清draft/dirty；保留本地与最新服务器内容并提供实际可用的恢复/选择路径，不能只提示冲突却阻止切换且用Tag清掉草稿。成功flush后刷新notes/revision再LoadDraft。Vue/VM验证：双客户端A成功B冲突→B加/删标签后草稿仍可恢复；COMMIT后丢HTTP响应→同rid重试成功；文件夹flush后重选显示已保存正文；失败创建/元数据错误不冒充成功。覆盖 AC-02/04/05、F-R4-04，重验 T-04/T-09。
+- [x] T-15: 草稿意图、冲突恢复与动作保护。修改 `notes_store.at`/`editor.at` 及adapter必要结果契约：编辑意图分配并保存非空rid，响应丢失后相同意图重试复用；变更内容需明确新意图。所有标签、置顶、筛选、切换、新建动作不得在失败/冲突下清draft/dirty；保留本地与最新服务器内容并提供实际可用的恢复/选择路径，不能只提示冲突却阻止切换且用Tag清掉草稿。成功flush后刷新notes/revision再LoadDraft。Vue/VM验证：双客户端A成功B冲突→B加/删标签后草稿仍可恢复；COMMIT后丢HTTP响应→同rid重试成功；文件夹flush后重选显示已保存正文；失败创建/元数据错误不冒充成功。覆盖 AC-02/04/05、F-R4-04，重验 T-04/T-09。
+  [✅ 已闭合 2026-10-12（经 T-30/T-31 r7 复核）] 草稿保护/稳定目标/恢复：Vue 24/24 + 独立 UI 4 场景 + R7-VM-2。
   [历史work闭合申报（本轮以复审为准） 2026-10-12] 草稿保护/稳定 rid/恢复：Vue R4-1/2/3 + r5 负例套件。
-- [ ] T-16: 回归门与提交/依赖证据。保留现有18项Vue成功回归，新增上列真实负例与升级/长Unicode/原收据/双UI/响应丢失的断言；battery显式UTF-8，覆盖update故障、null报告与同fault request_id重放，不能只测不同request_id。按原T-11完成 `auto run` 与 `auto run -r vm` 的保存冲突/恢复实际验收；修订Spec增量，固定AutoDown gitlink和AutoLang工具链提交，使用合并后的可复现工具链重建；保留他人WIP不混入提交。全部AC与delta通过后才复审并归档，更新current_step和checkbox。覆盖 AC-01–05/F-R4-05，重验 T-11。
+- [x] T-16: 回归门与提交/依赖证据。保留现有18项Vue成功回归，新增上列真实负例与升级/长Unicode/原收据/双UI/响应丢失的断言；battery显式UTF-8，覆盖update故障、null报告与同fault request_id重放，不能只测不同request_id。按原T-11完成 `auto run` 与 `auto run -r vm` 的保存冲突/恢复实际验收；修订Spec增量，固定AutoDown gitlink和AutoLang工具链提交，使用合并后的可复现工具链重建；保留他人WIP不混入提交。全部AC与delta通过后才复审并归档，更新current_step和checkbox。覆盖 AC-01–05/F-R4-05，重验 T-11。
+  [✅ 已闭合 2026-10-12（r7 复核）] 回归门/固定依赖：终态全套门 + fresh gen/build + 依赖固定（AutoDown 96f095b、CLI a6e108f60、AutoLang 897eb349 线）。
   [历史work闭合申报（本轮以复审为准） 2026-10-12] 回归门/固定依赖：终态全套门 + 依赖固定（AutoDown 96f095b、CLI a6e108f60）+ fresh gen/build。
 
 ### Phase 4：兼容与恢复分支修复（当前勾选以本轮复审为准）
@@ -158,18 +169,21 @@ T-00先行；T-01→T-02→T-03→T-04顺序实施。T-00输出能力报告，T-
 
 任务owner_stage=work；全部T-00–T-33属实现/其回归合同。独立final review和merge-owned关闭门另在§6/8显式记录，不将未执行操作打勾或将代码正确性推迟到merge。Phase4/5当前未闭合项由Phase6对应任务修复/补验；T-20的严格notes.json迁移实现保留通过。
 
-- [ ] T-17: 旧存储完整、安全升级（owner_stage=work）。核对Phase1已提交repo_set_meta/load_doc，合并manifest权威state/pinned/folder/tags/revision，保留实体正文/ID及请求记录；严格校验manifest/实体/路径/备份结果，损坏或不完整升级不得空成功后不可重试，已误写upgraded标记也须安全恢复。已有SQLite与旧树并存、ID冲突先给保全/显式错误策略，不静默忽略任一已保存数据。验证wedge-snapshot正常正文、manifest-only标签/置顶/folder/trash（活动列表不得复活）、备份路径为文件、缺唯一实体/补回重试、manifest={}、正常/硬杀/幂等升级；源hash与备份保持。覆盖AC-01/03/05、F-R5-01，重验T-12/T-02/T-07。
+- [x] T-17: 旧存储完整、安全升级（owner_stage=work）。核对Phase1已提交repo_set_meta/load_doc，合并manifest权威state/pinned/folder/tags/revision，保留实体正文/ID及请求记录；严格校验manifest/实体/路径/备份结果，损坏或不完整升级不得空成功后不可重试，已误写upgraded标记也须安全恢复。已有SQLite与旧树并存、ID冲突先给保全/显式错误策略，不静默忽略任一已保存数据。验证wedge-snapshot正常正文、manifest-only标签/置顶/folder/trash（活动列表不得复活）、备份路径为文件、缺唯一实体/补回重试、manifest={}、正常/硬杀/幂等升级；源hash与备份保持。覆盖AC-01/03/05、F-R5-01，重验T-12/T-02/T-07。
+  [✅ 已闭合 2026-10-12（经 T-28/T-29 r7 复核）] 升级权威/失败边界/身份校验漏分支全部关闭：independent-api 5 断言 + battery S15/S16/S19。
   [历史work闭合申报（本轮以复审为准） 2026-10-12（经 Phase 5 T-22/T-23 重实现复核）] r5 缺陷（权威元数据/失败边界/{}实体）由 r6 重写关闭：battery S15/S16/S19 + 独立 IND-API-1/2/3。
   [历史work完成申报；2026-10-12复审未闭合，历史当时未完成，非当前交接] upgrade_if_legacy 重写（manifest entry 覆盖实体元数据，与旧 load_doc 规则一致；备份校验、实体缺失→upgrade_incomplete 可重试、manifest={} 显式错误、upgrade_conflict、误写标记修复入口=upgrade_error/legacy corrupted_r1 在案即重跑合并）。证据：battery S15/S16 + r5-work/verify_backend_scratch.py U1–U8（含源hash不变、备份保持、重启/幂等）。
 - [x] T-18: 请求身份与兼容裁决（owner_stage=work）。修create/update意图编码为无歧义规范表示并迁移已有v2持久行；同rid不同字段/目标/操作明确拒绝，原收据不可漂移。先有界调查旧JSON journal/receipts与旧SQLite三列requests可恢复的类型/意图/原revision/快照，输出决策制品；信息不足不得通配确认新操作或编造rev1，无法满足原兼容承诺时先提出具体needs_replan/用户决策，不自行削弱AC。验证title=a|b/body=c与title=a/body=b|c同rid必须冲突、旧更新收据复用于create拒绝、旧三列表不同正文不得假成功、可恢复原收据正确且保留旧对象；覆盖AC-02/04、F-R5-02，重验T-14/T-07/T-10。
   [历史work闭合申报（本轮以复审为准） 2026-10-12] 规范意图/迁移/旧行拒绝全验证；兼容承诺差异经用户决策 A（2026-10-12，维持安全拒绝）批准——见 T-26。
   [历史work完成申报；2026-10-12复审未闭合，历史当时未完成，非当前交接] `v2c|` 规范意图（字段独立 JSON 编码）+ schema v2→v3 管道行确定性重导 + replay_in_txn 重写（旧行一律 request_conflict，不编造 rev1）。决策制品 [t18-legacy-request-adjudication.md](evidence/001-r5-work/t18-legacy-request-adjudication.md)。证据：battery S15（d-2 复用双向拒绝、对象不变）/S17（歧义冲突+同重放+迁移）+ scratch R1–R3。
-- [ ] T-19: 草稿恢复与后续意图（owner_stage=work）。改NotesStore RecoverDraft/StashDraft/DiscardDraft/编辑及保存路径：当前dirty时Recover必须保留旧暂存与当前两份内容；已有恢复槽不得被后续冲突导航静默覆盖，必要时显式阻止动作/交换槽/可恢复集合，选择须满足VM可用原语。Discard刷新最新服务器正文/revision后才清dirty；未确认提交后用户继续输入需裁决旧提交与新意图，保留新草稿，不能只换rid仍用陈旧revision或复用旧rid永远失败。Vue及实际VM/MCP验证失败Welcome入槽→Shopping输入→Recover、连续两次失败导航、外部写者后Discard、COMMIT丢响应后继续编辑再保存；双方内容可读/可恢复，原样重试仍成功。覆盖AC-02/04/05、F-R5-03，重验T-15/T-04/T-09。
+- [x] T-19: 草稿恢复与后续意图（owner_stage=work）。改NotesStore RecoverDraft/StashDraft/DiscardDraft/编辑及保存路径：当前dirty时Recover必须保留旧暂存与当前两份内容；已有恢复槽不得被后续冲突导航静默覆盖，必要时显式阻止动作/交换槽/可恢复集合，选择须满足VM可用原语。Discard刷新最新服务器正文/revision后才清dirty；未确认提交后用户继续输入需裁决旧提交与新意图，保留新草稿，不能只换rid仍用陈旧revision或复用旧rid永远失败。Vue及实际VM/MCP验证失败Welcome入槽→Shopping输入→Recover、连续两次失败导航、外部写者后Discard、COMMIT丢响应后继续编辑再保存；双方内容可读/可恢复，原样重试仍成功。覆盖AC-02/04/05、F-R5-03，重验T-15/T-04/T-09。
+  [✅ 已闭合 2026-10-12（经 T-30/T-31 r7 复核）] 双槽/链式裁决/稳定目标：独立 UI 4 场景 + R7-VM-1/2。
   [历史work闭合申报（本轮以复审为准） 2026-10-12（经 Phase 5 T-24/T-25 重实现复核）] 双槽对称满槽 + 全 flush 裁决 + 上下文搬运：独立 IND-VUE-1/2、IND-VM-1/2 转绿。
   [历史work完成申报；2026-10-12复审未闭合，历史当时未完成，非当前交接] 双恢复槽（容量2保最旧，Recover 当前dirty入另一槽）；Discard 刷新工作集按 draft_id 装载最新服务器版；BindIntent rid 绑定即记意图快照 + prev 裁决（revision_conflict/request_conflict → get_note_r 对比 prev，一致采纳服务器 revision 重试）。新端点 update_note_r/get_note_r。证据：Vue negatives-r5 R5-1/2/3 + VM 负例 13/13（run_vm_negative.py，真实 MCP+外部写者+fault 注入）。
 - [x] T-20: 迁移完整类型与报告合同（owner_stage=work）。严格整数ID（不能以SQL true当整数）、body字符串、tags数组及每元素字符串，按批准缺省策略处理缺字段，错类型不得静默默认空值；CorruptItem.snippet保持字符串型及可诊断来源上下文。验证boolean ID/body对象/tags=[7,null]/正常中文多行分别报告坏项并继续后续合法项，报告/原件hash、重试与Unicode处理正确。覆盖AC-03、F-R5-04，重验T-13/T-01/T-08。
   [历史work完成申报（本轮以复审为准） 2026-10-08] migrate_legacy_at 严格类型链（is_int_literal 拒 bool/字符串/小数 id；body/tags元素/folder/pinned 错类型报告；缺字段按批准缺省）+ snippet 恒 json.encode 字符串。证据：battery S18 + scratch M1（migrated=2/corrupted=3、原因精确、snippet 字符串、后续合法中文项迁入、原件hash不变、幂等）。
-- [ ] T-21: 回归与知识关闭准备（owner_stage=work）。将F-R5-01–04真实反例加入可执行断言，保留Vue21项、VM19项、battery已有正常控制，新增断言能让错误实现非零失败；动态端口、单实例单用途、UTF-8与私有MCP配置留证。固定修复commit/CLI与依赖，重新生成并应用级构建，完整Vue/VM及API升级/重放/故障/恢复门按AC采证；不得用套件全绿替代漏测分支。准备SD-07–16与实际已验实现一致的Spec diff供review，规范发布由merge阶段执行。关闭受影响原任务后重算进度、修正文档索引，只有本阶段代码门关闭才能execution_done。覆盖AC-01–05/F-R5-05，重验T-16/T-11；未verified的required criterion不得改成债务。
+- [x] T-21: 回归与知识关闭准备（owner_stage=work）。将F-R5-01–04真实反例加入可执行断言，保留Vue21项、VM19项、battery已有正常控制，新增断言能让错误实现非零失败；动态端口、单实例单用途、UTF-8与私有MCP配置留证。固定修复commit/CLI与依赖，重新生成并应用级构建，完整Vue/VM及API升级/重放/故障/恢复门按AC采证；不得用套件全绿替代漏测分支。准备SD-07–16与实际已验实现一致的Spec diff供review，规范发布由merge阶段执行。关闭受影响原任务后重算进度、修正文档索引，只有本阶段代码门关闭才能execution_done。覆盖AC-01–05/F-R5-05，重验T-16/T-11；未verified的required criterion不得改成债务。
+  [✅ 已闭合 2026-10-12（经 T-33 r7 覆盖复核）] 失败断言持久化、注入可靠、固定指纹、全套门、Spec 稿——见 T-33。
   [历史work闭合申报（本轮以复审为准） 2026-10-12（经 Phase 5 T-27 覆盖复核）] 失败断言持久化、固定 commit/CLI/依赖、fresh 全套门、一致 Spec 稿——见 T-27。
   [历史work完成申报；2026-10-12复审未闭合，历史当时未完成，非当前交接] battery S15–S18（失败断言非零退出）；Vue 24/24（含 negatives-r5 三项自建探针）；VM 19/19 + 负例 13/13；动态端口/私有MCP/UTF-8/净库留证于 r5-work 脚本；Spec diff [spec-delta-r5-implementation.md](evidence/001-r5-work/spec-delta-r5-implementation.md) 供 review（canonical 未动，发布归 merge）。证据索引 [r5-work/README.md](evidence/001-r5-work/README.md)。
 
@@ -186,18 +200,23 @@ T-00先行；T-01→T-02→T-03→T-04顺序实施。T-00输出能力报告，T-
 | SD-21 | modify（待裁决） | 旧行全拒后自称AC未变 → 逐类兼容表和具体差异，承诺变化先用户决策 | AC-02 |
 | SD-22 | modify | 未关闭原任务即execution_done/矛盾Spec → 证据映射、真实计数、一致实现稿，经review后merge发布 | 全部AC |
 
-- [ ] T-22: 升级冲突与修复凭据安全（owner_stage=work；repository.at upgrade_if_legacy）。区分真实已知旧升级修复来源与upgrade_conflict/普通I/O错误，冲突不能因下一次读取自动授予合并。匹配来源与目标后才补导；已有更高revision/已确认新提交或同revision不同正文不得回退，不能假设corrupted_r1即所有行可覆盖。修复成功清理凭据或记录完成代际；后续读取/写入/重启均不能再次重导。验证混合库重复3次+重启、r4缺陷库首次修复正例、修复前后rev3确认正文/标签/ID保存、同修订异内容冲突，源hash/requests与备份保全。AC-01/03/04，F-R6-01/02，SD-17；重验T-17/T-12/T-02/T-07。
+- [x] T-22: 升级冲突与修复凭据安全（owner_stage=work；repository.at upgrade_if_legacy）。区分真实已知旧升级修复来源与upgrade_conflict/普通I/O错误，冲突不能因下一次读取自动授予合并。匹配来源与目标后才补导；已有更高revision/已确认新提交或同revision不同正文不得回退，不能假设corrupted_r1即所有行可覆盖。修复成功清理凭据或记录完成代际；后续读取/写入/重启均不能再次重导。验证混合库重复3次+重启、r4缺陷库首次修复正例、修复前后rev3确认正文/标签/ID保存、同修订异内容冲突，源hash/requests与备份保全。AC-01/03/04，F-R6-01/02，SD-17；重验T-17/T-12/T-02/T-07。
+  [✅ 已闭合 2026-10-12（r7 复核修复出口后）] 凭据隔离/可证明匹配/完成代际保持；新增必需写入失败检查（T-29）——independent-api repair-update-failure 正反例。
   [历史work完成申报（本轮以复审为准） 2026-10-12] 修复凭据=corrupted_r1 legacy 标记唯一（upgrade_error 永不授予合并）；upgraded=0+notes>0 恒 upgrade_conflict；repair_legacy_merge 仅对 revision/title/body 与实体全等的行回收权威元数据，确认 rev3 跳过保护；成功清凭据+repair_generation。证据：battery S19a/S19b、独立 IND-API-1/2（复审断言转绿）。
-- [ ] T-23: 旧树实体结构与身份校验（owner_stage=work；repository.at升级解析/路径）。校验manifest entry与实体note_id/legacy_id/引用身份一致、必要正文与元数据类型、路径限定；{}、缺身份、身份错位、错blocks/tags类型不得导成空ID/空正文后置upgraded。失败显式结构化错误、回滚、不标完成，修正后可以重试；合法Phase1快照及manifest-only元数据继续通过。AC-01/03，F-R6-03，SD-18；重验T-17/T-12/T-01。
+- [x] T-23: 旧树实体结构与身份校验（owner_stage=work；repository.at升级解析/路径）。校验manifest entry与实体note_id/legacy_id/引用身份一致、必要正文与元数据类型、路径限定；{}、缺身份、身份错位、错blocks/tags类型不得导成空ID/空正文后置upgraded。失败显式结构化错误、回滚、不标完成，修正后可以重试；合法Phase1快照及manifest-only元数据继续通过。AC-01/03，F-R6-03，SD-18；重验T-17/T-12/T-01。
+  [✅ 已闭合 2026-10-12（r7 补清单校验后）] 实体校验 + r7 补 manifest entry 类型/双向身份（validate_legacy_entry）——independent-api manifest-identity/types/revision 拒绝 + valid-control 通过。
   [历史work完成申报（本轮以复审为准） 2026-10-12] validate_legacy_entity（note_id 非空且与 entry 一致、legacy_id/revision 严格整数字面量、title/blocks(text)/tags(元素)/folder/state 类型、pinned 布尔）+ valid_legacy_file 路径守卫 + entity missing 显式检查；违反 ROLLBACK 不标完成、可重试。证据：battery S19c（{} 拒绝+修复重试）/S16、scratch U4/U5/U9/U10、独立 IND-API-3。
-- [ ] T-24: 恢复容量全路径保全（owner_stage=work；notes_store.at StashDraft/RecoverDraft/RecoverDraft2及调用者）。A/B已占槽、当前C dirty时，恢复或第三次失败导航都不能静默覆盖B；对称检查两Recover入口。选择显式阻止或先由用户明确释放，并返回/显示可见状态使调用者不继续清dirty/LoadDraft。验证两次失败导航、满槽+C分别点两Recover、第三次失败导航（select/search/folder/tag/new）、明确Dismiss后允许继续，A/B/C内容和服务器版本可读。Vue与实际VM/MCP均留真实断言。AC-04/05，F-R6-04，SD-19；重验T-19/T-15/T-09。
+- [x] T-24: 恢复容量全路径保全（owner_stage=work；notes_store.at StashDraft/RecoverDraft/RecoverDraft2及调用者）。A/B已占槽、当前C dirty时，恢复或第三次失败导航都不能静默覆盖B；对称检查两Recover入口。选择显式阻止或先由用户明确释放，并返回/显示可见状态使调用者不继续清dirty/LoadDraft。验证两次失败导航、满槽+C分别点两Recover、第三次失败导航（select/search/folder/tag/new）、明确Dismiss后允许继续，A/B/C内容和服务器版本可读。Vue与实际VM/MCP均留真实断言。AC-04/05，F-R6-04，SD-19；重验T-19/T-15/T-09。
+  [✅ 已闭合 2026-10-12（r7 补全入口状态原位后）] 双槽对称满槽 + stash_blocked 可见 + SetSearch 状态副作用修正——独立 UI full_slots_search + R7-VM-3。
   [历史work完成申报（本轮以复审为准） 2026-10-12] StashDraft A→B→满则 stash_blocked（不覆盖、不清上下文）；RecoverDraft/RecoverDraft2 对称 can 检查；导航 handler flushed 门（满槽保持原位不清 dirty）+ editor 满槽横幅。证据：独立 IND-VUE-1/IND-VM-1 转绿、Vue R5-1。
-- [ ] T-25: 未确认意图跨导航/恢复完整裁决（owner_stage=work；notes_store.at模型、各flush与恢复槽）。保存与自动flush使用一致意图轮换及服务器裁决；槽保存/恢复完整rid、绑定内容/基线revision、未确认提交上下文，不能只保存rid或清has_pend/has_prev。验证C1提交后丢响应→编辑C2→导航失败入槽→Recover→连续Save可落地C2；覆盖原样C1幂等、C2确未提交、外部后续不同内容仍冲突保全、select/search/filter/tag/pin/new各调用路径。Vue route.abort及实际VM after_manifest分别复现。AC-02/04，F-R6-05，SD-20；重验T-19/T-15/T-09/T-04。
+- [x] T-25: 未确认意图跨导航/恢复完整裁决（owner_stage=work；notes_store.at模型、各flush与恢复槽）。保存与自动flush使用一致意图轮换及服务器裁决；槽保存/恢复完整rid、绑定内容/基线revision、未确认提交上下文，不能只保存rid或清has_pend/has_prev。验证C1提交后丢响应→编辑C2→导航失败入槽→Recover→连续Save可落地C2；覆盖原样C1幂等、C2确未提交、外部后续不同内容仍冲突保全、select/search/filter/tag/pin/new各调用路径。Vue route.abort及实际VM after_manifest分别复现。AC-02/04，F-R6-05，SD-20；重验T-19/T-15/T-09/T-04。
+  [✅ 已闭合 2026-10-12（r7 补未知链后）] 全 flush 轮换+裁决保持；未知意图链 prev2（T-30）——独立 UI repeated_unknown + R7-VM-1。
   [历史work完成申报（本轮以复审为准） 2026-10-12] 全部 flush 路径（select/search/folder/tag/pin/new）内联意图轮换+裁决；槽携带完整 pend/prev 上下文随 stash/restore 搬运；保存/flush 统一 revision_conflict/request_conflict 裁决采纳服务器 revision 重试。证据：独立 IND-VUE-2/IND-VM-2 转绿、VM 负例 R5-VM-3（13/13）、Vue R5-3。
 - [x] T-26: 旧请求兼容承诺具体裁决（owner_stage=work；输入现有t18决策制品，无须重复无界调查）。输出JSON收据/v1三列/v2快照/新协议逐类兼容表，列明可证明同意图/原收据的恢复方式与不可证明边界；信息不足继续安全拒绝，不恢复通配假成功。若仍采用旧rid重放一律拒绝，明确给出相对原AC-02兼容承诺的差异并取得用户对该具体变更的决策后更新合同/实施，不能仅把AC解释为“本协议”后勾完成。验证旧d-2原样与异图、v1缺rev、v2正确重放/异图、新协议正反例。AC-02，F-R6-06，SD-21；重验T-18/T-14。
   [历史work闭合申报（本轮以复审为准） 2026-10-12] 用户决策 **A：维持安全拒绝（现状，推荐）**——旧行（Phase 1 收据/v1 三列/残缺 v2）重放一律 request_conflict，AC-02 重放承诺限定于可验证意图请求；原收据可查询、旧对象不变。决策记录于 [t26-legacy-compat-table.md](evidence/001-r6-work/t26-legacy-compat-table.md)；验证证据 battery S15/S17、scratch R1–R3。
   [历史待决记录，已由用户决策A覆盖] 逐类兼容表+承诺差异+三选项已交付 [t26-legacy-compat-table.md](evidence/001-r6-work/t26-legacy-compat-table.md)（A=维持安全拒绝[实现现状/推荐]；B=部分恢复自动确认[有假确认风险，不推荐]；C=拒绝+专用错误码）。验证类证据已过（battery S15/S17、scratch R1–R3）； AskUserQuestion 已提出、用户未答复——合同要求取得决策后才能勾选，选项 A 以外需更新实现。
-- [ ] T-27: 全回归、原任务关闭与一致规范提案（owner_stage=work；依赖T-22–T-26）。将上述API3/Vue2/VM2实际失败断言固化到持久测试，保留原battery/Vue/VM门，验证失败传播而非只看包装exit。固定新修复commit、CLI与当前依赖，fresh gen/build及全套门。按AC→T-00–27→实现→证据逐一核对并关闭已验证原任务，失败任务保持未完成；完成所有work-owned合同才能execution_done，计数/§0/§8/索引一致。准备无容量/flush/旧兼容矛盾的SD-07–22实际Spec稿；review验证后由merge发布，canonical此阶段未动。全部AC，F-R6-07，SD-22；重验T-21/T-16/T-11。
+- [x] T-27: 全回归、原任务关闭与一致规范提案（owner_stage=work；依赖T-22–T-26）。将上述API3/Vue2/VM2实际失败断言固化到持久测试，保留原battery/Vue/VM门，验证失败传播而非只看包装exit。固定新修复commit、CLI与当前依赖，fresh gen/build及全套门。按AC→T-00–27→实现→证据逐一核对并关闭已验证原任务，失败任务保持未完成；完成所有work-owned合同才能execution_done，计数/§0/§8/索引一致。准备无容量/flush/旧兼容矛盾的SD-07–22实际Spec稿；review验证后由merge发布，canonical此阶段未动。全部AC，F-R6-07，SD-22；重验T-21/T-16/T-11。
+  [✅ 已闭合 2026-10-12（r7 T-33 覆盖复核）] 断言持久化/指纹固定/全套门/Spec 稿一致/链接修复——见 T-33。
   [历史work闭合申报（本轮以复审为准） 2026-10-12] 复审 3 API+2 Vue+2 VM 失败断言固化为持久测试（battery S19 + independent 入库副本）；fresh gen/build + 终态全套门全绿（battery S0–S19 exit0/39 断言、scratch 38/38、Vue 24/24、VM 19/19、VM 负例 13/13、独立×3 exit0，二进制 cc422c9a）；原任务按证据逐项闭合（T-01..T-27 全勾，AC-01..04 留 review）；计数 28/28、§0/§8/索引一致；无矛盾 Spec 稿 [spec-delta-r6-implementation.md](evidence/001-r6-work/spec-delta-r6-implementation.md)（决策 A 已反映）供 review，发布=merge。
   [历史部分完成记录，非当前交接] 已完成：复审 3 API+2 Vue+2 VM 失败断言固化为持久测试（battery S19+independent 脚本入库）；fresh gen/build+全套门终态全绿（battery S0–S19 exit0、scratch 38/38、Vue 24/24、VM 19/19、VM 负例 13/13、独立×3 exit0，证据 [r6-work/README](evidence/001-r6-work/README.md)）；一致 Spec 稿 [spec-delta-r6-implementation.md](evidence/001-r6-work/spec-delta-r6-implementation.md)（r5 稿容量/flush 矛盾已消除）；S15 空洞断言（静默 SyntaxError）修复。待 T-26 决策后：关闭映射、计数、execution_done。
 
@@ -209,12 +228,24 @@ T-00先行；T-01→T-02→T-03→T-04顺序实施。T-00输出能力报告，T-
 
 SD-07–22 原意继续保留，SD-21 按已决 A。新增 SD-23–28 全部 modify `docs/specs/notes/durable-inbox.md`，完整 before/after、理由、AC/任务在冻结[修订7增量](evidence/001-r6-recheck-20261012/spec-delta-r7.md)；work 输出修复后的实际 Spec 全文，review 独立验证，merge 发布。当前 r6 实现稿的“严格清单/全原位/完整裁决”不得直接发布。
 
-- [ ] T-28: 权威清单与实体共同验证（owner_stage=work；关闭现有 T-23/T-17 的漏分支；repository.at 的 upgrade_if_legacy/repair_legacy_merge/entry_authority_json）。验证 manifest entry 自身的身份、revision/legacy_id/seq、tags 元素、folder/state/pinned，再合并；entry 与引用实体 note_id/legacy_id 一致，不能导入错映射或 rev0。保留合法旧十进制字符串、manifest-only 权威元数据和旧实体正文。坏类型/杂字符/身份不一致明确回滚且不完成，源与备份不变，修正后正常重试；普通升级和修复路径都验。输入为独立 API manifest-identity/types/revision 与合法原快照，固化持久测试。AC-01/03，F-R7-01，SD-23；重验 T-01/T-12/T-17/T-23。
-- [ ] T-29: 修复事务的必需写入失败处理（owner_stage=work；repository.at repair_legacy_merge）。检查已匹配行 UPDATE、完成凭据及相关必需写入结果，不得更新失败后仍清来源、写成功代际。失败明确返回并回滚，恢复条件后可再次修复，已确认较新/异内容不回退、请求行及旧树保留。复放独立 repair-update-failure 的合成 SQLite trigger 拒绝并移除后重试；补正常 UPDATE 成功、同修订异文与更高修订控制。不冒称合成失败是物理磁盘掉电。AC-01/03/04，F-R7-02，SD-24；重验 T-02/T-07/T-12/T-17/T-22。
-- [ ] T-30: 连续未知提交链的安全裁决（owner_stage=work；NotesStore 意图模型、SaveDraft/全部 flush、两恢复槽）。不能把仍可能已提交的 C1 证据被未执行 C2 覆盖；选择先裁决未确认提交或保留足够有证明的上下文，不能按服务器任何版本强行采纳。C1 commit+丢响应→C2 到后端前失败→编辑 C3→保存/导航/恢复后 C3 可落地，原样 C1 重放正常；C2 确未提交、C2 真已提交、服务器外部异文分别断言。Vue route.abort 与实际 VM/MCP 故障分支均验证，先保存可靠案例/诊断再改实现，测试反映最终可支持的裁决规则。AC-02/04，F-R7-03，SD-25；重验 T-09/T-15/T-19/T-25。
-- [ ] T-31: 筛选、刷新与恢复后的稳定动作目标（owner_stage=work；NotesStore LoadDraft/SelectNote/Recover×2/pin/tag/delete/new）。用户点击的目标 ID 在 flush 刷新/重排后继续成立，不能继续用旧索引；恢复笔记不在当前筛选工作集时，editor/save/pin/tag/delete 必须指向该草稿身份或明确阻止动作，不能操作另一行。复放 A 改名后从搜索中消失→点 B 和筛选外 R 恢复→Pin 的真实失败；补 pin/tag/delete、两恢复槽、重排/空结果和正常选择控制，直接检查双方服务端内容/元数据及可见草稿。Vue/实际 VM 留断言，不能仅靠 store 数组存在。AC-04/05，F-R7-04，SD-26；重验 T-04/T-09/T-15/T-19/T-25。
-- [ ] T-32: 容量阻止覆盖整个动作状态（owner_stage=work；StashDraft/Recover×2 与 select/search/folder/tag/new 调用者）。满槽 A/B+C dirty 的失败 flush 被阻止时，查询词、筛选、active 目标和工作集与草稿一起原位保留；不能先改 search 再跳过其余动作，也不能先创建/修改其他对象。复放 full_slots_search（两槽、dirty 和冲突明确前置断言），并验证两 Recover/第三次 select、folder、tag、new、明确 Dismiss 后继续。Vue及实际 VM 断言 A/B/C 与服务器版本均保全，阻止可见。AC-04/05，F-R7-05，SD-27；重验 T-09/T-15/T-19/T-24/T-25。
-- [ ] T-33: 可信验证门、完整路径映射与知识关闭（owner_stage=work；依赖 T-28–T-32；battery、Vue/VM tests、证据/计划/Spec 稿）。修复 S15 注入引号并直接断言错误元数据与 r4 标记已在 SQLite 落地；任何 required fixture/setup 失败必须非零。保留普通 assertion=false 的失败传播控制，另验证注入本身故意失败会使 battery 非零，正常控制真实修复成功。把本轮独立反例固化持久 tests，覆盖 manifest 两路径、修复失败出口、连续未知链、所有 flush/恢复动作和满容量状态，逐格记录实跑/源码辅助/缺口，不用 24/19 总数替代。固定修复 commit 与 CLI/依赖，fresh gen/build 后串行 VM 和持 exe 的其他门，跑原全套、旧独立示例及新增反例，按 AC→任务→实现→oracle 关闭受影响原任务；修复真实证据链接和缺文件，不将历史待决 prose 留作当前交接；输出与实际一致的 SD-07–28 全文提案。全部 AC，F-R7-06，SD-28；重验 T-11/T-16/T-21/T-27。AC 终验仍 review-owned，canonical/归档仍 merge-owned。
+- [x] T-28: 权威清单与实体共同验证（owner_stage=work；关闭现有 T-23/T-17 的漏分支；repository.at 的 upgrade_if_legacy/repair_legacy_merge/entry_authority_json）。验证 manifest entry 自身的身份、revision/legacy_id/seq、tags 元素、folder/state/pinned，再合并；entry 与引用实体 note_id/legacy_id 一致，不能导入错映射或 rev0。保留合法旧十进制字符串、manifest-only 权威元数据和旧实体正文。坏类型/杂字符/身份不一致明确回滚且不完成，源与备份不变，修正后正常重试；普通升级和修复路径都验。输入为独立 API manifest-identity/types/revision 与合法原快照，固化持久测试。AC-01/03，F-R7-01，SD-23；重验 T-01/T-12/T-17/T-23。
+  [✅ 已完成 2026-10-12] validate_legacy_entry（entry 字段类型：整数/历史十进制串容忍、布尔/杂字符拒绝；tags 元素/folder/state/pinned 类型）+ 双向身份（note_id 已有 + legacy_id 与实体一致）；fresh/repair 共用、authority 合并前调用。证据：independent-api manifest-identity/types/revision 三拒绝 + valid-control 通过（exit 0）。
+
+- [x] T-29: 修复事务的必需写入失败处理（owner_stage=work；repository.at repair_legacy_merge）。检查已匹配行 UPDATE、完成凭据及相关必需写入结果，不得更新失败后仍清来源、写成功代际。失败明确返回并回滚，恢复条件后可再次修复，已确认较新/异内容不回退、请求行及旧树保留。复放独立 repair-update-failure 的合成 SQLite trigger 拒绝并移除后重试；补正常 UPDATE 成功、同修订异文与更高修订控制。不冒称合成失败是物理磁盘掉电。AC-01/03/04，F-R7-02，SD-24；重验 T-02/T-07/T-12/T-17/T-22。
+  [✅ 已完成 2026-10-12] repair 必需写入（proven 行 UPDATE、凭据清理、代际、收据导入）逐一检查 exec 结果；失败 ROLLBACK + upgrade_error、凭据保留可重试。证据：independent-api repair-update-failure（SQL trigger 合成拒绝→凭据保留；移除→重试恢复权威 tags/folder）。
+
+- [x] T-30: 连续未知提交链的安全裁决（owner_stage=work；NotesStore 意图模型、SaveDraft/全部 flush、两恢复槽）。不能把仍可能已提交的 C1 证据被未执行 C2 覆盖；选择先裁决未确认提交或保留足够有证明的上下文，不能按服务器任何版本强行采纳。C1 commit+丢响应→C2 到后端前失败→编辑 C3→保存/导航/恢复后 C3 可落地，原样 C1 重放正常；C2 确未提交、C2 真已提交、服务器外部异文分别断言。Vue route.abort 与实际 VM/MCP 故障分支均验证，先保存可靠案例/诊断再改实现，测试反映最终可支持的裁决规则。AC-02/04，F-R7-03，SD-25；重验 T-09/T-15/T-19/T-25。
+  [✅ 已完成 2026-10-12] 未知意图链 prev2（容量 2）：轮换移 prev→prev2 不丢祖先；裁决逐链匹配（server==prev→prev2）才采纳 revision；链上下文随槽 stash/restore 搬运。证据：independent-ui repeated_unknown（C1 commit+abort、C2 abort、C3 落地）+ R7-VM-1（C2 真提交变体 4 断言）。
+
+- [x] T-31: 筛选、刷新与恢复后的稳定动作目标（owner_stage=work；NotesStore LoadDraft/SelectNote/Recover×2/pin/tag/delete/new）。用户点击的目标 ID 在 flush 刷新/重排后继续成立，不能继续用旧索引；恢复笔记不在当前筛选工作集时，editor/save/pin/tag/delete 必须指向该草稿身份或明确阻止动作，不能操作另一行。复放 A 改名后从搜索中消失→点 B 和筛选外 R 恢复→Pin 的真实失败；补 pin/tag/delete、两恢复槽、重排/空结果和正常选择控制，直接检查双方服务端内容/元数据及可见草稿。Vue/实际 VM 留断言，不能仅靠 store 数组存在。AC-04/05，F-R7-04，SD-26；重验 T-04/T-09/T-15/T-19/T-25。
+  [✅ 已完成 2026-10-12] SelectNote 捕获目标 id、刷新后按 id 重定位（找不到回落首行）；TogglePinActive pin 目标 flush 前捕获 + TagAdded/Removed/DeleteConfirmed 绑定 draft_id（draft_tags 镜像）。证据：independent-ui filtered_navigation + filtered_recovery_pin（R pinned/Z 未动）+ R7-VM-2（4 断言）。
+
+- [x] T-32: 容量阻止覆盖整个动作状态（owner_stage=work；StashDraft/Recover×2 与 select/search/folder/tag/new 调用者）。满槽 A/B+C dirty 的失败 flush 被阻止时，查询词、筛选、active 目标和工作集与草稿一起原位保留；不能先改 search 再跳过其余动作，也不能先创建/修改其他对象。复放 full_slots_search（两槽、dirty 和冲突明确前置断言），并验证两 Recover/第三次 select、folder、tag、new、明确 Dismiss 后继续。Vue及实际 VM 断言 A/B/C 与服务器版本均保全，阻止可见。AC-04/05，F-R7-05，SD-27；重验 T-09/T-15/T-19/T-24/T-25。
+  [✅ 已完成 2026-10-12] SetSearch 查询词赋值移入 flushed 分支（r6 错位修正）——满槽阻止 = 查询词/工作集/选择/草稿全部原位 + stash_blocked 可见。证据：independent-ui full_slots_search + R7-VM-3（3 断言）。
+
+- [x] T-33: 可信验证门、完整路径映射与知识关闭（owner_stage=work；依赖 T-28–T-32；battery、Vue/VM tests、证据/计划/Spec 稿）。修复 S15 注入引号并直接断言错误元数据与 r4 标记已在 SQLite 落地；任何 required fixture/setup 失败必须非零。保留普通 assertion=false 的失败传播控制，另验证注入本身故意失败会使 battery 非零，正常控制真实修复成功。把本轮独立反例固化持久 tests，覆盖 manifest 两路径、修复失败出口、连续未知链、所有 flush/恢复动作和满容量状态，逐格记录实跑/源码辅助/缺口，不用 24/19 总数替代。固定修复 commit 与 CLI/依赖，fresh gen/build 后串行 VM 和持 exe 的其他门，跑原全套、旧独立示例及新增反例，按 AC→任务→实现→oracle 关闭受影响原任务；修复真实证据链接和缺文件，不将历史待决 prose 留作当前交接；输出与实际一致的 SD-07–28 全文提案。全部 AC，F-R7-06，SD-28；重验 T-11/T-16/T-21/T-27。AC 终验仍 review-owned，canonical/归档仍 merge-owned。
+  [✅ 已完成 2026-10-12] S15/S19b 注入迁独立脚本 inject_legacy_marker.py（后置读回校验 + INJECT_CONTROL 自检 + battery `|| fail`）；注入失败控制 CONTROL PASSED、复审 battery-control pass=true；复审 5 API+4 Vue 断言原样转绿并入库；VM 侧 R7 驱动 7 断言；fresh gen/build + 终态全套门（battery exit0、scratch 38/38、Vue 24/24、VM 19/19、VM 负例 13/13、独立×3 exit0，二进制 5c187b2a）；r6 README 链接修复；计数 34/34、§0/§8/索引一致；Spec 稿 spec-delta-r7-implementation.md（决策 A 已反映）。证据 [r7-work/README](evidence/001-r7-work/README.md)。
+
 
 ## 6. 测试设计
 
@@ -294,6 +325,20 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
 新需求不得在执行中无限追加；发现必要遗漏先更新计划并讨论，不直接删验收项。知识系统/安装服务/AI等未交付依赖必须写明接口级与真实集成的差别。
 
 ## 9. 复审记录
+
+- stage: work | plan_id=NOTES-001 | plan_revision=7 | outcome=pass（T-28–T-33 完成；重开任务按 r7 证据映射闭合；execution_done 34/34；AC 终验归 review） | worktree_path=D:/autostack/auto-os/apps/015-notes | branch=v0.6-dev | base_commit=a2af202（r6-recheck needs_fix 文档提交） | code_commit=7c5fd8f（实现+测试+计划闭合单提交） | dependency_revisions=CLI auto 0.1.0+v0.4.2-2785-ga6e108f60；AutoLang main 897eb349 线；AutoDown 96f095b（pin=实际） | task_ids=T-28, T-29, T-30, T-31, T-32, T-33（+重开 T-01/02/04/07/09/11/12/15/16/17/19/21/22/23/24/25/27 按 r7 证据映射闭合） | evidence=[r7-work/](evidence/001-r7-work/README.md)（终态二进制 SHA256=5c187b2a…：battery S0–S19 exit0、scratch 38/38、Vue 24/24、VM 19/19、VM 负例 13/13、R7 VM 7/7、独立 API/UI exit0、双控制 pass） | spec_delta=SD-23..28 实现绑定稿 [spec-delta-r7-implementation.md](evidence/001-r7-work/spec-delta-r7-implementation.md)（SD-07..22 有效绑定延续；canonical 未动）；T-26 决策 A 维持 | blockers=无 | next_responsible_role=独立 final review（同树验证）→ merge
+
+  诊断（第三次连续复审失败的缺口分析）：前三轮共同模式=修复引入的新状态机分支
+  缺少区分性 oracle，且脚手架自身失败被吞（r6 S15"修复"实为静默 SyntaxError）。
+  本轮先补 oracle（复审 5 API+4 Vue 断言以独立脚本原样固化）再实施；battery 注入
+  迁独立脚本（后置读回校验 + INJECT_CONTROL 自检 + `|| fail` 传播）。
+
+  过程发现（留档 r7-work/README）：① `.at` 单引号字面量在 == 比较上下文被发射
+  为 char（i64）——字符串比较用转义双引号形式；② MCP 点击在重渲染后可能落在
+  旧 vnode 不分发——驱动用"点击至状态生效"重试（Vue 真实浏览器同路径断言通过，
+  产品无恙）；③ 驱动教训：搜索过滤后点击行再清过滤 = 刷新+LoadDraft 重置回首行
+  （F-R7-04 驱动版镜像）；跨会话断言必须用当前标题。
+
 
 - stage: review | review_scope=final | reviewer_identity=当前复审上下文（曾参与前次复审，未参与Phase5实现，无子agent） | plan_id=NOTES-001 | plan_revision=6 | outcome=needs_fix | worktree_path=D:/autostack/auto-os/apps/015-notes | branch=v0.6-dev | reviewed_commit=f0a3cab2485e750049e2e05bc2185dccee334c4f | implementation_commit=1757a906ea8a31f26cdbfa98e7e4625eced41266 | base_commit=9a22886eaaaae203a65176fbfa8813180b6d6459 | dependency_revisions=AutoLang897eb34911a4f496a28ba7cdfd8a82815fa043d1,CLI源码a6e108f60b0c36a1ffdfea4410a3b11d81eda865,AutoDown pin/实际96f095bfc41a8686331c5ccd3ce17b685147fcc1 | spec_inputs=canonical durable-inbox.md blob8f05b8ddb617d5d64e937e55027e782a2b0c0f85,冻结r6实现稿SHA256 a54bc1e0afceb9f515f9eccec2d20f743d01adf5213751c2e72b7d177af730cf | acceptance_results=AC-01 fail,AC-02 partial,AC-03 fail,AC-04 fail,AC-05 fail | findings=F-R7-01清单身份/类型,F-R7-02修复UPDATE假完成,F-R7-03未知链丢祖先,F-R7-04操作错目标,F-R7-05容量阻止状态漂移,F-R7-06注入失败假绿 | evidence=[当前完整报告/驱动/原始结果](evidence/001-r6-recheck-20261012/README.md)（fresh gen/build,Vue24/24,VM19/19,VM负例13/13,后端38/38,旧API3/Vue2/VM2通过；battery exit0但S15无效，新增API5/Vue4断言失败；故意普通assert失败传播控制通过） | pending_closeout_gates=canonical发布/派生索引/真实归档计数与恢复收据（merge-owned） | next=work(Phase6)，用户决策A保持通过；未改实现/canonical，未合入/推送/父仓gitlink。
 

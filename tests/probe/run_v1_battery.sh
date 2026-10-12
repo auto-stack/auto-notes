@@ -449,15 +449,9 @@ print('[S15] legacy request rows: kind/rev recovered, intent empty (unverifiable
 " || fail "S15 legacy request rows shape"
 # 误写标记恢复（r4 缺陷库形态）：模拟实体元数据错误导入 + upgraded=1 +
 # legacy corrupted_r1 残留 → 打开时按权威规则重跑回收，无重复
-OUT="$OUT" D15="$D15" python -c "
-import os, sqlite3
-db = sqlite3.connect(os.environ['D15']+'/data/inbox.db')
-db.execute(\"UPDATE notes SET tags_json='[]', pinned=0, state='active', folder='' WHERE note_id='n-1'\")
-db.execute(\"INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')\")
-db.execute('INSERT OR REPLACE INTO meta(k,v) VALUES(?,?)', ('corrupted_r1', '["legacy upgrade",[{"index":0,"reason":"entity unreadable"}]]'))
-db.commit(); db.close()
-print('r4-style mis-marked state injected')
-"
+# T-33/F-R7-06：注入走独立脚本（可靠执行 + 后置校验 + 失败非零传播）
+D15_DB=$(cygpath -w "$D15/data/inbox.db")
+python tests/probe/inject_legacy_marker.py mismark "$D15_DB" || fail "S15 injection (mismark) did not execute"
 curl -s -m 10 "$BASE/api/v1/notes/n-1" -o "$OUT/s15-merge.json"
 curl -s -m 10 "$BASE/api/v1/notes/n-1" -o "$OUT/s15-merge2.json"
 OUT="$OUT" D15="$D15" python -c "
@@ -693,13 +687,8 @@ payload "$work/p19u.json" <<'JSONEOF'
 {"expected_revision":2,"request_id":"s19-confirm","title":"升级后确认保存的新正文","body":"必须保留 rev3"}
 JSONEOF
 curl -s -m 10 -X PUT "$BASE/api/v1/notes/n-1" -H "Content-Type: application/json" --data-binary @"$work/p19u.json" -o "$OUT/s19-confirm.json"
-OUT="$OUT" D19b="$D19b" python -c "
-import os, sqlite3
-db = sqlite3.connect(os.environ['D19b']+'/data/inbox.db')
-db.execute('INSERT OR REPLACE INTO meta(k,v) VALUES(?,?)', ('corrupted_r1', '[\"legacy upgrade\",[{\"index\":0}]]'))
-db.commit(); db.close()
-print('r4 credential injected')
-"
+D19B_DB=$(cygpath -w "$D19b/data/inbox.db")
+python tests/probe/inject_legacy_marker.py marker "$D19B_DB" || fail "S19b injection (marker) did not execute"
 curl -s -m 10 "$BASE/api/v1/notes/n-1" -o "$OUT/s19-after-repair.json"
 curl -s -m 10 "$BASE/api/v1/notes/n-1" -o "$OUT/s19-after-repair2.json"
 D19b="$D19b" assert_py "S19b repair protects confirmed rev3, credential cleared" "

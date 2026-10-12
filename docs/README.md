@@ -9,13 +9,13 @@
 
 ## 首批计划
 
-1. [NOTES-001：可靠 Inbox、稳定标识与恢复](plans/001-durable-inbox.md) — 修订7，**executing（11/34）**；对f0a3cab/1757a90的独立final review=needs_fix，六项漏分支见[当前报告](plans/evidence/001-r6-recheck-20261012/README.md)。Phase6 T-28–T-33修复，17项受影响原任务重开；T-26决策A保持闭合。next=work，提交后同树final review；canonical发布/归档为merge门。
+1. [NOTES-001：可靠 Inbox、稳定标识与恢复](plans/001-durable-inbox.md) — 修订7，**execution_done（34/34）**；Phase 6 六项发现全部修复采证（[r7-work 证据](plans/evidence/001-r7-work/README.md)，复审断言原样转绿）；决策 A 维持。next=独立 final review；canonical 发布=merge 门。历史基线见[独立复现证据](plans/evidence/001-r6-recheck-20261012/README.md)。
 2. [NOTES-002：快速卡片、多媒体收存与剪贴板接收](plans/002-quick-card-assets.md)
 3. [NOTES-003：Launcher、小组件与知识交接适配](plans/003-entry-and-knowledge-adapters.md)
 
 ## 给执行agent
 
-先读仓根README、SOURCE-IMPORT.json、对应计划和产品设计，再核对当前git状态及源码。计划001当前为executing（修订7，11/34）：上轮示例已通过，本轮独立反例仍失败；先按Phase6修复并核对真实断言，决策A无须再次批准。修复提交后独立final review，通过才reviewed交merge。计划002/003仍为drafting。不自行删AC或通配确认。按对应计划的授权与现有auto-plan规则执行、留证据，经复审后才宣告完成。不要执行全部roadmap，不要以写过文档为验收。
+先读仓根README、SOURCE-IMPORT.json、对应计划和产品设计，再核对当前git状态及源码。计划001当前为execution_done（34/34）：Phase 6 六项发现已修复并全套门采证，接续独立 final review，通过后 reviewed 交 merge。计划002/003仍为drafting。
 
 本轮在各独立应用仓内从001–003编号，plan_id带应用前缀；核对本仓活动/归档计划为空后独占创建，不占用AutoLang/AutoOS的.next-id，也不与主力机739/740共用编号。新建后续计划按本仓取号机制检查活动及归档目录；本批不重新分配已存在ID。工作位置按2026-10-04用户约定，统一为D:/autostack/auto-os/apps/015-notes；在该检出的v0.6-dev编写计划和实施，不使用外部临时clone作为工作入口。不同app可并行，同app保持一个写入者，禁止junction/symlink。
 

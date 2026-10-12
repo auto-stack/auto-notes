@@ -1,0 +1,6 @@
+{
+  "backend_exe_sha256": "5c187b2a773f6d9d2ce3590b182beb8958e1d1bb6eda167eaa5ecf44585c6790",
+  "cli": "auto 0.1.0+v0.4.2-2785-ga6e108f60 (D:/autostack/auto-lang/target/debug/auto.exe)",
+  "auto_lang_main": "897eb34911a4f496a28ba7cdfd8a82815fa043d1 (r7 review era)",
+  "auto_down": "96f095bfc41a8686331c5ccd3ce17b685147fcc1 (pin=actual)"
+}

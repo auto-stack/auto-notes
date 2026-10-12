@@ -19,7 +19,7 @@ SyntaxError，断言空洞——已改参数化 SQL）。
 | 门 | 结果 | 证据 |
 |---|---|---|
 | fresh gen/build | exit 0 / 0 | build 日志本地（*.log 按仓规不入库） |
-| battery S0–S19 | exit 0（39 断言，含新 S19a/b/c） | [battery-summary.txt](../../../tests/probe/evidence/r6-work/battery-summary.txt) |
+| battery S0–S19 | exit 0（39 断言，含新 S19a/b/c） | [battery-summary.txt](../../../tests/probe/evidence/r5-work/battery-summary.txt) |
 | 后端 scratch | 38/38 fails=0（含新 U9 路径/U10 身份） | [scratch-summary.json](../../../tests/probe/evidence/r6-work/scratch-summary.json) |
 | Vue 全套 | 24/24 suite_exit=0 | [vue-playwright.log](../../../tests/probe/evidence/r6-work/vue-playwright.log) |
 | VM 原套件 | 19/19 suite_exit=0 | [vm-suite-result.json](../../../tests/probe/evidence/r6-work/vm-suite-result.json) |
