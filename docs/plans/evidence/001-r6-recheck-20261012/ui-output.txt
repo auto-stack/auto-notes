@@ -1,0 +1,1352 @@
+{
+  "filtered_navigation": {
+    "before": {
+      "notes": [
+        {
+          "id": 8,
+          "revision": 1,
+          "title": "SearchProbe-A",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 7,
+          "revision": 1,
+          "title": "SearchProbe-B",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        }
+      ],
+      "active_id": 0,
+      "search": "SearchProbe",
+      "draft_id": 8,
+      "draft_title": "NoMatch-A",
+      "draft_revision": 1,
+      "dirty": true,
+      "conflict": false,
+      "has_recovery": false,
+      "rec_title": "",
+      "has_recovery2": false,
+      "rec2_title": "",
+      "stash_blocked": false,
+      "has_pend": false,
+      "pend_title": "",
+      "has_prev": false,
+      "prev_title": ""
+    },
+    "after": {
+      "notes": [
+        {
+          "id": 7,
+          "revision": 1,
+          "title": "SearchProbe-B",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        }
+      ],
+      "active_id": 1,
+      "search": "SearchProbe",
+      "draft_id": 8,
+      "draft_title": "NoMatch-A",
+      "draft_revision": 1,
+      "dirty": false,
+      "conflict": false,
+      "has_recovery": false,
+      "rec_title": "",
+      "has_recovery2": false,
+      "rec2_title": "",
+      "stash_blocked": false,
+      "has_pend": false,
+      "pend_title": "NoMatch-A",
+      "has_prev": false,
+      "prev_title": ""
+    },
+    "errors": [
+      "Cannot read properties of undefined (reading 'id')",
+      "Cannot read properties of undefined (reading 'title')"
+    ],
+    "serverA": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-8",
+        "revision": 2,
+        "title": "NoMatch-A",
+        "body": "base",
+        "tags": [],
+        "color": "",
+        "pinned": false,
+        "state": "active",
+        "folder": "",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 8,
+        "seq": 8
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "",
+        "note_id": "",
+        "revision": 0,
+        "status": ""
+      },
+      "replayed": false
+    },
+    "expected_draft_id": 7,
+    "pass": false
+  },
+  "chain_first": {
+    "ok": true,
+    "err_code": "",
+    "err_detail": "",
+    "doc": {
+      "schema_version": 1,
+      "note_id": "n-9",
+      "revision": 2,
+      "title": "Chain-C1",
+      "body": "base",
+      "tags": [],
+      "color": "",
+      "pinned": false,
+      "state": "active",
+      "folder": "",
+      "created_at": "",
+      "updated_at": "",
+      "legacy_id": 9,
+      "seq": 9
+    },
+    "receipt": {
+      "schema_version": 1,
+      "request_id": "ui-edit-2",
+      "note_id": "n-9",
+      "revision": 2,
+      "status": "committed"
+    },
+    "replayed": false
+  },
+  "repeated_unknown": {
+    "s1": {
+      "notes": [
+        {
+          "id": 9,
+          "revision": 1,
+          "title": "ChainProbe-C",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 8,
+          "revision": 2,
+          "title": "NoMatch-A",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 7,
+          "revision": 1,
+          "title": "SearchProbe-B",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 6,
+          "revision": 1,
+          "title": "Sprint Planning",
+          "body": "Sprint 12 planning notes.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "work",
+            "seed"
+          ],
+          "folder": "work"
+        },
+        {
+          "id": 5,
+          "revision": 1,
+          "title": "Meeting Notes",
+          "body": "Q3 roadmap discussion.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "work",
+            "seed"
+          ],
+          "folder": "work"
+        },
+        {
+          "id": 4,
+          "revision": 1,
+          "title": "Recipe: Pasta",
+          "body": "200g flour, 2 eggs, pinch of salt.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "home",
+            "seed"
+          ],
+          "folder": "personal"
+        },
+        {
+          "id": 3,
+          "revision": 1,
+          "title": "Shopping List",
+          "body": "Milk, Eggs, Bread, Cheese",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "home",
+            "seed"
+          ],
+          "folder": "personal"
+        },
+        {
+          "id": 2,
+          "revision": 1,
+          "title": "Quick Ideas",
+          "body": "Build a markdown editor with live preview.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "ideas",
+            "seed"
+          ],
+          "folder": ""
+        },
+        {
+          "id": 1,
+          "revision": 1,
+          "title": "Welcome",
+          "body": "This is your notes app. Click on any note to view it.",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [
+            "intro",
+            "seed"
+          ],
+          "folder": ""
+        }
+      ],
+      "active_id": 0,
+      "search": "",
+      "draft_id": 9,
+      "draft_title": "Chain-C1",
+      "draft_revision": 1,
+      "dirty": true,
+      "conflict": false,
+      "has_recovery": false,
+      "rec_title": "",
+      "has_recovery2": false,
+      "rec2_title": "",
+      "stash_blocked": false,
+      "has_pend": true,
+      "pend_title": "Chain-C1",
+      "has_prev": false,
+      "prev_title": ""
+    },
+    "s2": {
+      "notes": [
+        {
+          "id": 9,
+          "revision": 1,
+          "title": "ChainProbe-C",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 8,
+          "revision": 2,
+          "title": "NoMatch-A",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 7,
+          "revision": 1,
+          "title": "SearchProbe-B",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 6,
+          "revision": 1,
+          "title": "Sprint Planning",
+          "body": "Sprint 12 planning notes.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "work",
+            "seed"
+          ],
+          "folder": "work"
+        },
+        {
+          "id": 5,
+          "revision": 1,
+          "title": "Meeting Notes",
+          "body": "Q3 roadmap discussion.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "work",
+            "seed"
+          ],
+          "folder": "work"
+        },
+        {
+          "id": 4,
+          "revision": 1,
+          "title": "Recipe: Pasta",
+          "body": "200g flour, 2 eggs, pinch of salt.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "home",
+            "seed"
+          ],
+          "folder": "personal"
+        },
+        {
+          "id": 3,
+          "revision": 1,
+          "title": "Shopping List",
+          "body": "Milk, Eggs, Bread, Cheese",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "home",
+            "seed"
+          ],
+          "folder": "personal"
+        },
+        {
+          "id": 2,
+          "revision": 1,
+          "title": "Quick Ideas",
+          "body": "Build a markdown editor with live preview.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "ideas",
+            "seed"
+          ],
+          "folder": ""
+        },
+        {
+          "id": 1,
+          "revision": 1,
+          "title": "Welcome",
+          "body": "This is your notes app. Click on any note to view it.",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [
+            "intro",
+            "seed"
+          ],
+          "folder": ""
+        }
+      ],
+      "active_id": 0,
+      "search": "",
+      "draft_id": 9,
+      "draft_title": "Chain-C2",
+      "draft_revision": 1,
+      "dirty": true,
+      "conflict": false,
+      "has_recovery": false,
+      "rec_title": "",
+      "has_recovery2": false,
+      "rec2_title": "",
+      "stash_blocked": false,
+      "has_pend": true,
+      "pend_title": "Chain-C2",
+      "has_prev": true,
+      "prev_title": "Chain-C1"
+    },
+    "s3": {
+      "notes": [
+        {
+          "id": 9,
+          "revision": 1,
+          "title": "ChainProbe-C",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 8,
+          "revision": 2,
+          "title": "NoMatch-A",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 7,
+          "revision": 1,
+          "title": "SearchProbe-B",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 6,
+          "revision": 1,
+          "title": "Sprint Planning",
+          "body": "Sprint 12 planning notes.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "work",
+            "seed"
+          ],
+          "folder": "work"
+        },
+        {
+          "id": 5,
+          "revision": 1,
+          "title": "Meeting Notes",
+          "body": "Q3 roadmap discussion.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "work",
+            "seed"
+          ],
+          "folder": "work"
+        },
+        {
+          "id": 4,
+          "revision": 1,
+          "title": "Recipe: Pasta",
+          "body": "200g flour, 2 eggs, pinch of salt.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "home",
+            "seed"
+          ],
+          "folder": "personal"
+        },
+        {
+          "id": 3,
+          "revision": 1,
+          "title": "Shopping List",
+          "body": "Milk, Eggs, Bread, Cheese",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "home",
+            "seed"
+          ],
+          "folder": "personal"
+        },
+        {
+          "id": 2,
+          "revision": 1,
+          "title": "Quick Ideas",
+          "body": "Build a markdown editor with live preview.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "ideas",
+            "seed"
+          ],
+          "folder": ""
+        },
+        {
+          "id": 1,
+          "revision": 1,
+          "title": "Welcome",
+          "body": "This is your notes app. Click on any note to view it.",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [
+            "intro",
+            "seed"
+          ],
+          "folder": ""
+        }
+      ],
+      "active_id": 0,
+      "search": "",
+      "draft_id": 9,
+      "draft_title": "Chain-C3",
+      "draft_revision": 1,
+      "dirty": true,
+      "conflict": true,
+      "has_recovery": false,
+      "rec_title": "",
+      "has_recovery2": false,
+      "rec2_title": "",
+      "stash_blocked": false,
+      "has_pend": true,
+      "pend_title": "Chain-C3",
+      "has_prev": true,
+      "prev_title": "Chain-C2"
+    },
+    "s4": {
+      "notes": [
+        {
+          "id": 9,
+          "revision": 1,
+          "title": "ChainProbe-C",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 8,
+          "revision": 2,
+          "title": "NoMatch-A",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 7,
+          "revision": 1,
+          "title": "SearchProbe-B",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 6,
+          "revision": 1,
+          "title": "Sprint Planning",
+          "body": "Sprint 12 planning notes.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "work",
+            "seed"
+          ],
+          "folder": "work"
+        },
+        {
+          "id": 5,
+          "revision": 1,
+          "title": "Meeting Notes",
+          "body": "Q3 roadmap discussion.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "work",
+            "seed"
+          ],
+          "folder": "work"
+        },
+        {
+          "id": 4,
+          "revision": 1,
+          "title": "Recipe: Pasta",
+          "body": "200g flour, 2 eggs, pinch of salt.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "home",
+            "seed"
+          ],
+          "folder": "personal"
+        },
+        {
+          "id": 3,
+          "revision": 1,
+          "title": "Shopping List",
+          "body": "Milk, Eggs, Bread, Cheese",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "home",
+            "seed"
+          ],
+          "folder": "personal"
+        },
+        {
+          "id": 2,
+          "revision": 1,
+          "title": "Quick Ideas",
+          "body": "Build a markdown editor with live preview.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "ideas",
+            "seed"
+          ],
+          "folder": ""
+        },
+        {
+          "id": 1,
+          "revision": 1,
+          "title": "Welcome",
+          "body": "This is your notes app. Click on any note to view it.",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [
+            "intro",
+            "seed"
+          ],
+          "folder": ""
+        }
+      ],
+      "active_id": 0,
+      "search": "",
+      "draft_id": 9,
+      "draft_title": "Chain-C3",
+      "draft_revision": 1,
+      "dirty": true,
+      "conflict": true,
+      "has_recovery": false,
+      "rec_title": "",
+      "has_recovery2": false,
+      "rec2_title": "",
+      "stash_blocked": false,
+      "has_pend": true,
+      "pend_title": "Chain-C3",
+      "has_prev": true,
+      "prev_title": "Chain-C2"
+    },
+    "server": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-9",
+        "revision": 2,
+        "title": "Chain-C1",
+        "body": "base",
+        "tags": [],
+        "color": "",
+        "pinned": false,
+        "state": "active",
+        "folder": "",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 9,
+        "seq": 9
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "",
+        "note_id": "",
+        "revision": 0,
+        "status": ""
+      },
+      "replayed": false
+    },
+    "pass": false
+  },
+  "before_recovery_search": {
+    "notes": [
+      {
+        "id": 11,
+        "revision": 1,
+        "title": "OnlyVisible-Z",
+        "body": "base",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [],
+        "folder": ""
+      },
+      {
+        "id": 10,
+        "revision": 1,
+        "title": "RecoverProbe-R",
+        "body": "base",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [],
+        "folder": ""
+      },
+      {
+        "id": 9,
+        "revision": 2,
+        "title": "Chain-C1",
+        "body": "base",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [],
+        "folder": ""
+      },
+      {
+        "id": 8,
+        "revision": 2,
+        "title": "NoMatch-A",
+        "body": "base",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [],
+        "folder": ""
+      },
+      {
+        "id": 7,
+        "revision": 1,
+        "title": "SearchProbe-B",
+        "body": "base",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [],
+        "folder": ""
+      },
+      {
+        "id": 6,
+        "revision": 1,
+        "title": "Sprint Planning",
+        "body": "Sprint 12 planning notes.",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [
+          "work",
+          "seed"
+        ],
+        "folder": "work"
+      },
+      {
+        "id": 5,
+        "revision": 1,
+        "title": "Meeting Notes",
+        "body": "Q3 roadmap discussion.",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [
+          "work",
+          "seed"
+        ],
+        "folder": "work"
+      },
+      {
+        "id": 4,
+        "revision": 1,
+        "title": "Recipe: Pasta",
+        "body": "200g flour, 2 eggs, pinch of salt.",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [
+          "home",
+          "seed"
+        ],
+        "folder": "personal"
+      },
+      {
+        "id": 3,
+        "revision": 1,
+        "title": "Shopping List",
+        "body": "Milk, Eggs, Bread, Cheese",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [
+          "home",
+          "seed"
+        ],
+        "folder": "personal"
+      },
+      {
+        "id": 2,
+        "revision": 1,
+        "title": "Quick Ideas",
+        "body": "Build a markdown editor with live preview.",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [
+          "ideas",
+          "seed"
+        ],
+        "folder": ""
+      },
+      {
+        "id": 1,
+        "revision": 1,
+        "title": "Welcome",
+        "body": "This is your notes app. Click on any note to view it.",
+        "time": "Just now",
+        "pinned": true,
+        "tags": [
+          "intro",
+          "seed"
+        ],
+        "folder": ""
+      }
+    ],
+    "active_id": 0,
+    "search": "",
+    "draft_id": 11,
+    "draft_title": "OnlyVisible-Z",
+    "draft_revision": 1,
+    "dirty": false,
+    "conflict": false,
+    "has_recovery": true,
+    "rec_title": "Recovered-content-R",
+    "has_recovery2": false,
+    "rec2_title": "",
+    "stash_blocked": false,
+    "has_pend": false,
+    "pend_title": "Recovered-content-R",
+    "has_prev": false,
+    "prev_title": "Recovered-C1-R"
+  },
+  "after_recovery_search": {
+    "notes": [
+      {
+        "id": 11,
+        "revision": 1,
+        "title": "OnlyVisible-Z",
+        "body": "base",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [],
+        "folder": ""
+      }
+    ],
+    "active_id": 0,
+    "search": "OnlyVisible-Z",
+    "draft_id": 11,
+    "draft_title": "OnlyVisible-Z",
+    "draft_revision": 1,
+    "dirty": false,
+    "conflict": false,
+    "has_recovery": true,
+    "rec_title": "Recovered-content-R",
+    "has_recovery2": false,
+    "rec2_title": "",
+    "stash_blocked": false,
+    "has_pend": false,
+    "pend_title": "Recovered-content-R",
+    "has_prev": false,
+    "prev_title": "Recovered-C1-R"
+  },
+  "filtered_recovery_pin": {
+    "restored": {
+      "notes": [
+        {
+          "id": 11,
+          "revision": 1,
+          "title": "OnlyVisible-Z",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        }
+      ],
+      "active_id": 0,
+      "search": "OnlyVisible-Z",
+      "draft_id": 10,
+      "draft_title": "Recovered-content-R",
+      "draft_revision": 2,
+      "dirty": true,
+      "conflict": true,
+      "has_recovery": false,
+      "rec_title": "Recovered-content-R",
+      "has_recovery2": false,
+      "rec2_title": "",
+      "stash_blocked": false,
+      "has_pend": true,
+      "pend_title": "Recovered-content-R",
+      "has_prev": true,
+      "prev_title": "Recovered-C1-R"
+    },
+    "after": {
+      "notes": [
+        {
+          "id": 11,
+          "revision": 1,
+          "title": "OnlyVisible-Z",
+          "body": "base",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [],
+          "folder": ""
+        }
+      ],
+      "active_id": 0,
+      "search": "OnlyVisible-Z",
+      "draft_id": 11,
+      "draft_title": "OnlyVisible-Z",
+      "draft_revision": 1,
+      "dirty": false,
+      "conflict": false,
+      "has_recovery": false,
+      "rec_title": "Recovered-content-R",
+      "has_recovery2": false,
+      "rec2_title": "",
+      "stash_blocked": false,
+      "has_pend": false,
+      "pend_title": "Recovered-content-R",
+      "has_prev": false,
+      "prev_title": "Recovered-C1-R"
+    },
+    "R": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-10",
+        "revision": 3,
+        "title": "Recovered-content-R",
+        "body": "base",
+        "tags": [],
+        "color": "",
+        "pinned": false,
+        "state": "active",
+        "folder": "",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 10,
+        "seq": 10
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "",
+        "note_id": "",
+        "revision": 0,
+        "status": ""
+      },
+      "replayed": false
+    },
+    "Z": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-11",
+        "revision": 1,
+        "title": "OnlyVisible-Z",
+        "body": "base",
+        "tags": [],
+        "color": "",
+        "pinned": true,
+        "state": "active",
+        "folder": "",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 11,
+        "seq": 11
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "",
+        "note_id": "",
+        "revision": 0,
+        "status": ""
+      },
+      "replayed": false
+    },
+    "pass": false
+  },
+  "full_slots_search": {
+    "before": {
+      "notes": [
+        {
+          "id": 14,
+          "revision": 1,
+          "title": "FullProbe-H",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 13,
+          "revision": 1,
+          "title": "FullProbe-G",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 12,
+          "revision": 1,
+          "title": "FullProbe-F",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 11,
+          "revision": 1,
+          "title": "OnlyVisible-Z",
+          "body": "base",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 10,
+          "revision": 3,
+          "title": "Recovered-content-R",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 9,
+          "revision": 2,
+          "title": "Chain-C1",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 8,
+          "revision": 2,
+          "title": "NoMatch-A",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 7,
+          "revision": 1,
+          "title": "SearchProbe-B",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 6,
+          "revision": 1,
+          "title": "Sprint Planning",
+          "body": "Sprint 12 planning notes.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "work",
+            "seed"
+          ],
+          "folder": "work"
+        },
+        {
+          "id": 5,
+          "revision": 1,
+          "title": "Meeting Notes",
+          "body": "Q3 roadmap discussion.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "work",
+            "seed"
+          ],
+          "folder": "work"
+        },
+        {
+          "id": 4,
+          "revision": 1,
+          "title": "Recipe: Pasta",
+          "body": "200g flour, 2 eggs, pinch of salt.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "home",
+            "seed"
+          ],
+          "folder": "personal"
+        },
+        {
+          "id": 3,
+          "revision": 1,
+          "title": "Shopping List",
+          "body": "Milk, Eggs, Bread, Cheese",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "home",
+            "seed"
+          ],
+          "folder": "personal"
+        },
+        {
+          "id": 2,
+          "revision": 1,
+          "title": "Quick Ideas",
+          "body": "Build a markdown editor with live preview.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "ideas",
+            "seed"
+          ],
+          "folder": ""
+        },
+        {
+          "id": 1,
+          "revision": 1,
+          "title": "Welcome",
+          "body": "This is your notes app. Click on any note to view it.",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [
+            "intro",
+            "seed"
+          ],
+          "folder": ""
+        }
+      ],
+      "active_id": 0,
+      "search": "",
+      "draft_id": 14,
+      "draft_title": "Draft-H",
+      "draft_revision": 1,
+      "dirty": true,
+      "conflict": false,
+      "has_recovery": true,
+      "rec_title": "Draft-F",
+      "has_recovery2": true,
+      "rec2_title": "Draft-G",
+      "stash_blocked": false,
+      "has_pend": false,
+      "pend_title": "Draft-G",
+      "has_prev": false,
+      "prev_title": ""
+    },
+    "after": {
+      "notes": [
+        {
+          "id": 14,
+          "revision": 1,
+          "title": "FullProbe-H",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 13,
+          "revision": 1,
+          "title": "FullProbe-G",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 12,
+          "revision": 1,
+          "title": "FullProbe-F",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 11,
+          "revision": 1,
+          "title": "OnlyVisible-Z",
+          "body": "base",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 10,
+          "revision": 3,
+          "title": "Recovered-content-R",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 9,
+          "revision": 2,
+          "title": "Chain-C1",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 8,
+          "revision": 2,
+          "title": "NoMatch-A",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 7,
+          "revision": 1,
+          "title": "SearchProbe-B",
+          "body": "base",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        },
+        {
+          "id": 6,
+          "revision": 1,
+          "title": "Sprint Planning",
+          "body": "Sprint 12 planning notes.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "work",
+            "seed"
+          ],
+          "folder": "work"
+        },
+        {
+          "id": 5,
+          "revision": 1,
+          "title": "Meeting Notes",
+          "body": "Q3 roadmap discussion.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "work",
+            "seed"
+          ],
+          "folder": "work"
+        },
+        {
+          "id": 4,
+          "revision": 1,
+          "title": "Recipe: Pasta",
+          "body": "200g flour, 2 eggs, pinch of salt.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "home",
+            "seed"
+          ],
+          "folder": "personal"
+        },
+        {
+          "id": 3,
+          "revision": 1,
+          "title": "Shopping List",
+          "body": "Milk, Eggs, Bread, Cheese",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "home",
+            "seed"
+          ],
+          "folder": "personal"
+        },
+        {
+          "id": 2,
+          "revision": 1,
+          "title": "Quick Ideas",
+          "body": "Build a markdown editor with live preview.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "ideas",
+            "seed"
+          ],
+          "folder": ""
+        },
+        {
+          "id": 1,
+          "revision": 1,
+          "title": "Welcome",
+          "body": "This is your notes app. Click on any note to view it.",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [
+            "intro",
+            "seed"
+          ],
+          "folder": ""
+        }
+      ],
+      "active_id": 0,
+      "search": "NeverMatch",
+      "draft_id": 14,
+      "draft_title": "Draft-H",
+      "draft_revision": 1,
+      "dirty": true,
+      "conflict": true,
+      "has_recovery": true,
+      "rec_title": "Draft-F",
+      "has_recovery2": true,
+      "rec2_title": "Draft-G",
+      "stash_blocked": true,
+      "has_pend": true,
+      "pend_title": "Draft-H",
+      "has_prev": false,
+      "prev_title": ""
+    },
+    "pass": false
+  },
+  "oracle_failures": [
+    "filtered_navigation",
+    "repeated_unknown",
+    "filtered_recovery_pin",
+    "full_slots_search"
+  ],
+  "errors": [
+    "Cannot read properties of undefined (reading 'id')",
+    "Cannot read properties of undefined (reading 'title')",
+    "Failed to fetch",
+    "Failed to fetch"
+  ]
+}

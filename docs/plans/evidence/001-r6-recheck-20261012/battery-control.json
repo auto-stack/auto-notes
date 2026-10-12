@@ -1,0 +1,9 @@
+{
+  "actual_exit": 1,
+  "expected_exit": 1,
+  "mutation": "assert rows==[('\u5df2\u786e\u8ba4\u7684\u65b0\u6570\u636e', 1)], rows -> assert False (only S19a)",
+  "original_sha256": "aa2eb3bee1d310ba9bfd29326c89ea370fdf4cb9f36db303d3b32c5cfd421f8f",
+  "mutated_sha256": "69a675429769290538c63f31f5596da03ce37764a700dcec18b574e8dd7ee78d",
+  "failure_file": "S19a mixed DB conflict constant, new data preserved\n",
+  "pass": true
+}

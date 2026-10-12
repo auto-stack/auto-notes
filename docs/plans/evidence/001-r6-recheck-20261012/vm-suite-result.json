@@ -1,0 +1,16 @@
+{
+  "command": [
+    "D:/autostack/auto-lang/target/debug/auto.exe",
+    "run",
+    "-r",
+    "vm",
+    "-B",
+    "3540"
+  ],
+  "mcp_port": 3539,
+  "backend_port": 3540,
+  "run_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\r5-vm-suite-1791765927009542700",
+  "suite_exit": 0,
+  "pid": 33060,
+  "mcp_ready": true
+}

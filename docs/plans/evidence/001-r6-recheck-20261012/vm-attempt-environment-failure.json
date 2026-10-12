@@ -1,0 +1,17 @@
+{
+  "command": [
+    "D:/autostack/auto-lang/target/debug/auto.exe",
+    "run",
+    "-r",
+    "vm",
+    "-B",
+    "5712"
+  ],
+  "mcp_port": 5711,
+  "backend_port": 5712,
+  "run_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\r5-vm-1791765990313132200",
+  "pid": 31316,
+  "boot_exit": 1,
+  "mcp_ready": false,
+  "error": "mcp not ready"
+}

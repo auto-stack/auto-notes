@@ -1,0 +1,40 @@
+[PASS] U1 wedge upgraded body/rev
+[PASS] U1 no upgrade_error
+[PASS] U2 manifest metadata authority
+[PASS] U2 trashed not resurrected in active list
+[PASS] U7 legacy update receipt reused for create rejected
+[PASS] U7 no note created by rejected replay
+[PASS] U7 legacy row update reuse also rejected (intent unverifiable)
+[PASS] U7 legacy object untouched
+[PASS] U6 legacy source untouched by upgrade
+[PASS] U6 backup manifest exists
+[PASS] U6 legacy request rows intent empty (unverifiable)
+[PASS] U6 hard-restart metadata survives
+[PASS] U6 no duplicate notes after retry
+[PASS] U3 backup blocked -> no silent success
+[PASS] U3 retry after unblocking succeeds
+[PASS] U4 missing entity -> explicit failure
+[PASS] U4 retry after restoring entity succeeds
+[PASS] U5 manifest {} rejected explicitly
+[PASS] U8 mis-marked DB repaired on open
+[PASS] U8 authority metadata recovered
+[PASS] R1 create a|b/c ok
+[PASS] R1 delimiter intent differs -> request_conflict (not replayed ok)
+[PASS] R1 second intent not executed
+[PASS] R1 identical retry replays
+[PASS] R2 setup create/update ok
+[PASS] R2 migrated pipe row replays original receipt rev2
+[PASS] R2 migrated row different content -> conflict
+[PASS] R3 legacy 3-col row replay rejected (no fabricated receipt)
+[PASS] R3 row untouched
+[PASS] M1 migrated=2 (valid-0 + chinese), corrupted=3
+[PASS] M1 reasons strict
+[PASS] M1 snippet is string for every corrupted item
+[PASS] M1 later valid chinese item migrated
+[PASS] M1 persisted report snippet strings
+[PASS] M1 source untouched + backup equal
+[PASS] M1 retry idempotent
+[PASS] U9 path-unsafe fid rejected
+[PASS] U10 identity mismatch rejected
+
+R5 backend verify done. fails = 0 []

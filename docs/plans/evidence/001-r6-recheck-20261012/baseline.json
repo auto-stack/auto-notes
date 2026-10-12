@@ -1,0 +1,56 @@
+{
+  "review_scope": "final",
+  "reviewer_identity": "current review context; previous reviewer; not Phase 5 implementer; no subagents",
+  "worktree_path": "D:\\autostack\\auto-os\\apps\\015-notes",
+  "branch": "v0.6-dev",
+  "reviewed_commit": "f0a3cab2485e750049e2e05bc2185dccee334c4f",
+  "implementation_commit": "1757a906ea8a31f26cdbfa98e7e4625eced41266",
+  "base_commit": "9a22886eaaaae203a65176fbfa8813180b6d6459",
+  "plan_revision_reviewed": 6,
+  "plan_revision_handoff": 7,
+  "auto_lang": "897eb34911a4f496a28ba7cdfd8a82815fa043d1",
+  "auto_down": "96f095bfc41a8686331c5ccd3ce17b685147fcc1",
+  "canonical_blob": "8f05b8ddb617d5d64e937e55027e782a2b0c0f85",
+  "cli_sha256": "0b8f5d7bccb41f4d0e02687d8dff7a83f8e31e192a061c9e663918c7a60a71bf",
+  "cli_version": "auto 0.1.0+v0.4.2-2785-ga6e108f60",
+  "cli_source": "a6e108f60b0c36a1ffdfea4410a3b11d81eda865",
+  "final_vue_backend_sha256": "ab84b74ac055e48183b88d025ba92ca7f7b33334fe2e6bdb5290a803f191491d",
+  "spec_delta_sha256": "a54bc1e0afceb9f515f9eccec2d20f743d01adf5213751c2e72b7d177af730cf",
+  "source_sha256": {
+    "src/back/repository.at": "eccd5ae171ebc57b2cda27d257381b20e94400c4d7b33efcd6367b91cc195f28",
+    "src/front/notes_store.at": "e98c1539ba5676e2bafbb73323f4445295c11b8231dc2e47f132620cbb364267",
+    "src/front/editor.at": "66183f3e250b3ab807f3316860b98944de719a5978e0a39f2722e9c3806e1822",
+    "tests/probe/run_v1_battery.sh": "e377fef4c02b0b813bd609a1a9f754d96b499366e76a1c9c6e70acd1b9afceca",
+    "tests/autotest/__init__.py": "27f6efa6c6353029fae0699037ed8daa0657ada1b68f0275188a6ed8bdc16c83"
+  },
+  "input_sha256": {
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\manifest.json": "66be23ef297c724ccb7fd7fb8fa5d9d7c6eaa3dd895135ec8b3d405c4d3f05e8",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\writer.lock": "b6f547b605f770b635a2d5b396a9c65227de50c30fa72085b6c9985011f8ce00",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\journal\\intent-1.json": "d1fbdc9e4237bb127a0adcb470dd48f72677cb6f6f31a1c3ddb3eaf93f9688e6",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\journal\\intent-2.json": "4e55b0ed17ffa982c45deaf46d85f48fb24ed63c99ecc9f055ab09618d3d9e01",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\journal\\intent-3.json": "a0a334e46c2f36c51a54324eb39aef21825ffc4c15120f2da14a2756c5a434ca",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\notes\\n-1.r2.json": "c340d4aa8c0c2745c9286c3037514ce2e617527c48010c2b9a491c0ab3842093",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\notes\\n-3.r1.json": "deb88138fa74aa400c7a2b323c1b5c72cc6cfbc83e8a4f5e01dc69e557e8628b",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\receipts\\d-1.json": "dc34e798022bf626136a6a220639f2be32f81d3d895f038a665e2d71d4ebf242",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\receipts\\d-2.json": "6ef8416b2aff55ff62720431e8c9fd8d38bd126f37564c942dcf3b8bd0699a4c"
+  },
+  "paths": {
+    "api": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-r6-20261012\\api-combinations-1791766303948838400",
+    "ui": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review-r6-ui-combinations-1791766493374707000",
+    "vue": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\r5-vue-1791766302865425600",
+    "battery": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\notes-r4-recheck-1791766301545024900",
+    "control": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-r6-20261012\\battery-control-1791766301966950700"
+  },
+  "limitations": [
+    "Original Vue/scratch wrapper GBK stdout failures occurred after successful test execution; final UTF-8 runs used.",
+    "First VM-negative run rebuilt while an isolated browser backend owned exe; build failed; serial clean retry passed.",
+    "UI aborted HTTP is an unknown transport result; after_manifest is real post-COMMIT fault; SQL trigger is synthetic SQLite UPDATE rejection, not physical disk failure.",
+    "AutoLang tracked WIP docs and untracked review fixtures preserved; no runtime source/build changes; no dependency commit drift.",
+    "No app implementation or canonical Spec edits; no merge/push/parent gitlink."
+  ],
+  "submitted_spec_delta_sha256": "3c3a3eea947670f857572b9339c3f89c8e60afc02c9da1a2fe66770e4a2c8c19",
+  "skill_sha256": {
+    "auto-plan-review": "8601f051c52568d2f1068083b10ebd647a8492c1d976423f88b6b1ebf3328614",
+    "auto-plan-new": "af91050145c6e602621e9cd0cb433995e72c48a8a5f63594fcd0220ae86b19d7"
+  }
+}

@@ -1,0 +1,444 @@
+{
+  "results": {
+    "valid-control": {
+      "patch": {},
+      "response": {
+        "http": 200,
+        "value": [
+          {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "doc1-updated",
+            "body": "body two",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          }
+        ]
+      },
+      "status": {
+        "loaded": true,
+        "err": "",
+        "counter": 3,
+        "entries": 1,
+        "max_legacy_id": 1,
+        "migrated": "",
+        "upgrade_error": "",
+        "data_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-r6-20261012\\api-combinations-1791766303948838400\\valid-control"
+      },
+      "db": {
+        "notes": [
+          [
+            "n-1",
+            1,
+            2,
+            "doc1-updated",
+            "[]",
+            ""
+          ]
+        ],
+        "meta": [
+          [
+            "counter",
+            "3"
+          ],
+          [
+            "schema_v",
+            "3"
+          ],
+          [
+            "upgrade_error",
+            ""
+          ],
+          [
+            "upgraded",
+            "1"
+          ]
+        ]
+      },
+      "source_unchanged": true
+    },
+    "manifest-identity": {
+      "patch": {
+        "legacy_id": "7"
+      },
+      "response": {
+        "http": 200,
+        "value": [
+          {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "doc1-updated",
+            "body": "body two",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 7,
+            "seq": 1
+          }
+        ]
+      },
+      "status": {
+        "loaded": true,
+        "err": "",
+        "counter": 8,
+        "entries": 1,
+        "max_legacy_id": 7,
+        "migrated": "",
+        "upgrade_error": "",
+        "data_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-r6-20261012\\api-combinations-1791766303948838400\\manifest-identity"
+      },
+      "db": {
+        "notes": [
+          [
+            "n-1",
+            7,
+            2,
+            "doc1-updated",
+            "[]",
+            ""
+          ]
+        ],
+        "meta": [
+          [
+            "counter",
+            "3"
+          ],
+          [
+            "schema_v",
+            "3"
+          ],
+          [
+            "upgrade_error",
+            ""
+          ],
+          [
+            "upgraded",
+            "1"
+          ]
+        ]
+      },
+      "source_unchanged": true
+    },
+    "manifest-types": {
+      "patch": {
+        "revision": true,
+        "tags": [
+          7,
+          null
+        ],
+        "folder": 42,
+        "pinned": 1
+      },
+      "response": {
+        "http": 200,
+        "value": [
+          {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 0,
+            "title": "doc1-updated",
+            "body": "body two",
+            "tags": [
+              "",
+              ""
+            ],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          }
+        ]
+      },
+      "status": {
+        "loaded": true,
+        "err": "",
+        "counter": 3,
+        "entries": 1,
+        "max_legacy_id": 1,
+        "migrated": "",
+        "upgrade_error": "",
+        "data_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-r6-20261012\\api-combinations-1791766303948838400\\manifest-types"
+      },
+      "db": {
+        "notes": [
+          [
+            "n-1",
+            1,
+            0,
+            "doc1-updated",
+            "[7,null]",
+            ""
+          ]
+        ],
+        "meta": [
+          [
+            "counter",
+            "3"
+          ],
+          [
+            "schema_v",
+            "3"
+          ],
+          [
+            "upgrade_error",
+            ""
+          ],
+          [
+            "upgraded",
+            "1"
+          ]
+        ]
+      },
+      "source_unchanged": true
+    },
+    "manifest-revision": {
+      "patch": {
+        "revision": "2oops"
+      },
+      "response": {
+        "http": 200,
+        "value": [
+          {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "doc1-updated",
+            "body": "body two",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          }
+        ]
+      },
+      "status": {
+        "loaded": true,
+        "err": "",
+        "counter": 3,
+        "entries": 1,
+        "max_legacy_id": 1,
+        "migrated": "",
+        "upgrade_error": "",
+        "data_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-r6-20261012\\api-combinations-1791766303948838400\\manifest-revision"
+      },
+      "db": {
+        "notes": [
+          [
+            "n-1",
+            1,
+            2,
+            "doc1-updated",
+            "[]",
+            ""
+          ]
+        ],
+        "meta": [
+          [
+            "counter",
+            "3"
+          ],
+          [
+            "schema_v",
+            "3"
+          ],
+          [
+            "upgrade_error",
+            ""
+          ],
+          [
+            "upgraded",
+            "1"
+          ]
+        ]
+      },
+      "source_unchanged": true
+    },
+    "repair-update-failure": {
+      "before": {
+        "notes": [
+          [
+            "n-1",
+            1,
+            2,
+            "doc1-updated",
+            "[]",
+            ""
+          ]
+        ],
+        "meta": [
+          [
+            "corrupted_r1",
+            "legacy upgrade incomplete"
+          ],
+          [
+            "counter",
+            "3"
+          ],
+          [
+            "schema_v",
+            "3"
+          ],
+          [
+            "upgrade_error",
+            ""
+          ],
+          [
+            "upgraded",
+            "1"
+          ]
+        ]
+      },
+      "response": {
+        "http": 200,
+        "value": [
+          {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "doc1-updated",
+            "body": "body two",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          }
+        ]
+      },
+      "after": {
+        "notes": [
+          [
+            "n-1",
+            1,
+            2,
+            "doc1-updated",
+            "[]",
+            ""
+          ]
+        ],
+        "meta": [
+          [
+            "counter",
+            "3"
+          ],
+          [
+            "repair_generation",
+            "1"
+          ],
+          [
+            "schema_v",
+            "3"
+          ],
+          [
+            "upgrade_error",
+            ""
+          ],
+          [
+            "upgraded",
+            "1"
+          ]
+        ]
+      },
+      "status": {
+        "loaded": true,
+        "err": "",
+        "counter": 3,
+        "entries": 1,
+        "max_legacy_id": 1,
+        "migrated": "",
+        "upgrade_error": "",
+        "data_dir": "D:\\autostack\\auto-os\\apps\\015-notes\\.auto\\review001-r6-20261012\\api-combinations-1791766303948838400\\repair-update-failure"
+      },
+      "retry": {
+        "response": {
+          "http": 200,
+          "value": [
+            {
+              "schema_version": 1,
+              "note_id": "n-1",
+              "revision": 2,
+              "title": "doc1-updated",
+              "body": "body two",
+              "tags": [],
+              "color": "",
+              "pinned": false,
+              "state": "active",
+              "folder": "",
+              "created_at": "",
+              "updated_at": "",
+              "legacy_id": 1,
+              "seq": 1
+            }
+          ]
+        },
+        "db": {
+          "notes": [
+            [
+              "n-1",
+              1,
+              2,
+              "doc1-updated",
+              "[]",
+              ""
+            ]
+          ],
+          "meta": [
+            [
+              "counter",
+              "3"
+            ],
+            [
+              "repair_generation",
+              "1"
+            ],
+            [
+              "schema_v",
+              "3"
+            ],
+            [
+              "upgrade_error",
+              ""
+            ],
+            [
+              "upgraded",
+              "1"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "oracle_failures": [
+    "manifest-identity rejected",
+    "manifest-types rejected",
+    "manifest-revision rejected",
+    "repair UPDATE failure retains retry credential",
+    "repair retry restores authority"
+  ]
+}
