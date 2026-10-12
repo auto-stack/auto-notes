@@ -16,7 +16,7 @@
 | SD-18 (r6) | 实体/清单身份/结构/类型/路径严格校验，非法实体可修复重试 | `validate_legacy_entity`（note_id 非空且与 entry 一致、legacy_id/revision 严格整数字面量、title/blocks(text)/tags(元素)/folder/state 类型、pinned 布尔）+ `valid_legacy_file`（无分隔符/穿越）+ 显式 entity missing 检查；违反 → ROLLBACK + upgrade_error，不标完成 | battery S19c（{} 拒绝+修复重试）/S16；scratch U4/U5/U9/U10；独立 IND-API-3 |
 | SD-19 (r6) | 全入口容量保全：满槽显式阻止（无驱逐），可见状态，调用者不清 dirty | `notes_store.at`: StashDraft（A→B→满则 stash_blocked）/RecoverDraft/RecoverDraft2 对称 can 检查/导航 handler 的 flushed 门（满槽=保持原位不清 dirty）+ editor 满槽横幅 | 独立 IND-VUE-1/IND-VM-1；Vue R5-1 |
 | SD-20 (r6) | 保存与全部 flush 一致意图轮换+服务器裁决；槽携带完整未确认上下文 | 各 flush handler 内联轮换（BindIntent/prev）+ adjudication（revision_conflict/request_conflict → get_note_r 对比 prev → 采纳服务器 revision 重试）；rec_*_pend/prev ×2 槽随 stash/restore 搬运 | 独立 IND-VUE-2/IND-VM-2；VM r5 负例 R5-VM-3；Vue R5-3 |
-| SD-21 (r6，待用户决策) | 旧行逐类兼容表 + 承诺差异显式化 | [t26-legacy-compat-table.md](t26-legacy-compat-table.md)；实现=旧行重放一律 request_conflict（选项 A 现状） | battery S15/S17；scratch R1–R3 |
+| SD-21 (r6，已决：A) | 旧行逐类兼容表 + 承诺差异显式化 | [t26-legacy-compat-table.md](t26-legacy-compat-table.md)；实现=旧行重放一律 request_conflict（选项 A 现状） | battery S15/S17；scratch R1–R3 |
 | SD-22 (r6) | 证据映射关闭原任务、真实计数、一致实现稿 | 本计划 §9 work 记录 + 计数核对（见下）+ 本稿 | 复审/merge |
 
 原 r5 表中 SD-07..16 的实现绑定继续有效（S07/12 由 r6 重写修正后通过——见上
@@ -161,8 +161,8 @@ SD-17/18 行；S08/09/10/11/13/14/15 绑定不变，验证以本轮全套门为�
 
 ## 发布核对清单（merge 执行）
 
-1. 【提案全文】替换 canonical（T-26 用户决策若非选项 A，先按决策更新
-   "旧行裁决"段），git blob/hash 记入合入收据。
+1. 【提案全文】替换 canonical（T-26 已决 A，"旧行裁决"段即最终语义），
+   git blob/hash 记入合入收据。
 2. 刷新 docs/README 计划索引（001 → archived，修正 Phase 状态描述）。
 3. 计数核对：以计划 frontmatter 为准（T-26 决策后 re-count），归档副本一致。
 4. merge-owned 其余关闭门按计划 §8 执行。
