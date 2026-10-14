@@ -14,7 +14,7 @@ with socket.socket() as s:
 with socket.socket() as s:
     s.bind(('127.0.0.1', 0)); front_port = s.getsockname()[1]
 env = dict(os.environ, AUTO_HTTP_PORT=str(back_port), AUTO_FRONT_PORT=str(front_port),
-           NOTES_DATA_DIR=str(run / 'data'), NOTES_SEED='1', NOTES_TEST_MODE='0', TAURI_ENV='1',
+           NOTES_DATA_DIR=str(run / 'data'), NOTES_SEED='1', NOTES_TEST_MODE='1', TAURI_ENV='1',
            NOTES_URL=f'http://127.0.0.1:{front_port}', PYTHONIOENCODING='utf-8', R5_RUN=str(run))
 for key in ('NOTES_FORCE_LOCK', 'NOTES_FAULT', 'NOTES_LEGACY_FILE', 'AUTO_HTTP_PROXY'):
     env.pop(key, None)
@@ -22,8 +22,8 @@ processes = []
 logs = []
 try:
     commands = [
-        ([str(root / 'rust-workspace/target/debug/app-015-notes-back.exe')], root, 'backend'),
-        (['D:/soft/nodejs/node.exe', str(root / 'gen/front/vue/node_modules/vite/bin/vite.js'),
+        ([str(root / 'rust-workspace/target/debug/auto-notes-back.exe')], root, 'backend'),
+        (['node', str(root / 'gen/front/vue/node_modules/vite/bin/vite.js'),
           '--host', '127.0.0.1', '--port', str(front_port), '--strictPort'], root / 'gen/front/vue', 'frontend'),
     ]
     for cmd, cwd, name in commands:
@@ -38,7 +38,7 @@ try:
     else:
         raise RuntimeError('frontend not ready')
     with open(run / 'playwright.log', 'wb') as output:
-        tests = subprocess.run(['D:/soft/nodejs/node.exe', str(root / 'tests/node_modules/@playwright/test/cli.js'), 'test'],
+        tests = subprocess.run(['node', str(root / 'tests/node_modules/@playwright/test/cli.js'), 'test'],
                                cwd=root / 'tests', env=env, stdout=output, stderr=subprocess.STDOUT, timeout=300)
     print('Evidence:', str(run))
     print('suite_exit_code=', tests.returncode)

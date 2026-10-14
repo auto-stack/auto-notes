@@ -12,7 +12,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path.cwd()
-EXE = ROOT / 'rust-workspace/target/debug/app-015-notes-back.exe'
+EXE = ROOT / 'rust-workspace/target/debug/auto-notes-back.exe'
 WEDGE = ROOT / 'tests/probe/evidence/v1/wedge-snapshot'
 RUN = Path(os.environ.get('R5_WORK', ROOT / '.auto' / ('r5-work-' + str(time.time_ns()))))
 RUN.mkdir(parents=True, exist_ok=True)
@@ -346,6 +346,89 @@ with Server('u10') as s:
     lst = s.call('GET', '/api/v1/notes')['value']
     st = status(s)
     check('U10 identity mismatch rejected', lst == [] and 'does not match' in st.get('upgrade_error', ''), (lst, st))
+
+# ═══ U11 (r8/T-02/T-15): 元数据/删除/恢复必需写入失败传播（F-R8-01）═══
+# 合成 trigger 拒绝单条语句：RAISE(ABORT) 只中止该语句，不检查返回值的实现
+# 仍 COMMIT 成功并返回成功形状。负例断言显式失败，正常控制断言成功。
+with Server('u11') as s:
+    dbp = s.data / 'inbox.db'
+
+    def trig(field):
+        c = sqlite3.connect(dbp)
+        c.execute(f"CREATE TRIGGER reject_u11 BEFORE UPDATE OF {field} ON notes "
+                  "BEGIN SELECT RAISE(ABORT,'independent metadata rejection'); END")
+        c.commit()
+        c.close()
+
+    def untrig():
+        c = sqlite3.connect(dbp)
+        c.execute('DROP TRIGGER reject_u11')
+        c.commit()
+        c.close()
+
+    created = s.call('POST', '/api/v1/notes',
+                     {'request_id': 'u11-base', 'title': '确认中文', 'body': '第一行\n第二行', 'folder': ''})['value']
+    nid = created['doc']['note_id']
+    lid = created['doc']['legacy_id']
+    trig('pinned')
+    r = s.call('PATCH', f'/api/notes/{lid}/pin')
+    raw = (r.get('value') if 'value' in r else r.get('body'))
+    check('U11 pinned rejection reported', raw is None or (isinstance(raw, str) and raw.strip() in ('', 'null')), r)
+    untrig()
+    r = s.call('PATCH', f'/api/notes/{lid}/pin')
+    check('U11 pinned normal control', isinstance(r['value'], dict) and r['value']['pinned'] is True, r)
+    trig('tags_json')
+    r = s.call('PUT', f'/api/notes/{lid}/tags', {'tags': ['必须保存']})
+    raw = (r.get('value') if 'value' in r else r.get('body'))
+    check('U11 tags rejection reported', raw is None or (isinstance(raw, str) and raw.strip() in ('', 'null')), r)
+    untrig()
+    r = s.call('PUT', f'/api/notes/{lid}/tags', {'tags': ['必须保存']})
+    check('U11 tags normal control', isinstance(r['value'], dict) and r['value']['tags'] == ['必须保存'], r)
+    trig('state')
+    r = s.call('DELETE', f'/api/notes/{lid}')
+    check('U11 delete rejection reported', r['value'] is False, r)
+    g = s.call('GET', f'/api/v1/notes/{nid}')['value']
+    check('U11 rejected delete left document active', g['ok'] and g['doc']['state'] == 'active', g)
+    r = s.call('POST', f'/api/v1/notes/{nid}/restore')
+    check('U11 restore rejection reported', isinstance(r['value'], dict) and r['value']['ok'] is False, r)
+    untrig()
+    r = s.call('DELETE', f'/api/notes/{lid}')
+    check('U11 delete normal control', r['value'] is True, r)
+    r = s.call('POST', f'/api/v1/notes/{nid}/restore')
+    g = s.call('GET', f'/api/v1/notes/{nid}')['value']
+    ok = (r['value']['ok'] and g['ok'] and g['doc']['state'] == 'active'
+          and g['doc']['pinned'] is True and g['doc']['tags'] == ['必须保存'])
+    check('U11 restore control + final consistency', ok, (r, g))
+
+# ═══ U12 (r8/T-12/T-17): fresh 升级完成标记失败 → 整体回滚可重试（F-R8-02）═══
+with Server('u12') as s:
+    dbp = s.data / 'inbox.db'
+    c = sqlite3.connect(dbp)
+    c.execute("DELETE FROM meta WHERE k='upgraded'")
+    c.execute("CREATE TRIGGER reject_u12 BEFORE INSERT ON meta WHEN NEW.k='upgraded' "
+              "BEGIN SELECT RAISE(ABORT,'independent finalize rejection'); END")
+    c.commit()
+    c.close()
+    temp = copy_wedge(s.data / 'incoming')
+    for name in ('manifest.json', 'notes', 'receipts', 'journal'):
+        shutil.move(str(temp / name), str(s.data / name))
+    first = s.call('GET', '/api/v1/notes')
+    second = s.call('GET', '/api/v1/notes')
+    st = status(s)
+    n = sql(dbp, 'SELECT COUNT(*) FROM notes')[0][0]
+    up = sql(dbp, "SELECT v FROM meta WHERE k='upgraded'")
+    check('U12 finalize marker failure rolls back whole upgrade',
+          first['value'] == [] and second['value'] == [] and st.get('upgrade_error', '') != ''
+          and n == 0 and (not up or up[0][0] != '1'),
+          (first['value'], second['value'], st, n, up))
+    c = sqlite3.connect(dbp)
+    c.execute('DROP TRIGGER reject_u12')
+    c.commit()
+    c.close()
+    third = s.call('GET', '/api/v1/notes')
+    check('U12 normal upgrade control succeeds',
+          len(third['value']) == 1 and third['value'][0]['note_id'] == 'n-1'
+          and third['value'][0]['revision'] == 2, third)
 
 print()
 print('R5 backend verify done. fails =', len(fails), fails)

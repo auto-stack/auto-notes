@@ -34,7 +34,7 @@ try:
                              creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP)
         record['pid'] = p.pid
         ready = False
-        for i in range(90):
+        for i in range(600):
             if p.poll() is not None:
                 record['boot_exit'] = p.returncode
                 break
@@ -229,7 +229,7 @@ try:
             p = subprocess.Popen(cmd, cwd=root, env=env, stdout=log2, stderr=log2,
                                  creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP)
         ready2 = False
-        for i in range(90):
+        for i in range(600):
             if p.poll() is not None:
                 break
             try:

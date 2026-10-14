@@ -730,6 +730,187 @@ l=json.load(open(OUT+'/s19-badent-fix.json'))
 assert len(l)==1 and l[0]['note_id']=='n-1' and l[0]['revision']==2, l
 print('[S19c] entity restored -> upgrade succeeds ✓')
 " | tee -a "$SUM"
+# ── S20（T-02/T-15 r8）：元数据/删除/恢复必需写入失败传播（F-R8-01）────
+# 合成 trigger 拒绝单条语句：RAISE(ABORT) 只中止该语句，不检查返回值的旧实现
+# 仍 COMMIT 成功并返回成功形状——负例断言显式失败，正常控制断言成功。
+D20="$work/s20-meta"; D20W="$work_win/s20-meta"; mkdir -p "$D20/data"
+setup "$D20W/data" "$D20W/nope.json" > /dev/null
+curl -s -m 10 -X POST "$BASE/api/v1/notes" -H "Content-Type: application/json" \
+  -d '{"request_id":"s20-base","title":"元数据失败探针","body":"x","folder":""}' -o "$OUT/s20-create.json"
+D20="$D20" assert_py "S20 probe created" "
+import json
+d=json.load(open(OUT+'/s20-create.json'))
+assert d['ok'] and d['doc']['note_id'].startswith('n-'), d
+print('[S20] probe note created ✓')
+" | tee -a "$SUM"
+NID=$(python -c "import json;print(json.load(open('$OUT/s20-create.json'))['doc']['note_id'])")
+LID=$(python -c "import json;print(json.load(open('$OUT/s20-create.json'))['doc']['legacy_id'])")
+# pinned 负例 + 正常控制
+D20="$D20" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D20']+'/data/inbox.db')
+db.execute(\"CREATE TRIGGER reject_s20 BEFORE UPDATE OF pinned ON notes BEGIN SELECT RAISE(ABORT,'independent metadata rejection'); END\")
+db.commit(); db.close()" || fail "SQL trigger setup/teardown failed (S20/S21 infra)"
+curl -s -m 10 -X PATCH "$BASE/api/notes/$LID/pin" -o "$OUT/s20-pin-neg.json"
+D20="$D20" assert_py "S20 pinned rejection reported" "
+import json
+raw=open(OUT+'/s20-pin-neg.json').read().strip()
+# 框架对 ?Note None 返回 404 空体：不得是成功 Note（旧实现返回 200+Note 假成功）
+r=json.loads(raw) if raw else None
+assert r is None, r
+print('[S20] pinned UPDATE rejected -> null/404 (failure), not a success Note ✓')
+" | tee -a "$SUM"
+D20="$D20" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D20']+'/data/inbox.db')
+db.execute('DROP TRIGGER reject_s20')
+db.commit(); db.close()" || fail "SQL trigger setup/teardown failed (S20/S21 infra)"
+curl -s -m 10 -X PATCH "$BASE/api/notes/$LID/pin" -o "$OUT/s20-pin-ctl.json"
+assert_py "S20 pinned normal control" "
+import json
+r=json.load(open(OUT+'/s20-pin-ctl.json'))
+assert isinstance(r, dict) and r['pinned']==True, r
+print('[S20] pinned control -> success, pinned=True ✓')
+" | tee -a "$SUM"
+# tags 负例 + 正常控制
+D20="$D20" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D20']+'/data/inbox.db')
+db.execute(\"CREATE TRIGGER reject_s20 BEFORE UPDATE OF tags_json ON notes BEGIN SELECT RAISE(ABORT,'independent metadata rejection'); END\")
+db.commit(); db.close()" || fail "SQL trigger setup/teardown failed (S20/S21 infra)"
+curl -s -m 10 -X PUT "$BASE/api/notes/$LID/tags" -H "Content-Type: application/json" \
+  -d '{"tags":["必须保存"]}' -o "$OUT/s20-tags-neg.json"
+D20="$D20" assert_py "S20 tags rejection reported" "
+import json
+raw=open(OUT+'/s20-tags-neg.json').read().strip()
+r=json.loads(raw) if raw else None
+assert r is None, r
+print('[S20] tags UPDATE rejected -> null/404 (failure), not a success Note ✓')
+" | tee -a "$SUM"
+D20="$D20" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D20']+'/data/inbox.db')
+db.execute('DROP TRIGGER reject_s20')
+db.commit(); db.close()" || fail "SQL trigger setup/teardown failed (S20/S21 infra)"
+curl -s -m 10 -X PUT "$BASE/api/notes/$LID/tags" -H "Content-Type: application/json" \
+  -d '{"tags":["必须保存"]}' -o "$OUT/s20-tags-ctl.json"
+assert_py "S20 tags normal control" "
+import json
+r=json.load(open(OUT+'/s20-tags-ctl.json'))
+assert isinstance(r, dict) and r['tags']==['必须保存'], r
+print('[S20] tags control -> success, tags persisted ✓')
+" | tee -a "$SUM"
+# state（软删）负例 + 正常控制
+D20="$D20" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D20']+'/data/inbox.db')
+db.execute(\"CREATE TRIGGER reject_s20 BEFORE UPDATE OF state ON notes BEGIN SELECT RAISE(ABORT,'independent metadata rejection'); END\")
+db.commit(); db.close()" || fail "SQL trigger setup/teardown failed (S20/S21 infra)"
+curl -s -m 10 -X DELETE "$BASE/api/notes/$LID" -o "$OUT/s20-del-neg.json"
+D20="$D20" assert_py "S20 delete rejection reported" "
+import json
+r=json.load(open(OUT+'/s20-del-neg.json'))
+assert r is False, r
+print('[S20] state UPDATE rejected -> false (failure), not true ✓')
+" | tee -a "$SUM"
+curl -s -m 10 "$BASE/api/v1/notes/$NID" -o "$OUT/s20-del-neg-get.json"
+assert_py "S20 delete negative left document active" "
+import json
+r=json.load(open(OUT+'/s20-del-neg-get.json'))
+assert r['ok'] and r['doc']['state']=='active', r
+print('[S20] rejected delete: document still active ✓')
+" | tee -a "$SUM"
+D20="$D20" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D20']+'/data/inbox.db')
+db.execute('DROP TRIGGER reject_s20')
+db.commit(); db.close()" || fail "SQL trigger setup/teardown failed (S20/S21 infra)"
+curl -s -m 10 -X DELETE "$BASE/api/notes/$LID" -o "$OUT/s20-del-ctl.json"
+assert_py "S20 delete normal control" "
+import json
+r=json.load(open(OUT+'/s20-del-ctl.json'))
+assert r is True, r
+print('[S20] delete control -> true ✓')
+" | tee -a "$SUM"
+# 恢复入口负例 + 正常控制（state 必需写入的恢复路径同函数出口）
+D20="$D20" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D20']+'/data/inbox.db')
+db.execute(\"CREATE TRIGGER reject_s20 BEFORE UPDATE OF state ON notes BEGIN SELECT RAISE(ABORT,'independent metadata rejection'); END\")
+db.commit(); db.close()" || fail "SQL trigger setup/teardown failed (S20/S21 infra)"
+curl -s -m 10 -X POST "$BASE/api/v1/notes/$NID/restore" -o "$OUT/s20-rst-neg.json"
+D20="$D20" assert_py "S20 restore rejection reported" "
+import json
+r=json.load(open(OUT+'/s20-rst-neg.json'))
+assert r['ok'] is False and r['err_code']=='storage_unwritable', r
+print('[S20] restore UPDATE rejected -> ok:false storage_unwritable ✓')
+" | tee -a "$SUM"
+D20="$D20" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D20']+'/data/inbox.db')
+db.execute('DROP TRIGGER reject_s20')
+db.commit(); db.close()" || fail "SQL trigger setup/teardown failed (S20/S21 infra)"
+curl -s -m 10 -X POST "$BASE/api/v1/notes/$NID/restore" -o "$OUT/s20-rst-ctl.json"
+curl -s -m 10 "$BASE/api/v1/notes/$NID" -o "$OUT/s20-final-get.json"
+D20="$D20" assert_py "S20 restore control + final consistency" "
+import json
+rst=json.load(open(OUT+'/s20-rst-ctl.json'))
+assert rst['ok'], rst
+g=json.load(open(OUT+'/s20-final-get.json'))
+doc=g['doc']
+assert doc['state']=='active', doc
+assert doc['pinned']==True, doc
+assert doc['tags']==['必须保存'], doc
+print('[S20] restore control -> active; final doc pinned/tags intact ✓')
+" | tee -a "$SUM"
+
+# ── S21（T-12/T-17 r8）：fresh 升级完成标记失败 → 整体回滚可重试（F-R8-02）──
+D21="$work/s21-final"; D21W="$work_win/s21-final"
+wedge_into "$D21/data"
+setup "$D21W/data" "$D21W/nope.json" > /dev/null
+# upgrade 在首次 repo 访问时运行（setup 只做 ensure_schema）：挂载拒写
+# upgraded 标记的 trigger 后再触发。
+D21="$D21" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D21']+'/data/inbox.db')
+db.execute(\"CREATE TRIGGER reject_s21 BEFORE INSERT ON meta WHEN NEW.k='upgraded' BEGIN SELECT RAISE(ABORT,'independent finalize rejection'); END\")
+db.commit(); db.close()" || fail "SQL trigger setup/teardown failed (S20/S21 infra)"
+curl -s -m 10 "$BASE/api/v1/notes" -o "$OUT/s21-final-neg.json"
+curl -s -m 10 "$BASE/api/v1/status" -o "$OUT/s21-final-neg-status.json"
+D21="$D21" assert_py "S21 finalize marker failure rolls back whole upgrade" "
+import json, os, sqlite3
+l=json.load(open(OUT+'/s21-final-neg.json'))
+s=json.loads(json.load(open(OUT+'/s21-final-neg-status.json')))
+assert l==[], l
+assert s['upgrade_error']!='', s
+db = sqlite3.connect(os.environ['D21']+'/data/inbox.db')
+n = db.execute('SELECT COUNT(*) FROM notes').fetchone()[0]
+up = db.execute(\"SELECT v FROM meta WHERE k='upgraded'\").fetchone()
+db.close()
+assert n==0, n
+assert (up is None) or (up[0]!='1'), up
+print('[S21] finalize write rejected -> rollback, no notes, no marker, error visible ✓')
+" | tee -a "$SUM"
+# 第二次读取不得变成假完成/不可见之外的其它漂移（恒定可重试）
+curl -s -m 10 "$BASE/api/v1/notes" -o "$OUT/s21-final-neg2.json"
+assert_py "S21 retry state stable" "
+import json
+l=json.load(open(OUT+'/s21-final-neg2.json'))
+assert l==[], l
+print('[S21] second read still empty (constant, retryable) ✓')
+" | tee -a "$SUM"
+D21="$D21" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D21']+'/data/inbox.db')
+db.execute('DROP TRIGGER reject_s21')
+db.commit(); db.close()" || fail "SQL trigger setup/teardown failed (S20/S21 infra)"
+curl -s -m 10 "$BASE/api/v1/notes" -o "$OUT/s21-final-ctl.json"
+assert_py "S21 normal upgrade control succeeds" "
+import json
+l=json.load(open(OUT+'/s21-final-ctl.json'))
+assert len(l)==1 and l[0]['note_id']=='n-1' and l[0]['revision']==2, l
+print('[S21] trigger removed -> wedge upgrade succeeds (n-1 rev2) ✓')
+" | tee -a "$SUM"
 FAILS=$(wc -l < "$OUT/.fails" | tr -d ' ')
 log "== battery done; fails=$FAILS; artifacts in $OUT"
 if [ "$FAILS" -gt 0 ]; then

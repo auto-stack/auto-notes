@@ -405,14 +405,24 @@ fn upgrade_if_legacy(db SqliteDb) str {
             return ""
         }
         if has_legacy == false {
-            db.exec("DELETE FROM meta WHERE k='corrupted_r1'")
-            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('repair_generation','1')")
+            // 凭据清理/代际记录也是必需写入（F-R8-02 同类出口）：失败显式报错，
+            // 部分清理状态下次打开可重试。
+            var drc int = db.exec("DELETE FROM meta WHERE k='corrupted_r1'")
+            var rgw int = db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('repair_generation','1')")
+            if drc < 0 || rgw < 0 {
+                return "storage_unwritable"
+            }
             return ""
         }
         return repair_legacy_merge(db)
     }
     if has_legacy == false {
-        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')")
+        // 全新库的 upgraded 完成标记是必需写入（F-R8-02 同类出口）：写入失败
+        // 不得静默放行，否则每次打开都重试且无任何可见错误。
+        var mkw int = db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')")
+        if mkw < 0 {
+            return "storage_unwritable"
+        }
         return ""
     }
     var cnt_rows List<List<str>> = db.query("SELECT COUNT(*) FROM notes")
@@ -514,10 +524,21 @@ fn upgrade_if_legacy(db SqliteDb) str {
         }
         var cur str = meta_get_on(db, "counter")
         if cur == "" {
-            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('counter'," + json.encode(counter) + ")")
+            // 旧分配器权威计数也是必需写入（F-R8-02 同类）：失败回滚整个升级。
+            var cins int = db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('counter'," + json.encode(counter) + ")")
+            if cins < 0 {
+                db.exec("ROLLBACK")
+                db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','counter import failed')")
+                return "storage_unwritable"
+            }
         } else {
             if counter > parse_int(cur) {
-                db.exec("UPDATE meta SET v=" + json.encode(counter) + " WHERE k='counter'")
+                var cupd int = db.exec("UPDATE meta SET v=" + json.encode(counter) + " WHERE k='counter'")
+                if cupd < 0 {
+                    db.exec("ROLLBACK")
+                    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','counter import failed')")
+                    return "storage_unwritable"
+                }
             }
         }
     }
@@ -527,9 +548,18 @@ fn upgrade_if_legacy(db SqliteDb) str {
         db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error'," + sql_str(ferr) + ")")
         return "storage_unwritable"
     }
-    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')")
-    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','')")
-    db.exec("DELETE FROM meta WHERE k='corrupted_r1'")
+    // fresh 升级完成事务内的全部必需写入（F-R8-02）：upgraded 完成标记、
+    // 清错误、清凭据。RAISE(ABORT) 只中止单条语句，不检查返回值会让
+    // 「笔记已入库但无完成标记」的假完成状态提交，后续读取被
+    // upgrade_conflict 挡死（旧数据不可见）。任一失败 → ROLLBACK 保留重试条件。
+    var upw int = db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')")
+    var clew int = db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','')")
+    var crc int = db.exec("DELETE FROM meta WHERE k='corrupted_r1'")
+    if upw < 0 || clew < 0 || crc < 0 {
+        db.exec("ROLLBACK")
+        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','finalize marker write failed')")
+        return "storage_unwritable"
+    }
     var commit int = db.exec("COMMIT")
     if commit < 0 {
         return "storage_unwritable"
@@ -666,10 +696,20 @@ fn repair_legacy_merge(db SqliteDb) str {
         }
         var cur str = meta_get_on(db, "counter")
         if cur == "" {
-            db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('counter'," + json.encode(counter) + ")")
+            var cins int = db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('counter'," + json.encode(counter) + ")")
+            if cins < 0 {
+                db.exec("ROLLBACK")
+                db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','counter import failed')")
+                return "storage_unwritable"
+            }
         } else {
             if counter > parse_int(cur) {
-                db.exec("UPDATE meta SET v=" + json.encode(counter) + " WHERE k='counter'")
+                var cupd int = db.exec("UPDATE meta SET v=" + json.encode(counter) + " WHERE k='counter'")
+                if cupd < 0 {
+                    db.exec("ROLLBACK")
+                    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','counter import failed')")
+                    return "storage_unwritable"
+                }
             }
         }
     }
@@ -682,14 +722,12 @@ fn repair_legacy_merge(db SqliteDb) str {
     var delc int = db.exec("DELETE FROM meta WHERE k='corrupted_r1'")
     var genw int = db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('repair_generation','1')")
     var clrw int = db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','')")
-    if delc < 0 {
-        if genw < 0 {
-            if clrw < 0 {
-                db.exec("ROLLBACK")
-                db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','repair credential update failed')")
-                return "storage_unwritable"
-            }
-        }
+    // 任一必需写入失败即回滚（F-R8-02 同类出口）：原嵌套 if 等价于「三者
+    // 全部失败才回滚」，会把单条语句拒绝（RAISE(ABORT)）吞成假完成。
+    if delc < 0 || genw < 0 || clrw < 0 {
+        db.exec("ROLLBACK")
+        db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('upgrade_error','repair credential update failed')")
+        return "storage_unwritable"
     }
     var commit int = db.exec("COMMIT")
     if commit < 0 {
@@ -1238,17 +1276,36 @@ fn repo_set_meta(note_id str, new_state str, pin int, tags_json str, set_tags bo
         db.exec("ROLLBACK")
         return "{\"ok\":false,\"err_code\":\"not_found\"}"
     }
+    // 必需 UPDATE 失败传播（F-R8-01/SD-03）：任一语句被存储层拒绝（如触发器
+    // RAISE(ABORT)）必须 ROLLBACK 并显式失败——RAISE 只中止单条语句，后续
+    // COMMIT 仍可成功，忽略返回值会把失败冒充成成功。
     if new_state != "" {
-        db.exec("UPDATE notes SET state=" + sql_str(new_state) + " WHERE note_id=" + sql_str(note_id))
+        var wst int = db.exec("UPDATE notes SET state=" + sql_str(new_state) + " WHERE note_id=" + sql_str(note_id))
+        if wst < 0 {
+            db.exec("ROLLBACK")
+            return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
+        }
     }
     if pin >= 0 {
-        db.exec("UPDATE notes SET pinned=" + json.encode(pin) + " WHERE note_id=" + sql_str(note_id))
+        var wpin int = db.exec("UPDATE notes SET pinned=" + json.encode(pin) + " WHERE note_id=" + sql_str(note_id))
+        if wpin < 0 {
+            db.exec("ROLLBACK")
+            return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
+        }
     }
     if set_tags {
-        db.exec("UPDATE notes SET tags_json=" + sql_str(tags_json) + " WHERE note_id=" + sql_str(note_id))
+        var wtg int = db.exec("UPDATE notes SET tags_json=" + sql_str(tags_json) + " WHERE note_id=" + sql_str(note_id))
+        if wtg < 0 {
+            db.exec("ROLLBACK")
+            return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
+        }
     }
     if set_folder {
-        db.exec("UPDATE notes SET folder=" + sql_str(folder) + " WHERE note_id=" + sql_str(note_id))
+        var wfd int = db.exec("UPDATE notes SET folder=" + sql_str(folder) + " WHERE note_id=" + sql_str(note_id))
+        if wfd < 0 {
+            db.exec("ROLLBACK")
+            return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
+        }
     }
     var commit int = db.exec("COMMIT")
     if commit < 0 {
@@ -1565,8 +1622,15 @@ pub fn migrate_legacy_at(legacy_path str) str {
             return "{\"attempted\":true,\"migrated\":0,\"skipped_existing\":false,\"saved\":false,\"err\":\"storage_unwritable\",\"backup_file\":" + json.encode(bdst) + ",\"corrupted\":[" + corrupted + "]}"
         }
     }
-    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('corrupted_r1'," + sql_str(corrupted_json) + ")")
-    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('migrated','1')")
+    // migrated/corrupted 完成标记是幂等与重试的判据（F-R8-02 同类必需写入）：
+    // 标记写失败必须 ROLLBACK 并显式 saved=false——否则报告 saved=true 而
+    // 下次重跑无 skipped_existing 判据，会重复迁移。
+    var crw int = db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('corrupted_r1'," + sql_str(corrupted_json) + ")")
+    var mgw int = db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('migrated','1')")
+    if crw < 0 || mgw < 0 {
+        db.exec("ROLLBACK")
+        return "{\"attempted\":true,\"migrated\":0,\"skipped_existing\":false,\"saved\":false,\"err\":\"storage_unwritable\",\"backup_file\":" + json.encode(bdst) + ",\"corrupted\":[" + corrupted + "]}"
+    }
     var commit int = db.exec("COMMIT")
     var saved_str str = "true"
     if commit < 0 {

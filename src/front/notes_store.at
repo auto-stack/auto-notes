@@ -79,6 +79,10 @@ store NotesStore {
         // 失败/冲突保留 → 原样重试同一意图幂等）。conflict=true = 上次保存被拒。
         var draft_request_id str = ""
         var conflict bool = false
+        // F-R8-01：元数据/删除/置顶/标签动作的服务端拒绝（非 revision 冲突）
+        // 可见信号。conflict 仅在 dirty 分支渲染，动作失败常发生在 clean
+        // 草稿上，故单列；LoadDraft（成功动作后都会走到）清零。
+        var action_error str = ""
         // 标签单独镜像一份：视图遍历 .store.draft_tags 比下标点路径可靠。
         var draft_tags []str = []
         var dirty bool = false
@@ -268,6 +272,12 @@ store NotesStore {
         .LoadDraft -> {
             if .dirty == false {
                 if .notes.len() > 0 {
+                    // F-R8-03 越界防护：active_id 是相对 .notes 的下标，任何
+                    // 调用方在刷新/重排后必须先按身份重定位；此处兜底钳到
+                    // 合法范围，绝不以越界下标解引用（Vue/VM undefined 崩溃）。
+                    if .active_id >= .notes.len() {
+                        .active_id = 0
+                    }
                     .draft_id = .notes[.active_id].id
                     .draft_revision = .notes[.active_id].revision
                     .draft_title = .notes[.active_id].title
@@ -288,6 +298,7 @@ store NotesStore {
                 }
                 .draft_request_id = ""
                 .conflict = false
+                .action_error = ""
                 .has_pend = false
                 .has_prev = false
                 .has_prev2 = false
@@ -733,6 +744,9 @@ store NotesStore {
                 k0 = k0 + 1
             }
             var flushed bool = true
+            // F-R8-03：flush 成功时 notes 已刷新且 active_id 已按目标 id 重定位，
+            // 尾部不得再用点击时的旧下标覆盖（见尾部 flushed 分支）。
+            var refreshed bool = false
             if .dirty {
                 if .has_pend {
                     if .draft_title != .pend_title {
@@ -811,6 +825,7 @@ store NotesStore {
                     }
                 }
                 if saved {
+                    refreshed = true
                     .dirty = false
                     .conflict = false
                     .draft_request_id = ""
@@ -845,7 +860,13 @@ store NotesStore {
                 }
             }
             if flushed {
-                .active_id = i
+                // F-R8-03：flush 成功分支已按目标 id 在刷新后的工作集中重定位
+                // active_id（刷新/重排后旧下标 i 可能越界或指向别行——「undefined
+                // id/title」与连续保存自身冲突的根因）。只有未发生刷新重载时
+                // （.notes 未动）旧下标才仍合法。
+                if refreshed == false {
+                    .active_id = i
+                }
                 .LoadDraft()
                 .ApplyFilter()
             }
@@ -1107,15 +1128,22 @@ store NotesStore {
 
         .DeleteConfirmed -> {
             if .draft_id != 0 {
-                delete_note(.draft_id)
-                if .search == "" {
-                    .notes = list_notes()
+                // 删除必需写入失败不得冒充成功（F-R8-01）：服务端拒绝时置
+                // conflict 可见并不刷新/不清本地草稿，保留重试条件。
+                var del_ok bool = delete_note(.draft_id)
+                if del_ok {
+                    if .search == "" {
+                        .notes = list_notes()
+                    } else {
+                        .notes = search_notes(.search)
+                    }
+                    .active_id = 0
+                    .LoadDraft()
+                    .ApplyFilter()
                 } else {
-                    .notes = search_notes(.search)
+                    .conflict = true
+                    .action_error = "delete"
                 }
-                .active_id = 0
-                .LoadDraft()
-                .ApplyFilter()
             }
             .confirm_delete = false
         }
@@ -1233,14 +1261,22 @@ store NotesStore {
                     }
                 }
                 if .conflict == false {
-                    toggle_pin(pin_target)
-                    if .search == "" {
-                        .notes = list_notes()
+                    var pn = toggle_pin(pin_target)
+                    if pn == None {
+                        // 置顶必需写入失败不得冒充成功（F-R8-01）：置 conflict
+                        // 可见，不刷新工作集/不清草稿（LoadDraft 会清 conflict，
+                        // 故失败分支不做刷新）。
+                        .conflict = true
+                        .action_error = "pin"
                     } else {
-                        .notes = search_notes(.search)
+                        if .search == "" {
+                            .notes = list_notes()
+                        } else {
+                            .notes = search_notes(.search)
+                        }
+                        .LoadDraft()
+                        .ApplyFilter()
                     }
-                    .LoadDraft()
-                    .ApplyFilter()
                 }
             }
         }
@@ -1785,23 +1821,30 @@ store NotesStore {
                 if exists == false {
                     tl.push(t)
                 }
-                update_tags(.draft_id, tl)
-                var dup bool = false
-                for e in .all_tags {
-                    if e == t {
-                        dup = true
-                    }
-                }
-                if dup == false {
-                    .all_tags.push(t)
-                }
-                if .search == "" {
-                    .notes = list_notes()
+                var tn = update_tags(.draft_id, tl)
+                if tn == None {
+                    // 标签必需写入失败不得冒充成功（F-R8-01）：不更新词表/
+                    // 不刷新工作集，置 conflict 可见，草稿保留可重试。
+                    .conflict = true
+                    .action_error = "tags"
                 } else {
-                    .notes = search_notes(.search)
+                    var dup bool = false
+                    for e in .all_tags {
+                        if e == t {
+                            dup = true
+                        }
+                    }
+                    if dup == false {
+                        .all_tags.push(t)
+                    }
+                    if .search == "" {
+                        .notes = list_notes()
+                    } else {
+                        .notes = search_notes(.search)
+                    }
+                    .LoadDraft()
+                    .ApplyFilter()
                 }
-                .LoadDraft()
-                .ApplyFilter()
             }
         }
 
@@ -1899,14 +1942,21 @@ store NotesStore {
                         tl.push(tg)
                     }
                 }
-                update_tags(.draft_id, tl)
-                if .search == "" {
-                    .notes = list_notes()
+                var tn2 = update_tags(.draft_id, tl)
+                if tn2 == None {
+                    // 标签必需写入失败不得冒充成功（F-R8-01）：不刷新工作集，
+                    // 置 conflict 可见，草稿与词表保留可重试。
+                    .conflict = true
+                    .action_error = "tags"
                 } else {
-                    .notes = search_notes(.search)
+                    if .search == "" {
+                        .notes = list_notes()
+                    } else {
+                        .notes = search_notes(.search)
+                    }
+                    .LoadDraft()
+                    .ApplyFilter()
                 }
-                .LoadDraft()
-                .ApplyFilter()
             }
         }
 

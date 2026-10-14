@@ -122,6 +122,12 @@ widget EditorPanel() {
                     } else {
                         text "Saved" { style: "text-xs text-muted-foreground/70" }
                     }
+                    if .store.action_error != "" {
+                        // F-R8-01：元数据/删除/置顶/标签动作的存储拒绝可见信号。
+                        // 独立于 dirty 的 conflict 分支——动作失败常发生在 clean
+                        // 草稿上，不能说"server has a newer version"。
+                        text "Action failed: change not saved" { style: "text-xs text-destructive" }
+                    }
                     if .store.draft_pinned {
                         button {
                             onclick: .TogglePinActive
