@@ -1,0 +1,130 @@
+{
+  "errors": [
+    "Cannot read properties of undefined (reading 'id')",
+    "Cannot read properties of undefined (reading 'title')",
+    "Cannot read properties of undefined (reading 'id')",
+    "Cannot read properties of undefined (reading 'title')"
+  ],
+  "after_navigation": {
+    "notes": [
+      {
+        "id": 7,
+        "revision": 1,
+        "title": "NavProbe-B",
+        "body": "base",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [],
+        "folder": ""
+      }
+    ],
+    "active_id": 1,
+    "draft_id": 7,
+    "draft_title": "NavProbe-B",
+    "draft_revision": 1,
+    "dirty": false,
+    "conflict": false,
+    "draft_request_id": ""
+  },
+  "after_first_save": {
+    "notes": [
+      {
+        "id": 7,
+        "revision": 2,
+        "title": "NavProbe-B-one",
+        "body": "base",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [],
+        "folder": ""
+      }
+    ],
+    "active_id": 1,
+    "draft_id": 7,
+    "draft_title": "NavProbe-B-one",
+    "draft_revision": 1,
+    "dirty": false,
+    "conflict": false,
+    "draft_request_id": ""
+  },
+  "server_first": {
+    "ok": true,
+    "err_code": "",
+    "err_detail": "",
+    "doc": {
+      "schema_version": 1,
+      "note_id": "n-7",
+      "revision": 2,
+      "title": "NavProbe-B-one",
+      "body": "base",
+      "tags": [],
+      "color": "",
+      "pinned": false,
+      "state": "active",
+      "folder": "",
+      "created_at": "",
+      "updated_at": "",
+      "legacy_id": 7,
+      "seq": 7
+    },
+    "receipt": {
+      "schema_version": 1,
+      "request_id": "",
+      "note_id": "",
+      "revision": 0,
+      "status": ""
+    },
+    "replayed": false
+  },
+  "after_second_save": {
+    "notes": [
+      {
+        "id": 7,
+        "revision": 2,
+        "title": "NavProbe-B-one",
+        "body": "base",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [],
+        "folder": ""
+      }
+    ],
+    "active_id": 1,
+    "draft_id": 7,
+    "draft_title": "NavProbe-B-two",
+    "draft_revision": 1,
+    "dirty": true,
+    "conflict": true,
+    "draft_request_id": "ui-edit-3"
+  },
+  "server_second": {
+    "ok": true,
+    "err_code": "",
+    "err_detail": "",
+    "doc": {
+      "schema_version": 1,
+      "note_id": "n-7",
+      "revision": 2,
+      "title": "NavProbe-B-one",
+      "body": "base",
+      "tags": [],
+      "color": "",
+      "pinned": false,
+      "state": "active",
+      "folder": "",
+      "created_at": "",
+      "updated_at": "",
+      "legacy_id": 7,
+      "seq": 7
+    },
+    "receipt": {
+      "schema_version": 1,
+      "request_id": "",
+      "note_id": "",
+      "revision": 0,
+      "status": ""
+    },
+    "replayed": false
+  },
+  "pass": false
+}

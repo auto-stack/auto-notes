@@ -1,0 +1,347 @@
+{
+  "records": {
+    "pinned": {
+      "before": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      },
+      "result": {
+        "http": 200,
+        "value": {
+          "id": 1,
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [],
+          "folder": ""
+        }
+      },
+      "after": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      },
+      "normal_control": {
+        "http": 200,
+        "value": {
+          "id": 1,
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [],
+          "folder": ""
+        }
+      }
+    },
+    "tags_json": {
+      "before": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "tags": [],
+          "color": "",
+          "pinned": true,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      },
+      "result": {
+        "http": 200,
+        "value": {
+          "id": 1,
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [],
+          "folder": ""
+        }
+      },
+      "after": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "tags": [],
+          "color": "",
+          "pinned": true,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      },
+      "normal_control": {
+        "http": 200,
+        "value": {
+          "id": 1,
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [
+            "必须保存"
+          ],
+          "folder": ""
+        }
+      }
+    },
+    "state": {
+      "before": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "tags": [
+            "必须保存"
+          ],
+          "color": "",
+          "pinned": true,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      },
+      "result": {
+        "http": 200,
+        "value": true
+      },
+      "after": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "tags": [
+            "必须保存"
+          ],
+          "color": "",
+          "pinned": true,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      },
+      "normal_control": {
+        "http": 200,
+        "value": true
+      }
+    },
+    "restored": {
+      "http": 200,
+      "value": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "tags": [
+            "必须保存"
+          ],
+          "color": "",
+          "pinned": true,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      }
+    },
+    "fresh-finalize": {
+      "first": {
+        "http": 200,
+        "value": [
+          {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "doc1-updated",
+            "body": "body two",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          }
+        ]
+      },
+      "second": {
+        "http": 200,
+        "value": []
+      },
+      "status": {
+        "loaded": true,
+        "err": "",
+        "counter": 3,
+        "entries": 1,
+        "max_legacy_id": 1,
+        "migrated": "",
+        "upgrade_error": "legacy tree present but repository already contains notes",
+        "data_dir": "D:\\autostack\\auto-notes\\.auto\\review001-extra-1791938893400941200\\fresh-upgrade-finalize"
+      },
+      "notes": [
+        [
+          "n-1",
+          2
+        ]
+      ],
+      "meta": [
+        [
+          "counter",
+          "3"
+        ],
+        [
+          "upgrade_error",
+          "legacy tree present but repository already contains notes"
+        ],
+        [
+          "schema_v",
+          "3"
+        ]
+      ]
+    }
+  },
+  "fails": [
+    "pinned SQL rejection is reported",
+    "tags_json SQL rejection is reported",
+    "state SQL rejection is reported",
+    "fresh upgrade required finalize failure rolls back"
+  ]
+}

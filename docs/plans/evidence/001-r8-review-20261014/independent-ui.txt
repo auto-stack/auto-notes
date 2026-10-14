@@ -1,0 +1,79 @@
+Evidence: D:\autostack\auto-notes\.auto\review-r6-ui-combinations-1791939017444419900
+ui_exit_code= 0
+, pinch of salt.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "home",
+            "seed"
+          ],
+          "folder": "personal"
+        },
+        {
+          "id": 3,
+          "revision": 1,
+          "title": "Shopping List",
+          "body": "Milk, Eggs, Bread, Cheese",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "home",
+            "seed"
+          ],
+          "folder": "personal"
+        },
+        {
+          "id": 2,
+          "revision": 1,
+          "title": "Quick Ideas",
+          "body": "Build a markdown editor with live preview.",
+          "time": "Just now",
+          "pinned": false,
+          "tags": [
+            "ideas",
+            "seed"
+          ],
+          "folder": ""
+        },
+        {
+          "id": 1,
+          "revision": 1,
+          "title": "Welcome",
+          "body": "This is your notes app. Click on any note to view it.",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [
+            "intro",
+            "seed"
+          ],
+          "folder": ""
+        }
+      ],
+      "active_id": 0,
+      "search": "",
+      "draft_id": 14,
+      "draft_title": "Draft-H",
+      "draft_revision": 1,
+      "dirty": true,
+      "conflict": true,
+      "has_recovery": true,
+      "rec_title": "Draft-F",
+      "has_recovery2": true,
+      "rec2_title": "Draft-G",
+      "stash_blocked": true,
+      "has_pend": true,
+      "pend_title": "Draft-H",
+      "has_prev": false,
+      "prev_title": ""
+    },
+    "pass": true
+  },
+  "oracle_failures": [],
+  "errors": [
+    "Cannot read properties of undefined (reading 'id')",
+    "Cannot read properties of undefined (reading 'title')",
+    "Failed to fetch",
+    "Failed to fetch"
+  ]
+}
+

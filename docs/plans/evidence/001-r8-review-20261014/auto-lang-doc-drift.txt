@@ -1,0 +1,7 @@
+docs/plans/.next-id
+docs/plans/742-api-handler-body-parity.md
+docs/plans/781-scroll-child-anchor.md
+docs/plans/782-reader-import-execution-budget.md
+docs/plans/783-native-reader-acceptance-channel.md
+docs/plans/attachments/742/work-r5/README.md
+docs/plans/attachments/742/work-r5/notes-v1-battery-summary.txt

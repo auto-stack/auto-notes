@@ -1,0 +1,42 @@
+{
+  "review_scope": "final",
+  "reviewer_identity": "current Codex conversation; did not implement Phase 6/7; no subagents; no exposed model/session identity claimed",
+  "plan_id": "NOTES-001",
+  "plan_revision": 8,
+  "worktree_path": "D:\\autostack\\auto-notes",
+  "branch": "main",
+  "reviewed_commit": "1391bd7eb2f6b3b08e9841d30b25125e47ced058",
+  "base_commit": "a2af2026d4f3d68fdc4d83add72f0c94bbd995c2",
+  "original_dirty": [
+    "untracked src/front/tests/screenshots/vm_initial.png"
+  ],
+  "historical_worktree": "D:/autostack/auto-os/apps/015-notes",
+  "historical_tree_current_commit": "853a551e681ad888f4c72c519b6ad1df94e7f313",
+  "historical_tree_note": "now a directory in auto-os main, not a linked worktree of the standalone Notes repository; reviewed current user-provided workspace; no writes to auto-os",
+  "auto_lang_build_input": "c171c1a09740fbd61e4bf6235286a3424e2e4a81",
+  "auto_lang_exit_commit": "db0f2eee12a09a5fe9e289587eac4440bdf5025d",
+  "auto_lang_drift_note": "entry c171c1a to exit commit changed only docs/plans, receipts and IDs; exact paths in auto-lang-doc-drift.txt; runtime source had no tracked WIP at entry",
+  "auto_down_pin": "c39ac7f9dacdc769fc4a5ad3b98ec896240b28e8",
+  "auto_down_actual": "c39ac7f9dacdc769fc4a5ad3b98ec896240b28e8",
+  "cli_version": "auto 0.1.0+v0.5.0-352-ge849e06f9-dirty",
+  "cli_sha256": "6e30c87f5c3eca157973ff6e2d6e8da9ddc850b4a276e7579244f0000f3524c5",
+  "cli_provenance_limit": "embedded e849e06f9-dirty identifies version only; the exact dirty source at CLI build time is unavailable; no fabricated source-bound final pass",
+  "vue_api_backend_sha256": "fc33b32b8ac092599515ea67b3f7692d1cc663695f1dede5ca89813f20ab66f4",
+  "post_vm_backend_sha256": "6b4bcb6a7c4d10c5246b625a50c285f07e0b8cdb68f4c55176a2b55e5d1a17c9",
+  "backend_transition_note": "auto run -r vm rebuilt the generated backend; Vue/API gates are bound to the first hash, VM gates to the later hash; .at source hashes were stable",
+  "source_sha256": {
+    "src/back/repository.at": "46c68475ff447d49b65478d0147d903378032ea876275f4d6b8f6cd1664b5dd4",
+    "src/back/db.at": "78fcacd34aed773e14fe4aaed77a3bcdd07459f6e680aa5aedb24447b9c4c5a5",
+    "src/back/api.at": "d7403ded72ff401acb5960b04ebee09c6823c5ed92cf0f9979b27fb9609dc850",
+    "src/front/notes_store.at": "6a6edd2f90713bac8b281883efcba2894e46c4742dce918b2a17a105da4c19d9",
+    "src/front/editor.at": "66183f3e250b3ab807f3316860b98944de719a5978e0a39f2722e9c3806e1822",
+    "tests/probe/run_v1_battery.sh": "41cafbebd48526632def18d3aef65d63dc2c2f2667165f51e791e0e003a7595f",
+    "tests/probe/inject_legacy_marker.py": "553a1bd0f1f42fd8778f04e848ef1706623bcda1c1be849366eb63a0fea35559",
+    "tests/autotest/__init__.py": "49c9f392e482d3c77fe198ac2666ce6e67e1de8c6c65c1c279f7f5211b51932c",
+    "pac.at": "b44932988243d2f17ad12daec71a245843b50b0f668d1c9359875f7b75001225"
+  },
+  "canonical_blob": "8f05b8ddb617d5d64e937e55027e782a2b0c0f85",
+  "spec_delta_sha256": "741b4b179936301d9618680d0b027c827a0e48e24e7559ac5a0f44fdbde8f7c5",
+  "input_plan_sha256": "e13fffaac730aef3de0f50a504581481b059189cf5f8bfd912a3e7768f413408",
+  "review_skill_sha256": "de80711504407fda06701ffdf33619ccf03a7a5885010c300cfd8c3ff32f05ec"
+}

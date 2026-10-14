@@ -1,0 +1,15 @@
+Evidence: D:\autostack\auto-notes\.auto\r7-vm-1791939247589831500
+[PASS] R7-VM-1 C1 fault-committed (chain node 1) 
+[PASS] R7-VM-1 C2 actually committed (chain node 2) 
+[PASS] R7-VM-1 chain adjudication lands C3 
+[PASS] R7-VM-1 server final = C3 
+[PASS] R7-VM-2 R C1 landed 
+[PASS] R7-VM-2 C2 fault-committed on nav (stashed with context) 
+DEBUG Recover exists: FOUND 1 match(es): kind=button, label~=Recover
+  Button "Rec
+[PASS] R7-VM-2 recover loads R draft outside working set 
+[PASS] R7-VM-2 pin bound to recovered draft identity 
+[PASS] R7-VM-3 A conflict kept 
+[PASS] R7-VM-3 slots full + C dirty precondition 
+[PASS] R7-VM-3 blocked search leaves search word unchanged 
+R7 VM negatives done. fails = 0 []

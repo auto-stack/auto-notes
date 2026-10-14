@@ -1,0 +1,4 @@
+battery exit: 1
+injection failure recorded: True
+evidence: D:\autostack\auto-notes\.auto\r7-inject-control-1791939142445355000
+CONTROL PASSED: broken injection -> battery non-zero with cause recorded

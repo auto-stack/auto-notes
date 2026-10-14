@@ -1,0 +1,30 @@
+Evidence: D:\autostack\auto-notes\.auto\review001-battery-1791938934030942100
+tes
+[S15] manifest tags/pinned/folder/trashed authoritative; trashed not in active ✓
+[S15] legacy d-2 reuse → request_conflict; object untouched ✓ (F-R5-02)
+[S15] legacy source untouched ✓
+[S15] legacy-backup present ✓
+[S15] legacy request rows: kind/rev recovered, intent empty (unverifiable) ✓
+INJECT-OK mismark -> D:\autostack\auto-notes\.auto\review001-battery-1791938934030942100\battery\wk\s15-upg\data\inbox.db
+[S15] mis-marked DB repaired on open: authority recovered, idempotent ✓
+[S16] backup path as file → no silent success ✓
+[S16] retry after removing backup blocker ✓
+[S16] missing entity → explicit error (not corrupted-then-done) ✓
+[S16] entity restored → upgrade succeeds ✓
+[S16] manifest {} → explicit error, not empty success ✓
+[S17] a|b/c vs a/b|c → conflict; identical retry → replay ✓ (F-R5-02)
+legacy 3-col row injected
+[S17] rev-less legacy row → conflict (no rev1 fabrication) ✓
+pipe intent + schema_v=2 injected
+[S17] migrated pipe row: same intent replays, changed content conflicts ✓
+[S18] bool-id/obj-body/tags-elements reported; chinese item migrated; snippets are strings ✓ (F-R5-04)
+[S18] persisted report snippets are strings ✓
+upgraded cleared (mixed state)
+[S19a] mixed DB: 3 reads -> conflict persists, confirmed data untouched ✓
+INJECT-OK marker -> D:\autostack\auto-notes\.auto\review001-battery-1791938934030942100\battery\wk\s19-repair\data\inbox.db
+[S19b] repair: confirmed rev3 preserved across reads; credential cleared ✓
+[S19c] {} entity: explicit error, rollback, not completed ✓
+[S19c] entity restored -> upgrade succeeds ✓
+== battery done; fails=0; artifacts in D:/autostack/auto-notes/.auto/review001-battery-1791938934030942100/battery
+BATTERY PASSED
+

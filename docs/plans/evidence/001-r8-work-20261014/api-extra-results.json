@@ -1,0 +1,298 @@
+{
+  "records": {
+    "pinned": {
+      "before": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      },
+      "result": {
+        "http": 404,
+        "body": ""
+      },
+      "after": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "tags": [],
+          "color": "",
+          "pinned": false,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      },
+      "normal_control": {
+        "http": 200,
+        "value": {
+          "id": 1,
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [],
+          "folder": ""
+        }
+      }
+    },
+    "tags_json": {
+      "before": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "tags": [],
+          "color": "",
+          "pinned": true,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      },
+      "result": {
+        "http": 404,
+        "body": ""
+      },
+      "after": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "tags": [],
+          "color": "",
+          "pinned": true,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      },
+      "normal_control": {
+        "http": 200,
+        "value": {
+          "id": 1,
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "time": "Just now",
+          "pinned": true,
+          "tags": [
+            "必须保存"
+          ],
+          "folder": ""
+        }
+      }
+    },
+    "state": {
+      "before": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "tags": [
+            "必须保存"
+          ],
+          "color": "",
+          "pinned": true,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      },
+      "result": {
+        "http": 200,
+        "value": false
+      },
+      "after": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "tags": [
+            "必须保存"
+          ],
+          "color": "",
+          "pinned": true,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      },
+      "normal_control": {
+        "http": 200,
+        "value": true
+      }
+    },
+    "restored": {
+      "http": 200,
+      "value": {
+        "ok": true,
+        "err_code": "",
+        "err_detail": "",
+        "doc": {
+          "schema_version": 1,
+          "note_id": "n-1",
+          "revision": 1,
+          "title": "确认中文",
+          "body": "第一行\n第二行",
+          "tags": [
+            "必须保存"
+          ],
+          "color": "",
+          "pinned": true,
+          "state": "active",
+          "folder": "",
+          "created_at": "",
+          "updated_at": "",
+          "legacy_id": 1,
+          "seq": 1
+        },
+        "receipt": {
+          "schema_version": 1,
+          "request_id": "",
+          "note_id": "",
+          "revision": 0,
+          "status": ""
+        },
+        "replayed": false
+      }
+    },
+    "fresh-finalize": {
+      "first": {
+        "http": 200,
+        "value": []
+      },
+      "second": {
+        "http": 200,
+        "value": []
+      },
+      "status": {
+        "loaded": true,
+        "err": "",
+        "counter": 1,
+        "entries": 0,
+        "max_legacy_id": 0,
+        "migrated": "",
+        "upgrade_error": "finalize marker write failed",
+        "data_dir": "D:\\autostack\\auto-notes\\.auto\\review001-extra-1791943982901511300\\fresh-upgrade-finalize"
+      },
+      "notes": [],
+      "meta": [
+        [
+          "upgrade_error",
+          "finalize marker write failed"
+        ],
+        [
+          "schema_v",
+          "3"
+        ]
+      ]
+    }
+  },
+  "fails": []
+}

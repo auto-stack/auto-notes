@@ -1,0 +1,72 @@
+Evidence: D:\autostack\auto-notes\.auto\review-r6-ui-combinations-1791938843015401200
+ui_exit_code= 1
+{
+  "before": {
+    "draft_id": 6,
+    "draft_title": "UNSAVED-delete-failure-001",
+    "draft_body": "用户尚未保存的中文\n第二行",
+    "dirty": true,
+    "has_recovery": false,
+    "rec_title": "",
+    "has_recovery2": false,
+    "rec2_title": "",
+    "conflict": false,
+    "confirm_delete": false
+  },
+  "buttons": [
+    "",
+    "New note",
+    "All",
+    "Pinned",
+    "work",
+    "personal",
+    "#work",
+    "#seed",
+    "#home",
+    "#ideas",
+    "#intro",
+    "WelcomeJust now",
+    "Sprint PlanningJust now",
+    "Meeting NotesJust now",
+    "Recipe: PastaJust now",
+    "Shopping ListJust now",
+    "Quick IdeasJust now",
+    "Settings",
+    "Theme",
+    "Save",
+    "Pin note",
+    "Cancel",
+    "Delete",
+    "",
+    "",
+    "Tag"
+  ],
+  "delete_result": true,
+  "after": {
+    "draft_id": 6,
+    "draft_title": "UNSAVED-delete-failure-001",
+    "draft_body": "用户尚未保存的中文\n第二行",
+    "dirty": true,
+    "has_recovery": false,
+    "rec_title": "",
+    "has_recovery2": false,
+    "rec2_title": "",
+    "conflict": false,
+    "confirm_delete": false
+  },
+  "server": {
+    "id": 6,
+    "revision": 1,
+    "title": "Sprint Planning",
+    "body": "Sprint 12 planning notes.",
+    "time": "Just now",
+    "pinned": false,
+    "tags": [
+      "work",
+      "seed"
+    ],
+    "folder": "work"
+  },
+  "pass": false
+}
+

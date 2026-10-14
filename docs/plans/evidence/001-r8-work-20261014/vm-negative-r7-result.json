@@ -1,0 +1,19 @@
+{
+  "command": [
+    "D:/autostack/auto-lang/target/debug/auto.exe",
+    "run",
+    "-r",
+    "vm",
+    "-B",
+    "9735"
+  ],
+  "mcp_port": 9734,
+  "backend_port": 9735,
+  "run_dir": "D:\\autostack\\auto-notes\\.auto\\r7-vm-1791945753312872500",
+  "pid": 52560,
+  "mcp_ready": false,
+  "error": "AssertionError('session 2 boot failed')",
+  "fails": [
+    "script-error"
+  ]
+}

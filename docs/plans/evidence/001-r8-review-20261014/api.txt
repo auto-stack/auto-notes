@@ -1,0 +1,7 @@
+[PASS] valid-control 
+[PASS] manifest-identity rejected 
+[PASS] manifest-types rejected 
+[PASS] manifest-revision rejected 
+[PASS] repair UPDATE failure retains retry credential 
+[PASS] repair retry restores authority 
+Evidence: D:\autostack\auto-notes\.auto\review001-r6-20261012\api-combinations-1791938906518780000

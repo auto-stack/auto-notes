@@ -1,0 +1,2 @@
+Evidence: D:\autostack\auto-notes\.auto\review001-r6-20261012\battery-control-1791939042086655800
+{"actual_exit": 1, "expected_exit": 1, "mutation": "assert rows==[('\u5df2\u786e\u8ba4\u7684\u65b0\u6570\u636e', 1)], rows -> assert False (only S19a)", "original_sha256": "41cafbebd48526632def18d3aef65d63dc2c2f2667165f51e791e0e003a7595f", "mutated_sha256": "f4846545469e09243faeafe4789d4140c7cf7e4fc4a0e40a49f73fdfa30c91ba", "failure_file": "S19a mixed DB conflict constant, new data preserved\n", "pass": true}
