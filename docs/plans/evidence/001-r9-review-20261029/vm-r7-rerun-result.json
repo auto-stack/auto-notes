@@ -1,0 +1,20 @@
+{
+  "command": [
+    "D:/autostack/.wt/notes-cli-r9/auto-lang/target/debug/auto.exe",
+    "run",
+    "-r",
+    "vm",
+    "-B",
+    "7075"
+  ],
+  "mcp_port": 7074,
+  "backend_port": 7075,
+  "run_dir": "D:\\autostack\\auto-notes\\.auto\\r7-vm-1793226530730511300",
+  "pid": 40600,
+  "boot_exit": 1,
+  "mcp_ready": false,
+  "error": "AssertionError('session 2 boot failed')",
+  "fails": [
+    "script-error"
+  ]
+}

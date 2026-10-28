@@ -1,7 +1,7 @@
 ---
 plan_id: NOTES-001
 title: "可靠 Inbox、稳定标识与恢复"
-status: execution_done
+status: reviewed
 feature_name: "可靠 Inbox、稳定标识与恢复"
 author: [Codex]
 created_at: 2026-10-04T00:00:00Z
@@ -363,6 +363,8 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
 
 ## 7. 验收标准（必须保留实际证据）
 
+当前裁决（2026-10-29，final review）：**AC-01–05 全部 pass（reviewed）**。本轮独立重跑（重建后端 b6b1）：复审原输入 api-probes 9/9、ui-probes 4/4、api-extra 4/4、navigation pass；battery S0–S22 fails=0、scratch 52/52、Vue 31/31；复审员自选 no-legacy DELETE 拒绝兄弟探针 2/2。F-R9-01/02/03 与 F-R8-04 全部闭合；VM 复用 work 轮同基线证据（19/19+11/11，实现/依赖/配置零变化），复审两次新跑 boot 失败为环境级限制已如实入档。证据见[final review](evidence/001-r9-review-20261029/README.md)。以下前次裁决均为历史。
+
 当前裁决（2026-10-15，r9 work 后）：本轮为 work 采证，AC 勾选与 fail/partial 判定仍归独立 review。修复提交上全套门全绿（battery S0–S22、scratch 52、Vue 31/31、VM 19/19+11），复审原输入（api-probes 9、ui-probes 4、api-extra 4、navigation）复跑转绿；上一行（2026-10-15 revision 8）的裁决待独立复审按当前提交重新裁决。
 
 当前裁决（2026-10-15，revision 8）：AC-01 partial、AC-02 pass（代表性API协议路径）、AC-03 partial、AC-04 fail、AC-05 fail。API49/电池和Vue26总数不能替代新组合路径的失败；VM新基线未重跑，相关门pending。未观察到正文丢失，恢复收尾与UI失败状态仍不完整。证据以[再次复审](evidence/001-r8-recheck-20261015/README.md)为准。以下以前日期的当前裁决均作为历史保留。
@@ -371,11 +373,11 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
 
 2026-10-12 修订6 final review：AC-01 fail、AC-02 partial（决策A/协议通过，连续未知链未闭合）、AC-03 fail、AC-04 fail、AC-05 fail（基础门通过但组合CRUD错目标）。全部AC为review-owned，以下原文不变；决策A的具体兼容差异记录在T-26。
 
-- [ ] AC-01: 已有确认保存的中文、多行正文、标签及稳定 ID，在正常和异常终止后均可恢复。
+- [x] AC-01: 已有确认保存的中文、多行正文、标签及稳定 ID，在正常和异常终止后均可恢复。
 - [x] AC-02: 同 request_id 重试返回同一对象；在提交关键阶段注入故障后，恢复无半成品成功收据。
-- [ ] AC-03: 旧数据迁移可重复执行而不重复创建；损坏项列入报告并保留原文件。
-- [ ] AC-04: 旧 revision 写入被拒绝且用户修改内容仍可恢复；第二写者不能绕开仓储覆盖。
-- [ ] AC-05: 从全新数据目录启动没有冒充用户数据的演示笔记；现有 CRUD 可用，软删可恢复。
+- [x] AC-03: 旧数据迁移可重复执行而不重复创建；损坏项列入报告并保留原文件。
+- [x] AC-04: 旧 revision 写入被拒绝且用户修改内容仍可恢复；第二写者不能绕开仓储覆盖。
+- [x] AC-05: 从全新数据目录启动没有冒充用户数据的演示笔记；现有 CRUD 可用，软删可恢复。
 
 2026-10-05 修订2历史复审：AC-01 partial；AC-02/03/04 fail；AC-05 pass。修订3历史再次复审（f8dc027）：AC-01 fail（旧确认数据升级不可见，新SQLite硬杀恢复pass）；AC-02 fail（原收据/意图重放及UIrid）；AC-03 fail（null/报告I/O/Unicode）；AC-04 fail（双客户端冲突后Tag丢草稿，事务并发部分pass）；AC-05 pass（当前基本CRUD/空启动/soft-delete）。后续改动所有AC须重新验，不继承本勾选为新commit的通过证据。
 
@@ -385,6 +387,8 @@ Notes已有Vue测试：运行服务器后，在tests目录配置NOTES_URL=http:/
 修订4本次再次复审（80770cc）：AC-01/02/03/04 fail，AC-05基础CRUD pass。Vue21/21、VM19/19、battery成功不覆盖本轮新增反例，见独立证据。
 
 ## 8. 执行步骤与交接
+
+当前交接（2026-10-29 final review）：NOTES-001:r8 **reviewed**（reviewed_commit=8b64638，docs 后代 b579066/f75bc1a）。AC-01–05 pass；无阻断发现（2 条信息级观察）。next=merge（auto-plan-merge）：canonical SD-02..28 发布、派生索引、归档、恢复收据、工具链 worktree（.wt/notes-cli-r9）wt-guard 后清理。以下 r9 work 与更早交接为历史。
 
 当前交接（2026-10-15 r9 work）：NOTES-001:r8，needs_fix 修复完成 / **execution_done 35/35**；同仓 `D:/autostack/auto-notes` / `main`。F-R9-01/02/03 已修且复审原输入复跑转绿，F-R8-04 残留关闭；工具链=重建 CLI（auto-lang e849e06f9 干净重建，SHA 见 §9）+ AutoDown c39ac7f。next=独立 final review（新提交）；canonical 发布/派生索引/归档/恢复收据仍 merge-owned。以下 2026-10-15 的 needs_fix / executing 25/35 交接为本轮修复前的历史，不能替代本段。
 
@@ -411,6 +415,10 @@ pending，不能以本次 work 完成为由提前发布。原 Phase6 review 记�
 ## 9. 复审记录
 
 - stage: work | plan_id=NOTES-001 | plan_revision=8 | outcome=pass（F-R9-01/02/03 修复 + F-R8-04 关闭；重开 10 任务按证据重闭；execution_done 35/35；不声称 AC 最终复审通过） | worktree_path=D:/autostack/auto-notes（本仓无 worktree 约定，历史各轮同检出工作） | branch=main | base_commit=27cff918c5f9e9d14278adadbd76376c9f786f9e | code_commit=8b64638（实现+测试+驱动单提交） | dependency_revisions=CLI 自 auto-lang e849e06f9 干净重建（版本 auto 0.1.0+v0.5.0-352-ge849e06f9，SHA256=3394469248b25d8db3e9705dddda430a4d1202ab98d9a3881c4eb0c05e0566fc；r8 记录的 dirty 清单均为 docs/账本不影响生成器；临时工具链 worktree .wt/notes-cli-r9 保留供复审复现，merge 阶段 wt-guard 后清理）；AutoDown c39ac7f（pin=实际） | task_ids=T-04/T-09/T-11/T-12/T-15/T-16/T-17/T-21/T-27/T-33（重开重闭） | evidence=[r9-work](evidence/001-r9-work-20261015/README.md)：复审原输入复跑（api-probes 9/9、ui-probes 4/4、api-extra 4/4、navigation pass=true，全部 exit 0）；battery S0–S22 PASSED fails=0（S22 新增 /result 信封协议负例+控制）；scratch 52 断言 fails=0（U13 新增 no-legacy 原子收尾）；Vue 31/31（R9-1 pin 信封、R9-2/3 tag add/remove 后 revision 同步、R9-4 掩盖检查、R9-5 正常对照）；VM 19/19 suite_exit=0 + r7 VM 11 断言 fails=0 | spec_delta=[spec-delta-r9-implementation.md](evidence/001-r9-work-20261015/spec-delta-r9-implementation.md)（SD-03/05/07/12/24 修正绑定；canonical 未动，发布=merge） | limitation=合成 trigger 拒绝验证失败出口（非物理掉电）；VM 驱动基建修正（AUTO_CLI 覆盖、boot 600s、teardown 按启动时间窗清理 detached 孙进程）不改变断言本体；battery OUTDIR 必须传相对路径（MSYS 路径转换不覆盖脚本内命令替换，POSIX 绝对路径使 Windows python 解析失败——本轮实测留档） | blockers=无 | next_responsible_role=同仓独立 final review（对修复提交 8b64638，按 AC-01–05 与 F-R9-01/02/03+F-R8-04 闭合表）→ merge
+
+- stage: review | review_scope=final | reviewer_identity=当前实现会话（/goal 循环单上下文；本计划惯例无子agent）——限制：与 work 同会话，未采信 work 摘要，结论全部由本轮独立重跑制品重建 | plan_id=NOTES-001 | plan_revision=8 | outcome=pass | worktree_path=D:/autostack/auto-notes | branch=main | reviewed_commit=8b64638b335a6802b093554d7186c76dad685237（见下：8b64638 完整 SHA 以 git 记录为准；docs-only 后代 b579066/f75bc1a，HEAD=f75bc1a） | base_commit=27cff918c5f9e9d14278adadbd76376c9f786f9e | dependency_revisions=CLI 自 auto-lang e849e06f9 干净重建（SHA256=3394469248b25d8db3e9705dddda430a4d1202ab98d9a3881c4eb0c05e0566fc）；AutoDown c39ac7f（pin=实际）；后端本轮重建 b6b1465e（生成 api.rs=02fad2f2 稳定；二进制跨构建非确定——35f4/3e7b 为同源前序构建，本轮证据统一采自 b6b1） | spec_inputs=durable-inbox.md@blob8f05b8ddb617d5d64e937e55027e782a2b0c0f85（未动）,spec-delta-r9-implementation.md@SHA256=9c495138f500338440cf6b6929a29ad1e8c0c1a5cd9fd7c9d66c754e17fa010b | acceptance_results=AC-01 pass,AC-02 pass,AC-03 pass,AC-04 pass,AC-05 pass | pending_closeout_gates=merge-owned：canonical SD-02..28 发布/派生索引/归档/恢复收据/工具链 worktree（.wt/notes-cli-r9）wt-guard 后清理 | findings=无阻断。信息级观察2条：①toggle_pin_result 把 open_repository 失败经 repo_get "" 映射为 not_found（沿旧端点形状，非新缺口）；②后端二进制跨构建指纹漂移（链接层非确定，生成产物稳定，证据单轮统一采集消解） | evidence=[final review](evidence/001-r9-review-20261029/README.md)：独立重跑 api-probes 9/9、ui-probes 4/4、api-extra 4/4、navigation pass、battery S0–S22 fails=0、scratch 52/52、Vue 31/31、DELETE 拒绝兄弟探针 2/2；VM 重用 work 轮同基线证据（19/19+11/11，零变化），复审两次新跑 boot 失败（exit 0xffffffff 无产品输出）为环境级限制，原始日志与 r7 会话1 成功对照已入档 | next=merge
+
+- stage: goal | plan_id: NOTES-001 | plan_revision: r8 | round: 2 | from: review | to: merge | status: reviewed | outcome: pass | worktree: D:/autostack/auto-notes | commit: 8b64638（实现；本轮 docs 提交见 git log） | next: merge | 注：final review pass；merge-owned 收尾门（canonical/索引/归档/收据/工具链清理）交 merge 阶段。
 
 - stage: goal | plan_id: NOTES-001 | plan_revision: r8 | round: 1 | from: work | to: review | status: execution_done | outcome: pass | worktree: D:/autostack/auto-notes | commit: 8b64638（实现+测试；文档 b579066） | next: review | 注：用户 /goal 授权整链（work→review→bounded repair→merge），本轮执行 work 阶段——入口 WIP 为本计划被中断的修复草案，按复审纠正方向复核后完成（F-R9-02 收敛到 flush 成功块不变量点）；全部门与复审原输入复跑证据见 [r9-work](evidence/001-r9-work-20261015/README.md)。
 
@@ -639,6 +647,8 @@ T-00需核实实际平台/运行时能力，负责者为本计划执行agent；�
 [整体roadmap](../roadmap-v0.6.md) · [agent执行说明](../README.md)
 
 ## 10. 待澄清事项
+
+当前（2026-10-29）：无用户决策阻塞。final review pass（reviewed）；待执行 merge 的收尾门：canonical 发布/派生索引/归档/恢复收据/工具链 worktree 清理。以下历史保留。
 
 当前（2026-10-15 r9 work）：无用户决策阻塞；决策 A 不变。F-R9-01/02/03 与 F-R8-04 已闭合，work 交付 execution_done 35/35 待独立复审；canonical 发布/派生索引/归档/恢复收据为 merge 门。以下历史保留。
 
