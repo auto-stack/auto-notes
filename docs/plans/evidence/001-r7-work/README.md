@@ -33,7 +33,7 @@
 | 后端 scratch | 38/38 fails=0 | [scratch-summary.json](../../../../tests/probe/evidence/r5-work/scratch-summary.json) |
 | 独立 API（复审脚本原样） | exit 0，5 断言过 | `independent-api-green.log`（本地产物，*.log 不入库；本轮 r8 复审以 [independent-api 6/6](../001-r8-review-20261014/api-results.json) 复验在案） |
 | 独立 Vue（复审脚本原样） | exit 0，4 场景过 | [independent-ui-r7-green.json](../../../../tests/probe/evidence/r7-work/independent-ui-r7-green.json) |
-| Vue 全套 | 24/24 suite_exit=0 | `vue-playwright.log`（本地产物，*.log 不入库；r8 修复轮 26/26 见 [r8-work vue-suite.txt](001-r8-work-20261014/vue-suite.txt)） |
+| Vue 全套 | 24/24 suite_exit=0 | `vue-playwright.log`（本地产物，*.log 不入库；r8 修复轮 26/26 见 [r8-work vue-suite.txt](../001-r8-work-20261014/vue-suite.txt)） |
 | VM 原套件 | 19/19 suite_exit=0 | [vm-suite-result.json](../../../../tests/probe/evidence/r7-work/vm-suite-result.json) |
 | VM r5 负例 | 13/13 fails=[] | [vm-negative-r5-result.json](../../../../tests/probe/evidence/r7-work/vm-negative-r5-result.json) |
 | VM r7 负例（新增） | exit 0，7 断言过 | [run_vm_negative_r7.py](../../../../tests/probe/evidence/r7-work/run_vm_negative_r7.py) / [vm-negative-r7-result.json](../../../../tests/probe/evidence/r7-work/vm-negative-r7-result.json) |

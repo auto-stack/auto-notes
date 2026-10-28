@@ -1,0 +1,10 @@
+[PASS] fresh upgraded rejection rolls back notes and credential 
+[PASS] fresh upgraded retry succeeds 
+[PASS] fresh upgrade_error rejection rolls back notes and credential 
+[PASS] fresh upgrade_error retry succeeds 
+[PASS] fresh corrupted_r1 rejection rolls back notes and credential 
+[PASS] fresh corrupted_r1 retry succeeds 
+[FAIL] no-legacy finalize failure keeps retry credential {'response': {'http': 200, 'value': []}, 'meta': {'upgraded': '1', 'schema_v': '3'}}
+[FAIL] no-legacy finalize retry completes generation {'response': {'http': 200, 'value': []}, 'meta': {'upgraded': '1', 'schema_v': '3'}}
+[PASS] no-legacy finalize normal control completes generation 
+Evidence: D:\autostack\auto-notes\.auto\review001-20261015-api-1792043712948781500

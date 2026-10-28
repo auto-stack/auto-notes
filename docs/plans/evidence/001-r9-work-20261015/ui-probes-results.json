@@ -1,0 +1,322 @@
+{
+  "pin": {
+    "first": {
+      "draft_id": 7,
+      "draft_title": "Retry-pin",
+      "draft_body": "base",
+      "draft_revision": 1,
+      "dirty": false,
+      "conflict": true,
+      "action_error": "pin",
+      "has_pend": false,
+      "has_prev": false,
+      "draft_request_id": "",
+      "all_tags": [
+        "work",
+        "seed",
+        "home",
+        "ideas",
+        "intro"
+      ]
+    },
+    "first_requests": [
+      {
+        "method": "PATCH",
+        "url": "http://127.0.0.1:11803/api/notes/7/pin/result",
+        "data": "{}"
+      }
+    ],
+    "banner": 1,
+    "retry": {
+      "draft_id": 7,
+      "draft_title": "Retry-pin",
+      "draft_body": "base",
+      "draft_revision": 1,
+      "dirty": false,
+      "conflict": false,
+      "action_error": "",
+      "has_pend": false,
+      "has_prev": false,
+      "draft_request_id": "",
+      "all_tags": [
+        "work",
+        "seed",
+        "home",
+        "ideas",
+        "intro"
+      ]
+    },
+    "retry_requests": [
+      {
+        "method": "PATCH",
+        "url": "http://127.0.0.1:11803/api/notes/7/pin/result",
+        "data": "{}"
+      }
+    ],
+    "server": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-7",
+        "revision": 1,
+        "title": "Retry-pin",
+        "body": "base",
+        "tags": [],
+        "color": "",
+        "pinned": true,
+        "state": "active",
+        "folder": "",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 7,
+        "seq": 7
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "",
+        "note_id": "",
+        "revision": 0,
+        "status": ""
+      },
+      "replayed": false
+    },
+    "errors": [],
+    "pass": true
+  },
+  "dirty_tag": {
+    "after_failure": {
+      "draft_id": 8,
+      "draft_title": "Retry-dirty-tag-one",
+      "draft_body": "base",
+      "draft_revision": 2,
+      "dirty": false,
+      "conflict": true,
+      "action_error": "tags",
+      "has_pend": false,
+      "has_prev": false,
+      "draft_request_id": "",
+      "all_tags": [
+        "work",
+        "seed",
+        "home",
+        "ideas",
+        "intro"
+      ]
+    },
+    "server_after_failure": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-8",
+        "revision": 2,
+        "title": "Retry-dirty-tag-one",
+        "body": "base",
+        "tags": [],
+        "color": "",
+        "pinned": false,
+        "state": "active",
+        "folder": "",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 8,
+        "seq": 8
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "",
+        "note_id": "",
+        "revision": 0,
+        "status": ""
+      },
+      "replayed": false
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "url": "http://127.0.0.1:11803/api/notes/8/result",
+        "data": "{\"expected_revision\":1,\"title\":\"Retry-dirty-tag-one\",\"body\":\"base\",\"request_id\":\"ui-edit-1\"}"
+      }
+    ],
+    "after_save": {
+      "draft_id": 8,
+      "draft_title": "Retry-dirty-tag-two",
+      "draft_body": "base",
+      "draft_revision": 3,
+      "dirty": false,
+      "conflict": false,
+      "action_error": "",
+      "has_pend": false,
+      "has_prev": false,
+      "draft_request_id": "",
+      "all_tags": [
+        "work",
+        "seed",
+        "home",
+        "ideas",
+        "intro"
+      ]
+    },
+    "server_after_save": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-8",
+        "revision": 3,
+        "title": "Retry-dirty-tag-two",
+        "body": "base",
+        "tags": [],
+        "color": "",
+        "pinned": false,
+        "state": "active",
+        "folder": "",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 8,
+        "seq": 8
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "",
+        "note_id": "",
+        "revision": 0,
+        "status": ""
+      },
+      "replayed": false
+    },
+    "errors": [],
+    "pass": true
+  },
+  "normal_control": {
+    "after_tag": {
+      "draft_id": 9,
+      "draft_title": "Retry-control-one",
+      "draft_body": "base",
+      "draft_revision": 2,
+      "dirty": false,
+      "conflict": false,
+      "action_error": "",
+      "has_pend": false,
+      "has_prev": false,
+      "draft_request_id": "",
+      "all_tags": [
+        "work",
+        "seed",
+        "home",
+        "ideas",
+        "intro",
+        "good-tag"
+      ]
+    },
+    "after_save": {
+      "draft_id": 9,
+      "draft_title": "Retry-control-two",
+      "draft_body": "base",
+      "draft_revision": 3,
+      "dirty": false,
+      "conflict": false,
+      "action_error": "",
+      "has_pend": false,
+      "has_prev": false,
+      "draft_request_id": "",
+      "all_tags": [
+        "work",
+        "seed",
+        "home",
+        "ideas",
+        "intro",
+        "good-tag"
+      ]
+    },
+    "server": {
+      "ok": true,
+      "err_code": "",
+      "err_detail": "",
+      "doc": {
+        "schema_version": 1,
+        "note_id": "n-9",
+        "revision": 3,
+        "title": "Retry-control-two",
+        "body": "base",
+        "tags": [
+          "good-tag"
+        ],
+        "color": "",
+        "pinned": false,
+        "state": "active",
+        "folder": "",
+        "created_at": "",
+        "updated_at": "",
+        "legacy_id": 9,
+        "seq": 9
+      },
+      "receipt": {
+        "schema_version": 1,
+        "request_id": "",
+        "note_id": "",
+        "revision": 0,
+        "status": ""
+      },
+      "replayed": false
+    },
+    "errors": [],
+    "pass": true
+  },
+  "masked_pin": {
+    "after_delete": {
+      "draft_id": 10,
+      "draft_title": "Retry-mask-control",
+      "draft_body": "base",
+      "draft_revision": 1,
+      "dirty": false,
+      "conflict": true,
+      "action_error": "delete",
+      "has_pend": false,
+      "has_prev": false,
+      "draft_request_id": "",
+      "all_tags": [
+        "good-tag",
+        "work",
+        "seed",
+        "home",
+        "ideas",
+        "intro"
+      ]
+    },
+    "after_pin": {
+      "draft_id": 10,
+      "draft_title": "Retry-mask-control",
+      "draft_body": "base",
+      "draft_revision": 1,
+      "dirty": false,
+      "conflict": true,
+      "action_error": "pin",
+      "has_pend": false,
+      "has_prev": false,
+      "draft_request_id": "",
+      "all_tags": [
+        "good-tag",
+        "work",
+        "seed",
+        "home",
+        "ideas",
+        "intro"
+      ]
+    },
+    "requests": [
+      {
+        "method": "PATCH",
+        "url": "http://127.0.0.1:11803/api/notes/10/pin/result",
+        "data": "{}"
+      }
+    ],
+    "banner": 1,
+    "pass": true
+  },
+  "failures": []
+}

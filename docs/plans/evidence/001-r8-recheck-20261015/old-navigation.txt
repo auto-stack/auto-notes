@@ -1,0 +1,95 @@
+Evidence: D:\autostack\auto-notes\.auto\review-r6-ui-combinations-1792043722488431100
+ui_exit_code= 0
+""
+      }
+    ],
+    "active_id": 0,
+    "draft_id": 7,
+    "draft_title": "NavProbe-B-one",
+    "draft_revision": 2,
+    "dirty": false,
+    "conflict": false,
+    "draft_request_id": ""
+  },
+  "server_first": {
+    "ok": true,
+    "err_code": "",
+    "err_detail": "",
+    "doc": {
+      "schema_version": 1,
+      "note_id": "n-7",
+      "revision": 2,
+      "title": "NavProbe-B-one",
+      "body": "base",
+      "tags": [],
+      "color": "",
+      "pinned": false,
+      "state": "active",
+      "folder": "",
+      "created_at": "",
+      "updated_at": "",
+      "legacy_id": 7,
+      "seq": 7
+    },
+    "receipt": {
+      "schema_version": 1,
+      "request_id": "",
+      "note_id": "",
+      "revision": 0,
+      "status": ""
+    },
+    "replayed": false
+  },
+  "after_second_save": {
+    "notes": [
+      {
+        "id": 7,
+        "revision": 3,
+        "title": "NavProbe-B-two",
+        "body": "base",
+        "time": "Just now",
+        "pinned": false,
+        "tags": [],
+        "folder": ""
+      }
+    ],
+    "active_id": 0,
+    "draft_id": 7,
+    "draft_title": "NavProbe-B-two",
+    "draft_revision": 3,
+    "dirty": false,
+    "conflict": false,
+    "draft_request_id": ""
+  },
+  "server_second": {
+    "ok": true,
+    "err_code": "",
+    "err_detail": "",
+    "doc": {
+      "schema_version": 1,
+      "note_id": "n-7",
+      "revision": 3,
+      "title": "NavProbe-B-two",
+      "body": "base",
+      "tags": [],
+      "color": "",
+      "pinned": false,
+      "state": "active",
+      "folder": "",
+      "created_at": "",
+      "updated_at": "",
+      "legacy_id": 7,
+      "seq": 7
+    },
+    "receipt": {
+      "schema_version": 1,
+      "request_id": "",
+      "note_id": "",
+      "revision": 0,
+      "status": ""
+    },
+    "replayed": false
+  },
+  "pass": true
+}
+

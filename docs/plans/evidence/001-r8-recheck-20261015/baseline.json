@@ -1,0 +1,57 @@
+{
+  "review_scope": "final",
+  "plan_id": "NOTES-001",
+  "plan_revision": 8,
+  "reviewed_commit": "27cff918c5f9e9d14278adadbd76376c9f786f9e",
+  "implementation_commit": "166a6663a256ff88e98cdefe00b7d7decda7947b",
+  "base_commit": "1391bd7eb2f6b3b08e9841d30b25125e47ced058",
+  "worktree_path": "D:\\autostack\\auto-notes",
+  "branch": "main",
+  "reviewer_identity": "current conversation; prior reviewer, not repair implementer; no subagents",
+  "initial_status": "?? src/front/tests/",
+  "source_sha256": {
+    "src/back/repository.at": "822746753f6dfe88c59cea7025629c24f978df089268599fd60dc815b84c6caf",
+    "src/back/db.at": "78fcacd34aed773e14fe4aaed77a3bcdd07459f6e680aa5aedb24447b9c4c5a5",
+    "src/back/api.at": "d7403ded72ff401acb5960b04ebee09c6823c5ed92cf0f9979b27fb9609dc850",
+    "src/front/notes_store.at": "38bb6a061a92adda17a99755d223c124c46aae2fc614fb8b6eb34dd9bc7c71f9",
+    "src/front/editor.at": "1f1016695c10da347c68c94341b7062d421dc7980583542c2fc3c9d1a5f518be",
+    "tests/probe/run_v1_battery.sh": "59b15ab4941427593b622b0fe675113ac6d184313b63d656ac8b61ef401b7bb4",
+    "tests/negatives-r8.spec.ts": "1b0ed18ca6a5cb36038da9c6793a9a3fa8c56092a85b3059e720ca0006a77ae6",
+    "tests/probe/evidence/r5-work/verify_backend_scratch.py": "667c80c9242c8f5b3558d1c8b94b3bc058985179e021929e6e202ee2ea7b7048",
+    "tests/probe/evidence/r5-work/run_vue_suite.py": "971f7ab1c2315e80ea3ad45fed66af3b3e3212413461c94d901e7c61087a7eb7",
+    "pac.at": "b44932988243d2f17ad12daec71a245843b50b0f668d1c9359875f7b75001225",
+    "docs/specs/notes/durable-inbox.md": "a8eef409a129bef31ce8f8c5ab7bfba9ebfd46273ea96d2b57786472f6d79001"
+  },
+  "auto_lang_entry": "3dac1cee467c38ddf8d4d50a8c7d857417fa518c",
+  "auto_lang_dirty": "M docs/plans/779-ui-native-provider-pilot.md\n M docs/plans/783-ac-artifact-contract-probe.md\n M docs/plans/KNOWN-DEBT-AND-RISKS.md\n?? docs/plans/attachments/782/review-r1/\n?? docs/plans/attachments/782/review-r2/\n?? docs/plans/attachments/782/review-r3/\n?? ledger_770.py",
+  "auto_down_pin": "c39ac7f9dacdc769fc4a5ad3b98ec896240b28e8",
+  "auto_down_actual": "c39ac7f9dacdc769fc4a5ad3b98ec896240b28e8",
+  "cli_version": "auto 0.1.0+v0.5.0-352-ge849e06f9-dirty",
+  "cli_sha256": "6e30c87f5c3eca157973ff6e2d6e8da9ddc850b4a276e7579244f0000f3524c5",
+  "canonical_blob": "8f05b8ddb617d5d64e937e55027e782a2b0c0f85",
+  "delta_sha256": "c6afc68a2251ca4636fea0b5e0f9bab35e3bf09f72f4592c325065eef355251d",
+  "review_skill_sha256": "0d68ba05276aff05a143c8f27010ee02b0a9bded14c27a0133d3a774c20f0cf3",
+  "backend_sha256": "a709982ca0340ddd5cfa4f8eb3ac73239c3c11205a828ec05b1770b2b8b6cf59",
+  "auto_lang_build_start": "b2c77fa700261353327a902b1cc963f7d4b69c55",
+  "auto_lang_exit": "3dac1cee467c38ddf8d4d50a8c7d857417fa518c",
+  "auto_lang_doc_drift": [
+    "docs/plans/782-ac-text-record-owned.md"
+  ],
+  "binary_provenance_note": "CLI sha stable; embedded dirty build source unknown; generated/backend rebuilt; dependency HEAD drift only docs",
+  "pending_checks": [
+    "affected VM targeted recheck on repaired baseline",
+    "post-fix review",
+    "merge-owned canonical/index/archive/receipts"
+  ],
+  "fixture_sha256": {
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\manifest.json": "66be23ef297c724ccb7fd7fb8fa5d9d7c6eaa3dd895135ec8b3d405c4d3f05e8",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\writer.lock": "b6f547b605f770b635a2d5b396a9c65227de50c30fa72085b6c9985011f8ce00",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\journal\\intent-1.json": "d1fbdc9e4237bb127a0adcb470dd48f72677cb6f6f31a1c3ddb3eaf93f9688e6",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\journal\\intent-2.json": "4e55b0ed17ffa982c45deaf46d85f48fb24ed63c99ecc9f055ab09618d3d9e01",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\journal\\intent-3.json": "a0a334e46c2f36c51a54324eb39aef21825ffc4c15120f2da14a2756c5a434ca",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\notes\\n-1.r2.json": "c340d4aa8c0c2745c9286c3037514ce2e617527c48010c2b9a491c0ab3842093",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\notes\\n-3.r1.json": "deb88138fa74aa400c7a2b323c1b5c72cc6cfbc83e8a4f5e01dc69e557e8628b",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\receipts\\d-1.json": "dc34e798022bf626136a6a220639f2be32f81d3d895f038a665e2d71d4ebf242",
+    "tests\\probe\\evidence\\v1\\wedge-snapshot\\receipts\\d-2.json": "6ef8416b2aff55ff62720431e8c9fd8d38bd126f37564c942dcf3b8bd0699a4c"
+  }
+}

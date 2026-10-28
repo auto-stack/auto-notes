@@ -9,7 +9,7 @@
 
 ## 首批计划
 
-1. [NOTES-001：可靠 Inbox、稳定标识与恢复](plans/001-durable-inbox.md) — 修订8，**execution_done（35/35）**；2026-10-14 复审 needs_fix 的三个缺陷（F-R8-01 元数据/删除写失败假成功、F-R8-02 升级完成标记失败假完成、F-R8-03 导航旧下标覆盖）已修复并采证，证据链接/文档绑定缺口（F-R8-04）已补，见 [r8-work 证据](plans/evidence/001-r8-work-20261014/README.md)；复审原输入见[复审报告](plans/evidence/001-r8-review-20261014/README.md)。next=同仓独立 final review；canonical 发布/归档仍为 merge 门。
+1. [NOTES-001：可靠 Inbox、稳定标识与恢复](plans/001-durable-inbox.md) — 修订8，r9 work 后 **execution_done（35/35）**；F-R9-01/02/03（HTTP错误接收、标签失败后自身冲突、无旧树收尾重试）已修且复审原输入复跑转绿，F-R8-04 残留关闭，见 [r9-work 证据](plans/evidence/001-r9-work-20261015/README.md)；复审原报告见[再次复审](plans/evidence/001-r8-recheck-20261015/README.md)。next=独立 final review（修复提交 8b64638）；canonical发布/归档仍为merge门。
 2. [NOTES-002：快速卡片、多媒体收存与剪贴板接收](plans/002-quick-card-assets.md)
 3. [NOTES-003：Launcher、小组件与知识交接适配](plans/003-entry-and-knowledge-adapters.md)
 
@@ -17,7 +17,7 @@
 
 2026-10-14 当前工作位置：用户提供的独立仓 `D:/autostack/auto-notes` / `main`。历史 `auto-os/apps/015-notes` 目录已属AutoOS仓main，不能按旧地址在该副本继续实现本计划。完整当前基线和限制见本轮复审报告；以下旧app子模块约定保留历史。
 
-先读仓根README、SOURCE-IMPORT.json、对应计划和产品设计，再核对当前git状态及源码。计划001当前为execution_done（35/35）：F-R8-01–04 已修复并全套门采证（[r8-work](plans/evidence/001-r8-work-20261014/README.md)），接续同仓独立 final review，通过后 reviewed 交 merge。计划002/003仍为drafting。
+先读仓根README、SOURCE-IMPORT.json、对应计划和产品设计，再核对当前git状态及源码。计划001当前为r9 work后 execution_done（35/35）：F-R9-01/02/03 与 F-R8-04 已按[2026-10-15再次复审](plans/evidence/001-r8-recheck-20261015/README.md)修复并采证（[r9-work](plans/evidence/001-r9-work-20261015/README.md)），AC终验与canonical发布分别归独立复审与merge。计划002/003仍为drafting。
 
 本轮在各独立应用仓内从001–003编号，plan_id带应用前缀；核对本仓活动/归档计划为空后独占创建，不占用AutoLang/AutoOS的.next-id，也不与主力机739/740共用编号。新建后续计划按本仓取号机制检查活动及归档目录；本批不重新分配已存在ID。工作位置按2026-10-04用户约定，统一为D:/autostack/auto-os/apps/015-notes；在该检出的v0.6-dev编写计划和实施，不使用外部临时clone作为工作入口。不同app可并行，同app保持一个写入者，禁止junction/symlink。
 

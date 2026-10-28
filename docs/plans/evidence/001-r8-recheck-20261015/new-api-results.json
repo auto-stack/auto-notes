@@ -1,0 +1,142 @@
+{
+  "records": {
+    "fresh-upgraded": {
+      "first": {
+        "http": 200,
+        "value": []
+      },
+      "meta": {
+        "corrupted_r1": "legacy upgrade incomplete",
+        "schema_v": "3",
+        "upgrade_error": "finalize marker write failed"
+      },
+      "count": 0,
+      "retry": {
+        "http": 200,
+        "value": [
+          {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "doc1-updated",
+            "body": "body two",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          }
+        ]
+      }
+    },
+    "fresh-upgrade_error": {
+      "first": {
+        "http": 200,
+        "value": []
+      },
+      "meta": {
+        "corrupted_r1": "legacy upgrade incomplete",
+        "schema_v": "3"
+      },
+      "count": 0,
+      "retry": {
+        "http": 200,
+        "value": [
+          {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "doc1-updated",
+            "body": "body two",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          }
+        ]
+      }
+    },
+    "fresh-corrupted_r1": {
+      "first": {
+        "http": 200,
+        "value": []
+      },
+      "meta": {
+        "corrupted_r1": "legacy upgrade incomplete",
+        "schema_v": "3",
+        "upgrade_error": "finalize marker write failed"
+      },
+      "count": 0,
+      "retry": {
+        "http": 200,
+        "value": [
+          {
+            "schema_version": 1,
+            "note_id": "n-1",
+            "revision": 2,
+            "title": "doc1-updated",
+            "body": "body two",
+            "tags": [],
+            "color": "",
+            "pinned": false,
+            "state": "active",
+            "folder": "",
+            "created_at": "",
+            "updated_at": "",
+            "legacy_id": 1,
+            "seq": 1
+          }
+        ]
+      }
+    },
+    "before": {
+      "schema_v": "3",
+      "upgraded": "1",
+      "corrupted_r1": "legacy upgrade incomplete"
+    },
+    "after_failure": {
+      "response": {
+        "http": 200,
+        "value": []
+      },
+      "meta": {
+        "upgraded": "1",
+        "schema_v": "3"
+      }
+    },
+    "after_retry": {
+      "response": {
+        "http": 200,
+        "value": []
+      },
+      "meta": {
+        "upgraded": "1",
+        "schema_v": "3"
+      }
+    },
+    "normal_control": {
+      "response": {
+        "http": 200,
+        "value": []
+      },
+      "meta": {
+        "upgraded": "1",
+        "schema_v": "3",
+        "repair_generation": "1"
+      }
+    }
+  },
+  "failures": [
+    "no-legacy finalize failure keeps retry credential",
+    "no-legacy finalize retry completes generation"
+  ]
+}

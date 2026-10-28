@@ -1,0 +1,2 @@
+suite_exit_code= 0
+  31 passed (2.6m)

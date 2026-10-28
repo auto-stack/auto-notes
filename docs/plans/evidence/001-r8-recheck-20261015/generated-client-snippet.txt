@@ -1,0 +1,30 @@
+226: 
+227: export async function delete_note(id: number): Promise<boolean> {
+228:     const response = await fetch(`/api/notes/${id}`, {
+229:         method: 'DELETE',
+230:         headers: { 'Content-Type': 'application/json' },
+231:     });
+232:     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+233:     return response.json();
+234: }
+235: 
+236: export async function toggle_pin(id: number): Promise<Note | null> {
+237:     const response = await fetch(`/api/notes/${id}/pin`, {
+238:         method: 'PATCH',
+239:         headers: { 'Content-Type': 'application/json' },
+240:         body: JSON.stringify({}),
+241:     });
+242:     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+243:     return response.json();
+244: }
+245: 
+246: export async function update_tags(id: number, tags: string[]): Promise<Note | null> {
+247:     const response = await fetch(`/api/notes/${id}/tags`, {
+248:         method: 'PUT',
+249:         headers: { 'Content-Type': 'application/json' },
+250:         body: JSON.stringify({ tags }),
+251:     });
+252:     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+253:     return response.json();
+254: }
+255: 

@@ -1,0 +1,4 @@
+suite_exit=0
+mcp_ready=True
+total: 19 passed, 0 failed, 0 skipped
+run_dir=D:\autostack\auto-notes\.auto\r5-vm-suite-1793222922374796000

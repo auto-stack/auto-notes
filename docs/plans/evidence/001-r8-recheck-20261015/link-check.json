@@ -1,0 +1,62 @@
+[
+  {
+    "source": "docs\\plans\\evidence\\001-r7-work\\README.md",
+    "target": "../../../../tests/probe/evidence/r7-work/baseline.json",
+    "exists": true
+  },
+  {
+    "source": "docs\\plans\\evidence\\001-r7-work\\README.md",
+    "target": "../../../../tests/probe/evidence/r7-work/battery-injection-control.py",
+    "exists": true
+  },
+  {
+    "source": "docs\\plans\\evidence\\001-r7-work\\README.md",
+    "target": "../../../../tests/probe/evidence/r7-work/battery-summary.txt",
+    "exists": true
+  },
+  {
+    "source": "docs\\plans\\evidence\\001-r7-work\\README.md",
+    "target": "../../../../tests/probe/evidence/r5-work/scratch-summary.json",
+    "exists": true
+  },
+  {
+    "source": "docs\\plans\\evidence\\001-r7-work\\README.md",
+    "target": "../001-r8-review-20261014/api-results.json",
+    "exists": true
+  },
+  {
+    "source": "docs\\plans\\evidence\\001-r7-work\\README.md",
+    "target": "../../../../tests/probe/evidence/r7-work/independent-ui-r7-green.json",
+    "exists": true
+  },
+  {
+    "source": "docs\\plans\\evidence\\001-r7-work\\README.md",
+    "target": "001-r8-work-20261014/vue-suite.txt",
+    "exists": false
+  },
+  {
+    "source": "docs\\plans\\evidence\\001-r7-work\\README.md",
+    "target": "../../../../tests/probe/evidence/r7-work/vm-suite-result.json",
+    "exists": true
+  },
+  {
+    "source": "docs\\plans\\evidence\\001-r7-work\\README.md",
+    "target": "../../../../tests/probe/evidence/r7-work/vm-negative-r5-result.json",
+    "exists": true
+  },
+  {
+    "source": "docs\\plans\\evidence\\001-r7-work\\README.md",
+    "target": "../../../../tests/probe/evidence/r7-work/run_vm_negative_r7.py",
+    "exists": true
+  },
+  {
+    "source": "docs\\plans\\evidence\\001-r7-work\\README.md",
+    "target": "../../../../tests/probe/evidence/r7-work/vm-negative-r7-result.json",
+    "exists": true
+  },
+  {
+    "source": "docs\\plans\\evidence\\001-r7-work\\README.md",
+    "target": "../../../../tests/probe/evidence/r7-work/battery-injection-control.py",
+    "exists": true
+  }
+]

@@ -1,0 +1,5 @@
+[PASS] pinned SQL rejection is reported 
+[PASS] tags_json SQL rejection is reported 
+[PASS] state SQL rejection is reported 
+[PASS] fresh upgrade required finalize failure rolls back 
+Evidence: D:\autostack\auto-notes\.auto\review001-extra-1792043681510596700
