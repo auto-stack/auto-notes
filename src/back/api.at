@@ -226,6 +226,22 @@ pub fn update_tags(id int, tags []str) ?Note {
     return db.update_tags(id, tags)
 }
 
+/// 置顶切换（结构化结果版，F-R9-01）：`?Note` None 被框架映射为 HTTP 404，
+/// 生成客户端在非 2xx 抛异常，调用点永远收不到 null——存储拒绝必须走
+/// RepoResult 信封（同 update_note_r 先例），UI 才能接收失败。
+/// PATCH /api/notes/:id/pin/result
+#[api(method = "PATCH", path = "/api/notes/:id/pin/result")]
+pub fn toggle_pin_result(id int) RepoResult {
+    return db.toggle_pin_result(id)
+}
+
+/// 标签更新（结构化结果版，F-R9-01）：同 pin/result 的理由。
+/// POST /api/notes/:id/tags/result
+#[api(method = "POST", path = "/api/notes/:id/tags/result")]
+pub fn update_tags_result(id int, tags []str) RepoResult {
+    return db.update_tags_result(id, tags)
+}
+
 /// Search notes by title + body
 /// GET /api/notes/search?q=...
 #[api(method = "GET", path = "/api/notes/search")]

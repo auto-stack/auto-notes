@@ -7,10 +7,26 @@
 #       after_manifest 表达"提交但响应未知"的链上节点。
 from pathlib import Path
 import os, json, socket, subprocess, time, urllib.request
+from datetime import datetime, timedelta
 
 root = Path.cwd()
 run = root / '.auto' / ('r7-vm-' + str(time.time_ns()))
 run.mkdir(parents=True)
+
+# r9：会话切换兜底——`auto run` 的 detached 孙进程（VM 窗口 auto-ui-tool、
+# 后端 auto-notes-back、残留 auto CLI）不在 taskkill /T 的进程树内，会话 1
+# 存活会占住 AUTOUI_MCP_PORT，session 2 的 tools/list 由旧服务应答而 autoui
+# 调用打到死窗口（wait_ready 超时、script-error）。按「启动时间晚于本驱动
+# 启动」清理本驱动产生的进程，不触碰用户既有实例。
+T0 = datetime.now() - timedelta(minutes=1)
+
+
+def kill_leftovers():
+    ps = ("Get-Process auto,auto-ui-tool,auto-notes-back -ErrorAction SilentlyContinue | "
+          f"Where-Object {{ $_.StartTime -gt (Get-Date '{T0.strftime('%Y-%m-%dT%H:%M:%S')}') }} | "
+          "Stop-Process -Force")
+    subprocess.run(['powershell', '-NoProfile', '-Command', ps],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def port():
     with socket.socket() as s:
@@ -21,7 +37,9 @@ env = dict(os.environ, NOTES_DATA_DIR=str(run / 'data'), NOTES_SEED='1', NOTES_T
            AUTOUI_MCP_PORT=str(mcp), PYTHONUTF8='1', PYTHONIOENCODING='utf-8')
 for key in ['NOTES_FAULT', 'NOTES_FORCE_LOCK', 'NOTES_LEGACY_FILE', 'AUTO_HTTP_PROXY']:
     env.pop(key, None)
-cmd = ['D:/autostack/auto-lang/target/debug/auto.exe', 'run', '-r', 'vm', '-B', str(back)]
+# r9：CLI 路径支持 AUTO_CLI 覆盖（r8 工具链二进制已丢失，本轮用重建版）。
+auto_cli = os.environ.get('AUTO_CLI', 'D:/autostack/auto-lang/target/debug/auto.exe')
+cmd = [auto_cli, 'run', '-r', 'vm', '-B', str(back)]
 record = {'command': cmd, 'mcp_port': mcp, 'backend_port': back, 'run_dir': str(run)}
 print('Evidence:', run, flush=True)
 
@@ -224,7 +242,16 @@ try:
         if p.poll() is None:
             subprocess.run(['taskkill', '/PID', str(p.pid), '/T', '/F'],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            p.wait(timeout=5)
+            try:
+                # r9：5s→60s——VM 窗口树（iced/后端子进程）在繁忙机器上退出可超 5s，
+                # 原窗口会让会话 2 boot 前的清理误报 script-error；超时再补一次强杀。
+                p.wait(timeout=60)
+            except subprocess.TimeoutExpired:
+                subprocess.run(['taskkill', '/PID', str(p.pid), '/T', '/F'],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                p.wait(timeout=60)
+        kill_leftovers()
+        time.sleep(1.0)
         with open(run / 'boot2.log', 'wb') as log2:
             p = subprocess.Popen(cmd, cwd=root, env=env, stdout=log2, stderr=log2,
                                  creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP)
@@ -324,6 +351,7 @@ finally:
             p.wait(timeout=5)
         except Exception:
             pass
+        kill_leftovers()
 record['fails'] = fails
 (run / 'vm-negative-r7-result.json').write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding='utf8')
 print('R7 VM negatives done. fails =', len(fails), fails, flush=True)

@@ -430,6 +430,44 @@ with Server('u12') as s:
           len(third['value']) == 1 and third['value'][0]['note_id'] == 'n-1'
           and third['value'][0]['revision'] == 2, third)
 
+# ═══ U13 (r9/T-12/T-17): no-legacy 收尾两写必须原子（F-R9-03）═══
+# upgraded=1 + corrupted_r1 在 + 旧树不在：仅拒绝 repair_generation INSERT 时，
+# 凭据 DELETE 不得单独提交（旧实现凭据已删、代际缺失，永远无法重试）。
+with Server('u13') as s:
+    dbp = s.data / 'inbox.db'
+    c = sqlite3.connect(dbp)
+    c.execute("INSERT OR REPLACE INTO meta(k,v) VALUES('upgraded','1')")
+    c.execute("INSERT OR REPLACE INTO meta(k,v) VALUES('corrupted_r1','legacy upgrade incomplete')")
+    c.execute("DELETE FROM meta WHERE k='repair_generation'")
+    c.execute("CREATE TRIGGER reject_u13 BEFORE INSERT ON meta WHEN NEW.k='repair_generation' "
+              "BEGIN SELECT RAISE(ABORT,'independent generation rejection'); END")
+    c.commit()
+    c.close()
+    first = s.call('GET', '/api/v1/notes')
+    meta_fail = dict(sql(dbp, "SELECT k,v FROM meta"))
+    check('U13 no-legacy finalize failure keeps retry credential',
+          first['value'] == [] and bool(meta_fail.get('corrupted_r1'))
+          and not meta_fail.get('repair_generation'), (first, meta_fail))
+    c = sqlite3.connect(dbp)
+    c.execute('DROP TRIGGER reject_u13')
+    c.commit()
+    c.close()
+    retry = s.call('GET', '/api/v1/notes')
+    meta_retry = dict(sql(dbp, "SELECT k,v FROM meta"))
+    check('U13 no-legacy finalize retry completes generation',
+          meta_retry.get('repair_generation') == '1' and not meta_retry.get('corrupted_r1'),
+          (retry, meta_retry))
+    # 正常控制：凭据在、无触发器 → 一次读取完成收尾
+    c = sqlite3.connect(dbp)
+    c.execute("INSERT OR REPLACE INTO meta(k,v) VALUES('corrupted_r1','legacy upgrade incomplete')")
+    c.commit()
+    c.close()
+    control = s.call('GET', '/api/v1/notes')
+    meta_ctl = dict(sql(dbp, "SELECT k,v FROM meta"))
+    check('U13 no-legacy finalize normal control completes generation',
+          meta_ctl.get('repair_generation') == '1' and not meta_ctl.get('corrupted_r1'),
+          (control, meta_ctl))
+
 print()
 print('R5 backend verify done. fails =', len(fails), fails)
 results_summary = {'fails': fails, 'run': str(RUN)}

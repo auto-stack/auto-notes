@@ -452,6 +452,33 @@ pub fn update_tags(id int, tags []str) ?Note {
     return note_of_result(js)
 }
 
+/// 置顶切换（结构化结果版，F-R9-01）：保持 toggle_pin 的取反语义，
+/// 失败经 RepoResult 信封返回，不让框架把 None 映射成 HTTP 404。
+pub fn toggle_pin_result(id int) RepoResult {
+    var nid str = repository.nid_of(id)
+    var cur_js str = repository.repo_get(nid)
+    if cur_js == "" {
+        return repo_result_of("{\"ok\":false,\"err_code\":\"not_found\"}")
+    }
+    var cur = json.parse(cur_js)
+    var v_pin = json.get(cur, "pinned")
+    var pb bool = v_pin == true
+    var want bool = true
+    if pb {
+        want = false
+    }
+    var js str = repository.repo_set_pinned(nid, want)
+    return repo_result_of(js)
+}
+
+/// 标签更新（结构化结果版，F-R9-01）。
+pub fn update_tags_result(id int, tags []str) RepoResult {
+    var nid str = repository.nid_of(id)
+    var tj str = json.encode(tags)
+    var js str = repository.repo_set_tags(nid, tj)
+    return repo_result_of(js)
+}
+
 pub fn search_notes(query str) []Note {
     var js str = repository.repo_search(query)
     var arr = json.parse(js)

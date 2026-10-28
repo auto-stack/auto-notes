@@ -911,6 +911,77 @@ l=json.load(open(OUT+'/s21-final-ctl.json'))
 assert len(l)==1 and l[0]['note_id']=='n-1' and l[0]['revision']==2, l
 print('[S21] trigger removed -> wedge upgrade succeeds (n-1 rev2) ✓')
 " | tee -a "$SUM"
+
+# ── S22（T-04/T-09/T-15 r9）：pin/tag 结构化结果端点的线上协议（F-R9-01）────
+# 旧 ?Note 端点的 None 被框架映射为 HTTP 404，生成客户端直接抛异常、UI 错误
+# 分支永远不执行。/result 端点必须以 HTTP 200 + RepoResult 信封传输失败：
+# 拒绝时 ok:false（err_code 可见、对象不变），解除后同端点成功。
+D22="$work/s22-result"; D22W="$work_win/s22-result"; mkdir -p "$D22/data"
+setup "$D22W/data" "$D22W/nope.json" > /dev/null
+curl -s -m 10 -X POST "$BASE/api/v1/notes" -H "Content-Type: application/json" \
+  -d '{"request_id":"s22-base","title":"结果端点探针","body":"x","folder":""}' -o "$OUT/s22-create.json"
+NID=$(python -c "import json;print(json.load(open('$OUT/s22-create.json'))['doc']['note_id'])")
+LID=$(python -c "import json;print(json.load(open('$OUT/s22-create.json'))['doc']['legacy_id'])")
+# pin /result 负例：必须是 200 信封失败，而不是 404
+D22="$D22" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D22']+'/data/inbox.db')
+db.execute(\"CREATE TRIGGER reject_s22 BEFORE UPDATE OF pinned ON notes BEGIN SELECT RAISE(ABORT,'independent metadata rejection'); END\")
+db.commit(); db.close()" || fail "SQL trigger setup/teardown failed (S22 infra)"
+CODE=$(curl -s -m 10 -w '%{http_code}' -X PATCH "$BASE/api/notes/$LID/pin/result" -o "$OUT/s22-pin-neg.json")
+curl -s -m 10 "$BASE/api/v1/notes/$NID" -o "$OUT/s22-pin-neg-get.json"
+D22="$D22" assert_py "S22 pin/result rejection is a 200 structured envelope" "
+import json
+code='$CODE'
+r=json.load(open(OUT+'/s22-pin-neg.json'))
+assert code=='200', (code, r)
+assert r['ok'] is False and r['err_code']=='storage_unwritable', r
+g=json.load(open(OUT+'/s22-pin-neg-get.json'))
+assert g['ok'] and g['doc']['pinned']==False, g
+print('[S22] pin/result rejected -> HTTP 200 ok:false storage_unwritable, object unchanged ✓')
+" | tee -a "$SUM"
+D22="$D22" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D22']+'/data/inbox.db')
+db.execute('DROP TRIGGER reject_s22')
+db.commit(); db.close()" || fail "SQL trigger setup/teardown failed (S22 infra)"
+curl -s -m 10 -X PATCH "$BASE/api/notes/$LID/pin/result" -o "$OUT/s22-pin-ctl.json"
+assert_py "S22 pin/result normal control" "
+import json
+r=json.load(open(OUT+'/s22-pin-ctl.json'))
+assert r['ok'] is True and r['doc']['pinned']==True, r
+print('[S22] pin/result control -> ok:true pinned=True ✓')
+" | tee -a "$SUM"
+# tags /result 负例 + 正常控制
+D22="$D22" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D22']+'/data/inbox.db')
+db.execute(\"CREATE TRIGGER reject_s22 BEFORE UPDATE OF tags_json ON notes BEGIN SELECT RAISE(ABORT,'independent metadata rejection'); END\")
+db.commit(); db.close()" || fail "SQL trigger setup/teardown failed (S22 infra)"
+CODE=$(curl -s -m 10 -w '%{http_code}' -X POST "$BASE/api/notes/$LID/tags/result" -H "Content-Type: application/json" \
+  -d '{"tags":["结果信封"]}' -o "$OUT/s22-tags-neg.json")
+D22="$D22" assert_py "S22 tags/result rejection is a 200 structured envelope" "
+import json
+code='$CODE'
+r=json.load(open(OUT+'/s22-tags-neg.json'))
+assert code=='200', (code, r)
+assert r['ok'] is False and r['err_code']=='storage_unwritable', r
+print('[S22] tags/result rejected -> HTTP 200 ok:false storage_unwritable ✓')
+" | tee -a "$SUM"
+D22="$D22" python -c "
+import os, sqlite3
+db = sqlite3.connect(os.environ['D22']+'/data/inbox.db')
+db.execute('DROP TRIGGER reject_s22')
+db.commit(); db.close()" || fail "SQL trigger setup/teardown failed (S22 infra)"
+curl -s -m 10 -X POST "$BASE/api/notes/$LID/tags/result" -H "Content-Type: application/json" \
+  -d '{"tags":["结果信封"]}' -o "$OUT/s22-tags-ctl.json"
+assert_py "S22 tags/result normal control" "
+import json
+r=json.load(open(OUT+'/s22-tags-ctl.json'))
+assert r['ok'] is True and r['doc']['tags']==['结果信封'], r
+print('[S22] tags/result control -> ok:true tags persisted ✓')
+" | tee -a "$SUM"
+
 FAILS=$(wc -l < "$OUT/.fails" | tr -d ' ')
 log "== battery done; fails=$FAILS; artifacts in $OUT"
 if [ "$FAILS" -gt 0 ]; then

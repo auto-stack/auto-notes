@@ -16,7 +16,10 @@ env = dict(os.environ, NOTES_DATA_DIR=str(run / 'data'), NOTES_SEED='1', NOTES_T
            AUTOUI_MCP_PORT=str(mcp), PYTHONUTF8='1', PYTHONIOENCODING='utf-8')
 for key in ['NOTES_FAULT', 'NOTES_FORCE_LOCK', 'NOTES_LEGACY_FILE', 'AUTO_HTTP_PROXY']:
     env.pop(key, None)
-cmd = ['D:/autostack/auto-lang/target/debug/auto.exe', 'run', '-r', 'vm', '-B', str(back)]
+# r9：CLI 路径支持 AUTO_CLI 覆盖（r8 工具链二进制随 auto-lang target 清理丢失；
+# 本轮用 AUTO_CLI 指向 e849e06f9 干净重建版）。
+auto_cli = os.environ.get('AUTO_CLI', 'D:/autostack/auto-lang/target/debug/auto.exe')
+cmd = [auto_cli, 'run', '-r', 'vm', '-B', str(back)]
 record = {'command': cmd, 'mcp_port': mcp, 'backend_port': back, 'run_dir': str(run), 'suite_exit': None}
 print('Evidence:', run, flush=True)
 p = None
@@ -26,7 +29,9 @@ try:
                              creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP)
         record['pid'] = p.pid
         ready = False
-        for i in range(90):
+        # r9：boot 窗口 90s→600s（与 r7 负例驱动一致——冷 target 编译期，
+        # r8 基建记录同款放宽）。
+        for i in range(600):
             if p.poll() is not None:
                 record['boot_exit'] = p.returncode
                 break

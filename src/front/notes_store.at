@@ -45,7 +45,7 @@
 //      rid；revision 冲突时按服务器内容裁决旧提交是否落地，落地则采用其
 //      revision 重试新意图，保留新草稿（不再沿用陈旧 revision 卡死）。
 
-use back.api: list_notes, create_note, update_note_r, get_note_r, delete_note, toggle_pin, update_tags, search_notes, next_request_id
+use back.api: list_notes, create_note, update_note_r, get_note_r, delete_note, toggle_pin_result, update_tags_result, search_notes, next_request_id
 
 store NotesStore {
     model {
@@ -1167,6 +1167,13 @@ store NotesStore {
                 // 动作目标在 flush 前捕获（F-R7-04）：flush 成功分支的 LoadDraft
                 // 会切到活动行，pin 必须仍指向用户正在编辑的草稿身份。
                 var pin_target int = .draft_id
+                // F-R9-01：上一条动作的失败状态（conflict/action_error）不阻断
+                // 新动作——conflict 的活意义只在保护 dirty 草稿期间；干净草稿上
+                // 的失败标记是陈旧状态，新动作自带重新判定。
+                if .dirty == false {
+                    .conflict = false
+                    .action_error = ""
+                }
                 if .dirty {
                     if .has_pend {
                         if .draft_title != .pend_title {
@@ -1261,11 +1268,14 @@ store NotesStore {
                     }
                 }
                 if .conflict == false {
-                    var pn = toggle_pin(pin_target)
-                    if pn == None {
+                    // F-R9-01：?Note None 被框架映射为 HTTP 404、生成客户端直接
+                    // 抛异常，调用点收不到 null——必须走结构化结果端点接收失败。
+                    var pr RepoResult = toggle_pin_result(pin_target)
+                    if pr.ok == false {
                         // 置顶必需写入失败不得冒充成功（F-R8-01）：置 conflict
                         // 可见，不刷新工作集/不清草稿（LoadDraft 会清 conflict，
-                        // 故失败分支不做刷新）。
+                        // 故失败分支不做刷新）。revision 已由 dirty flush 成功块
+                        // 的刷新+LoadDraft 同步（F-R9-02），此处不再取回。
                         .conflict = true
                         .action_error = "pin"
                     } else {
@@ -1724,6 +1734,11 @@ store NotesStore {
         // 不得改另一行）；flush 意图轮换+裁决；冲突动作继续但绝不清草稿。
         .TagAdded(t) -> {
             if .draft_id != 0 {
+                // F-R9-01：陈旧失败状态不阻断新动作（同 TogglePinActive）。
+                if .dirty == false {
+                    .conflict = false
+                    .action_error = ""
+                }
                 if .dirty {
                     if .has_pend {
                         if .draft_title != .pend_title {
@@ -1808,6 +1823,9 @@ store NotesStore {
                         .has_pend = false
                         .has_prev = false
                         .has_prev2 = false
+                        // F-R9-02：正文确认成功即同步服务器 revision——后续元
+                        // 数据动作失败（标签等）不得让草稿携带旧 revision 自我冲突。
+                        .draft_revision = fr2.doc.revision
                     }
                 }
                 var tl []str = []
@@ -1821,10 +1839,13 @@ store NotesStore {
                 if exists == false {
                     tl.push(t)
                 }
-                var tn = update_tags(.draft_id, tl)
-                if tn == None {
+                // F-R9-01：走结构化结果端点（?Note None → 404 → 客户端抛异常，
+                // 调用点收不到 null）。
+                var tn RepoResult = update_tags_result(.draft_id, tl)
+                if tn.ok == false {
                     // 标签必需写入失败不得冒充成功（F-R8-01）：不更新词表/
-                    // 不刷新工作集，置 conflict 可见，草稿保留可重试。
+                    // 不刷新工作集，置 conflict 可见，草稿保留可重试。revision
+                    // 已由上方 flush 成功块同步（F-R9-02），此处不再取回。
                     .conflict = true
                     .action_error = "tags"
                 } else {
@@ -1850,6 +1871,11 @@ store NotesStore {
 
         .TagRemoved(t) -> {
             if .draft_id != 0 {
+                // F-R9-01：陈旧失败状态不阻断新动作（同 TagAdded）。
+                if .dirty == false {
+                    .conflict = false
+                    .action_error = ""
+                }
                 if .dirty {
                     if .has_pend {
                         if .draft_title != .pend_title {
@@ -1934,6 +1960,8 @@ store NotesStore {
                         .has_pend = false
                         .has_prev = false
                         .has_prev2 = false
+                        // F-R9-02：同 TagAdded——正文确认成功即同步服务器 revision。
+                        .draft_revision = fr2.doc.revision
                     }
                 }
                 var tl []str = []
@@ -1942,10 +1970,12 @@ store NotesStore {
                         tl.push(tg)
                     }
                 }
-                var tn2 = update_tags(.draft_id, tl)
-                if tn2 == None {
+                // F-R9-01：结构化结果端点（同 TagAdded）。
+                var tn2 RepoResult = update_tags_result(.draft_id, tl)
+                if tn2.ok == false {
                     // 标签必需写入失败不得冒充成功（F-R8-01）：不刷新工作集，
-                    // 置 conflict 可见，草稿与词表保留可重试。
+                    // 置 conflict 可见，草稿与词表保留可重试。revision 已由上方
+                    // flush 成功块同步（F-R9-02），此处不再取回。
                     .conflict = true
                     .action_error = "tags"
                 } else {
