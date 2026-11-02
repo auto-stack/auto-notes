@@ -1,7 +1,8 @@
 # durable-inbox — 015-notes 可靠收件箱（current-state）
 
 > 状态：current-state（NOTES-001 r9 实施，SD-02..SD-06 与 SD-07..SD-28 随
-> r4–r9 修复落地）· 更新：2026-10-15 · 计划：NOTES-001 + AutoLang 742
+> r4–r9 修复落地；NOTES-004 补当前工具链双端再验）· 更新：2026-11-02 ·
+> 计划：NOTES-001 + AutoLang 742 + NOTES-004
 
 ## 存储契约（SQLite 单文件）
 
@@ -180,10 +181,14 @@
 - 测试基建：wait_ready 要求 draft_title 非空；驱动点击用"点击至状态生效"
   重试（重渲染 vnode 换代）；VM 驱动 boot 等待 ≥600s（taskkill 后共享 target
   冷重编窗口）。
-- 依赖固定（本轮工具链）：AutoDown c39ac7f（pin=实际）；CLI 自 auto-lang
-  e849e06f9 干净重建（r8 二进制已随 target 清理丢失；其记录的 dirty 项均为
-  文档/账本，不影响生成器——重建版 SHA256 见 r9-work README）；AutoLang
-  构建输入 e849e06f9 线。
+- 依赖固定（NOTES-004 再验工具链）：AutoDown c39ac7f9（pin=实际）；CLI
+  `0.1.0+plan-890-verified-r7-t19-14-g47d8f7b`（auto-man 47d8f7b）+ auto-ui-tool
+  （2026-11-02 重建）。**当前工具链双端再验（NOTES-004）**：battery S0–S22
+  fails=0、后端 scratch 52 断言 fails=0、Vue 31/31 passed、原生
+  015-notes.autotest 19/19 exit 0（当前 CLI 原生首启 176s MCP 就绪）、r7 VM
+  反例 11/11 fails=0、双端 N-04 强杀重启后下一次真实编辑 rev 推进（SQLite 只读
+  核实）——提交协议/幂等/revision/错误码/UI 契约零改动（证据：004 决策稿
+  与聚合门记录）。
 
 ## 已登记债务
 
