@@ -104,7 +104,7 @@ T-00新建决策稿 `docs/plans/evidence/004/standalone-decision.md`：固定源
 - [ ] T-01（owner_stage=work；依赖T-00；AC-01）：收口独立准备/启动和自有进程/数据隔离，明确空缓存与错误结果。**（Vue 半区收口：`tests/basic/verify_standalone.py --case n01` PASS——S1..S5 有界准备、空缓存首启就绪、坏 exe/端口占用两负控非零且不触碰旁观实例；CREATE_NO_WINDOW 会致工具链子进程静默失败已实证绕开；原生半区待 G4 解除）**
 - [ ] T-02（owner_stage=work；依赖T-01和确需的实际前置；AC-02）：完成当前真实Vue/原生编辑与引擎路径；只修实证缺口，保留现有正确能力。**（Vue 半区：31/31 套件 + recovery spec 真实编辑保存 + 引擎 dist（dev/src 与 build/dist 双路径）✓；原生半区待 G4）**
 - [ ] T-03（owner_stage=work；依赖T-02；AC-03）：回放失败保稿/冲突/软删和退出恢复后的下一次保存，关闭N-03/N-04。**（Vue 半区：N-04 PASS——真实 UI 中文/引号/换行落库 rev2 → 硬杀后端 → 同数据目录重启 → 正文逐字保真 + 下一次编辑 rev3（SQLite 磁盘核实）；N-03 由套件 R8/R9 负例 + battery S20..S22 fails=0 + scratch U11..U13 覆盖；原生半区待 G4）**
-- [ ] T-04（owner_stage=work；依赖T-03；AC-04）：建立聚合入口，复用既有门并跑N-01..05及失败控制，准备SD候选。
+- [ ] T-04（owner_stage=work；依赖T-03；AC-04）：建立聚合入口，复用既有门并跑N-01..05及失败控制，准备SD候选。**（Vue 半区收口：`--case all` PASS——n01+n04+套件31+battery S0-S22+scratch 52 exit 0；SD 候选稿 [spec-delta-standalone.md](evidence/004/spec-delta-standalone.md)（SD-01/SD-02，含 G4 回填位）；vm profile 在 G4 解除前命名非零（无静默跳过））**
 - [ ] T-05（owner_stage=work；依赖T-04；AC-01..04）：核对源码/依赖漂移、README/roadmap与证据覆盖，提交execution_done。
 - [ ] T-06（owner_stage=review；依赖T-05；AC-05）：同clone独立上下文最终复审。
 - [ ] T-07（owner_stage=merge；依赖T-06 pass；AC-06）：仅app规范/归档/提交push收尾，不集成OS。
@@ -115,6 +115,7 @@ T-00新建决策稿 `docs/plans/evidence/004/standalone-decision.md`：固定源
 - 已归档001、现实现Spec和产品源码保持不变；规划结构/链接通过不等于功能通过。review以同一clone的独立上下文核验，不自动创建agent/chat或指定模型。
 - stage: work | plan_id: NOTES-004 | plan_revision: 1 | round: 1 | outcome: blocked | worktree: D:/autostack/auto-notes（本仓独立clone main，计划§2规约） | branch: main | base_commit: 82b4d2f | code_commit: （本轮实现提交=pac.at npm_deps 形态修复+决策稿+本记录） | dependency_revisions: vendor/auto-down c39ac7f9；工具链 auto 0.1.0+plan-890-verified-r7-t19-5-g55c98c7（auto-man 67add3c，tool=auto-ui 2f43b4f 含 plan-910 rust-ui 重写）；后端依赖 auto-lang 5923d4dee/auto-web | task_ids: T-00（完成）；T-01..T-05 Vue 半区部分推进、原生半区未开 | evidence: docs/plans/evidence/004/standalone-decision.md + D:/autostack/plan-artifacts/plan-004/t00/（P-V 首启 PASS 0.9s；Vue 全套 31/31 exit0；P-N 10+ 次 0 过：`run -r vm` split vm↔rust 工具宿主静默死亡，4s 速死与 96–132s 生成后死亡两形态；隔离矩阵 merge vm+vm 过/hello 过/stub-back 可达 cargo 具名错误） | blockers: G4 原生门=auto-ui owner 缺口（plan-910 rust-ui 重写当日落地强相关；auto-database plan-002 同症先例在案），跨仓修复超出本计划授权（§2），验收调整需用户裁决（§10） | next_responsible_role: user（裁决后回 work：T-01 起）
 - stage: goal | plan_id: NOTES-004 | plan_revision: 1 | round: 2 | from: blocked | to: work | status: executing | outcome: pass | note: 用户裁决选 §10 选项1——等 plan-910 收口+工具重建后重探原生门（P-N），期间 Vue 轨 T-01..T-05 继续推进；G4 保持挂起、受影响原生半区任务保持未完成。 | next: work/T-01（Vue 半区收口）
+- stage: work | plan_id: NOTES-004 | plan_revision: 1 | round: 2 | outcome: pass（Vue 半区） | worktree: D:/autostack/auto-notes | branch: main | code_commit: 0f44298 + 本轮聚合/SD 稿 | task_ids: T-01/T-02/T-03/T-04（Vue 半区收口） | evidence: D:/autostack/plan-artifacts/plan-004/（t01-n01-vue.log N-01 三控 PASS；t03-n04-vue.log N-04 rev2→3；t03-battery-retry3.log S0-S22 fails=0；t03-scratch.log 52 fails=0；t04-all-vue.log 聚合 exit 0） | blockers: 原生半区待 G4（plan-910 未落地，轮末复查） | next_responsible_role: work（G4 解除→原生半区；未解除→waiting）
 
 ## 10. 待澄清事项
 

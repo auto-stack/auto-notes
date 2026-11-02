@@ -436,10 +436,72 @@ def case_n04_vue(run_id: str, run_dir: Path, record: dict) -> int:
         live.close()
 
 
+def case_backend_gates(run_dir: Path, record: dict, live_env_base: tuple[int, Path]) -> int:
+    """battery S0–S22 + scratch 52：直启 TEST_MODE 后端（无种子），Git bash 跑电池。
+    （battery 经 bash+curl+python，MSYS 环境变量/换行纪律见决策稿 §5/G4 附录）"""
+    back_port, data = live_env_base
+    import shutil as _sh
+    _sh.rmtree(ROOT / ".auto/t004-battery", ignore_errors=True)
+    env = dict(os.environ, NOTES_DATA_DIR=str(data), NOTES_TEST_MODE="1",
+               AUTO_HTTP_PORT=str(back_port), PYTHONUTF8="1", NOTES_BACK_EXE=str(BACKEND_EXE))
+    for k in ("NOTES_SEED", "NOTES_FAULT", "NOTES_FORCE_LOCK", "NOTES_LEGACY_FILE"):
+        env.pop(k, None)
+    log_f = open(run_dir / "backend-gates.log", "wb")
+    p = subprocess.Popen([str(BACKEND_EXE)], cwd=str(ROOT), env=env, stdout=log_f, stderr=log_f,
+                         creationflags=subprocess.CREATE_NO_WINDOW)
+    try:
+        for _ in range(100):
+            try:
+                urllib.request.urlopen(f"http://127.0.0.1:{back_port}/api/v1/status", timeout=1).close()
+                break
+            except Exception:
+                time.sleep(0.5)
+        else:
+            return fail("gates", "battery", "后端未就绪")
+        base = f"http://127.0.0.1:{back_port}"
+        # WSL bash 会丢弃 Windows env（T-03 实证）——必须用 Git bash 跑电池
+        bash = "C:/Program Files/Git/bin/bash.exe"
+        r1 = subprocess.run([bash, "tests/probe/run_v1_battery.sh", ".auto/t004-battery"],
+                            cwd=str(ROOT), env=dict(env, BASE=base),
+                            capture_output=True, text=True, timeout=BUDGETS["suite"])
+        summ = ROOT / ".auto/t004-battery/summary.txt"
+        record["battery_exit"] = r1.returncode
+        if r1.returncode != 0:
+            return fail("gates", "battery", (summ.read_text(encoding='utf8', errors='replace')[-300:]
+                                             if summ.is_file() else "无 summary"))
+        r2 = subprocess.run(["python", "tests/probe/evidence/r5-work/verify_backend_scratch.py"],
+                            cwd=str(ROOT), env=env, capture_output=True, text=True,
+                            timeout=BUDGETS["suite"])
+        record["scratch_exit"] = r2.returncode
+        if r2.returncode != 0:
+            return fail("gates", "scratch", (r2.stdout or "")[-300:])
+        record["backend_gates"] = "PASS (battery S0-S22 fails=0; scratch 52 fails=0)"
+        log("  backend gates PASS (battery S0-S22 + scratch 52)")
+        return 0
+    finally:
+        if p.poll() is None:
+            p.kill()
+        log_f.close()
+
+
+def case_all_vue(run_id: str, run_dir: Path, record: dict) -> int:
+    """聚合门（Vue profile）：n01 + n04 + suite + battery/scratch。首败即停，非零退出。"""
+    for name, fn in (("n01", case_n01_vue), ("n04", case_n04_vue), ("suite", case_suite_vue)):
+        if fn(run_id, run_dir, record) != 0:
+            return fail(run_id, f"all/{name}", "用例失败（见上文）")
+    data = run_dir / "data-gates"
+    if case_backend_gates(run_dir, record, (free_port(), data)) != 0:
+        return fail(run_id, "all/gates", "battery/scratch 失败")
+    record["all_verdict"] = "PASS"
+    log("ALL(vue) PASS: n01 + n04 + suite31 + battery S0-S22 + scratch 52")
+    return 0
+
+
 CASES = {
     "n01": case_n01_vue,
     "n04": case_n04_vue,
     "suite": case_suite_vue,
+    "all": case_all_vue,
 }
 
 
