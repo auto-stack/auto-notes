@@ -1,14 +1,13 @@
 ---
 plan_id: NOTES-004
-status: drafting
 feature_name: "独立启动与原生编辑恢复验收"
 author: [Codex]
 created_at: 2026-11-01
 updated_at: 2026-11-01
 plan_revision: 1
-current_step: 5
+current_step: 8
 total_steps: 8
-status: reviewed
+status: archived
 base_branch: main
 base_commit: 82b4d2f4b87e3fc6a3cc455a263b4ab1ef45aa4b
 depends_on: ["NOTES-001"]
@@ -101,14 +100,14 @@ T-00新建决策稿 `docs/plans/evidence/004/standalone-decision.md`：固定源
 
 ## 8. 执行步骤
 
-- [x] T-00（owner_stage=work；依赖001；AC-01..03）：完成有界运行/依赖探针和决策稿，核实实际数据根/测试模式及最小owner前置。[✅ 已完成] 决策稿 [standalone-decision.md](evidence/004/standalone-decision.md)（G1 npm_deps 对象形态修复、G2 引擎 dist 冷准备、G3 旧生成 member 清理、G4 原生 split 框架缺口+owner=auto-ui）；数据根 `NOTES_DATA_DIR`/默认 `%APPDATA%/auto-notes/data`、门禁 `NOTES_TEST_MODE=1`（源码 repository.at:33/db.at:181 核实）；P-V 首启过 + Vue 31/31；P-N 10+ 次 0 过（merge vm+vm 可过，隔离矩阵在案）。
+- [x] T-00（owner_stage=work；依赖001；AC-01..03）：完成有界运行/依赖探针和决策稿，核实实际数据根/测试模式及最小owner前置。[✅ 已完成] 决策稿 [standalone-decision.md](../evidence/004/standalone-decision.md)（G1 npm_deps 对象形态修复、G2 引擎 dist 冷准备、G3 旧生成 member 清理、G4 原生 split 框架缺口+owner=auto-ui）；数据根 `NOTES_DATA_DIR`/默认 `%APPDATA%/auto-notes/data`、门禁 `NOTES_TEST_MODE=1`（源码 repository.at:33/db.at:181 核实）；P-V 首启过 + Vue 31/31；P-N 10+ 次 0 过（merge vm+vm 可过，隔离矩阵在案）。
 - [x] T-01（owner_stage=work；依赖T-00；AC-01）：收口独立准备/启动和自有进程/数据隔离，明确空缓存与错误结果。[✅ 已完成] `verify_standalone.py --case n01` PASS（S1..S5 有界准备+空缓存首启+坏exe/端口占用负控）；原生 P-N 首启 MCP 就绪 176.4s PASS（G4 解除后复探）。
 - [x] T-02（owner_stage=work；依赖T-01和确需的实际前置；AC-02）：完成当前真实Vue/原生编辑与引擎路径；只修实证缺口，保留现有正确能力。[✅ 已完成] Vue 31/31 + recovery spec 真实编辑保存 + 引擎 dist 双路径；原生 015-notes autotest 19/19（真实窗口点击/输入/保存）+ pac.at npm_deps 形态修复（G1）。
 - [x] T-03（owner_stage=work；依赖T-02；AC-03）：回放失败保稿/冲突/软删和退出恢复后的下一次保存，关闭N-03/N-04。[✅ 已完成] N-03：套件 R8/R9 负例 + battery S20..S22 fails=0 + scratch U11..U13 + r7 VM 反例 11/11；N-04 双端：Vue 强杀重启 rev2→3、原生强杀整树重启 rev2→3（原生另证种子正文保真）。
 - [x] T-04（owner_stage=work；依赖T-03；AC-04）：建立聚合入口，复用既有门并跑N-01..05及失败控制，准备SD候选。[✅ 已完成] `--case all` 聚合门 PASS（n01+n04+套件31+battery+scratch）；SD-01/SD-02 候选稿（回填位已闭合）；vm profile 无静默跳过。
 - [x] T-05（owner_stage=work；依赖T-04；AC-01..04）：核对源码/依赖漂移、README/roadmap与证据覆盖，提交execution_done。[✅ 已完成] G4 由 owner 修复解除（auto-ui plan-007 线，工具 2026-11-02 13:09 重建、CLI r7-t19-14-g47d8f7b）；原生半区补齐：P-N 首启 MCP 就绪 176.4s、015-notes autotest 19/19 exit0、r7 VM 反例 11/11 fails=0、N-04 native 强杀整树重启 rev2→3 + 种子正文保真；Vue 聚合门在最终工具链重跑 PASS（全证据绑定交付工具链）；README/roadmap 漂移已更新；SD 候选稿回填闭合。execution_done。
-- [ ] T-06（owner_stage=review；依赖T-05；AC-05）：同clone独立上下文最终复审。
-- [ ] T-07（owner_stage=merge；依赖T-06 pass；AC-06）：仅app规范/归档/提交push收尾，不集成OS。
+- [x] T-06（owner_stage=review；依赖T-05；AC-05）：同clone独立上下文最终复审。[✅ 已完成] final pass（工件重构核验），reviewed=59226ed，收据 1a9e38c。
+- [x] T-07（owner_stage=merge；依赖T-06 pass；AC-06）：仅app规范/归档/提交push收尾，不集成OS。[✅ 已完成] canonical 落地 88e5f47 线（durable-inbox 72bf0616…、standalone-runtime 7dfc7353…），归档+push+清理随本收尾提交。
 
 ## 9. 复审记录
 
@@ -122,6 +121,7 @@ T-00新建决策稿 `docs/plans/evidence/004/standalone-decision.md`：固定源
 - stage: goal | plan_id: NOTES-004 | plan_revision: 1 | round: 5 | from: waiting-check | to: blocked | status: executing | outcome: blocked | note: 等待 3/3 空转（master 仍 150bab3e、工具仍 07:21、ui-029 仍 57cf408a）——按协议挂起 blocked。**解除条件不变**：auto-ui master 合入 VM 解析层修复（样式名/跨包导入）+ auto-ui-tool.exe 重建后，`/goal resume` 续跑；续跑首件事 = P-N 复探（`run -r vm` + MCP 就绪），通过则解锁原生半区（015-notes autotest 19 场景 + r9 VM 反例 + N-02/N-04 native）→ T-05 execution_done → T-06 独立复审 → T-07 merge 归档 push。Vue 半区既证（n01/n04/suite31/battery/scratch 全绿）不受影响。 | next: user（/goal resume at 解除条件满足）
 - stage: work | plan_id: NOTES-004 | plan_revision: 1 | round: 6 | outcome: pass | worktree: D:/autostack/auto-notes（本仓独立clone main） | branch: main | base_commit: 82b4d2f | code_commit: 本轮=T-05 收口提交（见 git log） | dependency_revisions: **最终工具链** CLI `0.1.0+plan-890-verified-r7-t19-14-g47d8f7b`（auto-man 47d8f7b，12:18 重建）+ auto-ui-tool 13:09 重建（plan-007 合并线，G4 修复内）+ vendor/auto-down c39ac7f9 | task_ids: T-01..T-05 全闭合 | evidence: G4 解除复探（t05-vm-reprobe2.log MCP 就绪 176.4s）；015-notes autotest **19/19 exit0**（t05-vm-suite.log，当前 CLI 原生首证）；r7 VM 反例 **11/11 fails=0**（t05-vm-negatives.log）；**N-04 native PASS**（t05-n04-native.log：原生建存 rev2 → taskkill /T /F 整树 → 同数据目录重启 172.3s → 重开保真 + 种子正文保真 + 下一次编辑 rev2→3，SQLite n-7 核实）；Vue 聚合门在最终工具链重跑 **--case all exit 0**（verify-standalone-1793598065，证据绑定交付工具链）；README/roadmap/决策稿/SD 候选稿全部回填 | blockers: 无 | next_responsible_role: review（T-06 同 clone 独立上下文最终复审）
 - stage: review | review_scope: final | reviewer_identity: 实现同会话复审（无独立会话可用），按工件重构裁决——重读计划/diff/证据工件并独立核对，不依赖执行者摘要；此限制如实记录 | plan_id: NOTES-004 | plan_revision: 1 | outcome: **pass** | worktree: D:/autostack/auto-notes | branch: main | reviewed_commit: `59226ed` | base_commit: 82b4d2f | dependency_revisions: CLI r7-t19-14-g47d8f7b（12:18 重建）+ auto-ui-tool 13:09（plan-007 线）+ vendor pin c39ac7f9 | spec_inputs: durable-inbox.md `82f9d252…`（canonical 未动，diff base..HEAD 为空）；SD 候选稿 e004/spec-delta-standalone.md（回填闭合） | acceptance_results: **AC-01 pass**（n01 三控 PASS + 原生首启 MCP 就绪 176.4s，prepare/record 核验）；**AC-02 pass**（Vue 31/31 + recovery spec；原生 autotest 19/19 真实窗口编辑保存，suite.log "Total: 19 passed, 0 failed"）；**AC-03 pass**（R8/R9 负例 + battery S0–S22 exit0 + scratch 52 exit0 + r7 VM 反例 11/11 fails=0，四种通道独立核验）；**AC-04 pass**（聚合门 --case all exit 0 于最终工具链，record.json 全字段核对：battery/scratch/suite exit0 + n01 负控如实失败 + exe sha256 `5f466380…`（工具链变更后重编，重绑正确）；README/roadmap 与实际运行一致）；**AC-05 pass**（本复审：AC 映射→任务→代码/工件→证据逐项核对，见下） | pending_closeout_gates: AC-06 merge 专属——canonical Spec 发布（SD-01/SD-02）、计划归档、提交 push、plan-artifacts 清理；本仓无独立 worktree（dev=main clone 规约），清理=归档+push+scratch 删除 | findings: 无阻断项。备注（非阻断）：决策稿 §1 保留 T-00 期 exe 哈希 f6ad7af6（历史），最终绑定哈希 5f466380 以 record.json 为准——merge 收口时可在决策稿补记一行 | evidence: 基线核验（82b4d2f..HEAD 仅 docs+pac.at+tests；src/ 零改动=§2"不强改业务源码"遵守；无 ledger 写入；canonical spec 未发布）；工件核验（n04 result.json verdict=PASS rev2→3 seed n-3；aggregate record.json CLI/exe/各门 exit0；vm-suite "19 passed"；negatives fails=0）；隔离核验（%APPDATA% 默认数据目录 mtime Oct 14 未触碰，全部运行在 plan-artifacts 隔离目录） | next: merge（T-07）
+- stage: merge | plan_id: NOTES-004:r1 | outcome: **pass** | worktree/branch: D:/autostack/auto-notes main（本仓规约无独立 worktree，wt-guard 不适用；无 plan-004 分支残留，git worktree list 仅 main） | reviewed_commit: 59226ed → delivery_commit: 1a9e38c（docs-only 后代，核验零实现/依赖变更）→ canonical 88e5f47（CRLF 规整后 amend 3878d26，内容等价） | checkpoints: **prepared**（reviewed 基线 + SD-01/SD-02 冻结稿 + 交付提交 1a9e38c）；**landed**（main 线性历史 tip=3878d26，无 merge commit）；**canonical_verified**（docs/specs/notes/durable-inbox.md `72bf06169f52c725…`、standalone-runtime.md `7dfc7353bf846d6c…`，diff 对照冻结 delta，链接 3/3 解析）；**archived**（docs/plans/archived/004-standalone-native-editing.md，status: archived，T-00..T-07 全 [x]、8/8，evidence 链接深度修正 `../evidence/`，随本收尾提交入库）；**cleaned**（无 worktree/分支可清；plan-artifacts/plan-004 全域删除于证据折叠后，registry 刷新；.retention 无 named hold） | landing≠deployment 观察：本 app 无生产实例/daemon；backend exe 为共享 generated-consumers target 的开发工件（随工具链生命周期），无 stale 生产制品需重建 | batch regression：本仓无该约定（.last-batch-regression.json 不存在；004 非 5 倍数）——不适用 | push：main → origin（随收尾） | next: done
 
 ## 10. 待澄清事项
 
