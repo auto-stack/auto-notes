@@ -1,11 +1,11 @@
 # auto-notes：独立可用性路线图
 
-更新：2026-11-01。以Spec与真实交付为准，计划目标不表示已实现。
+更新：2026-11-02。以Spec与真实交付为准，计划目标不表示已实现。
 
 | 顺序 | 计划/成果 | 当前状态与边界 |
 |---|---|---|
-| 基础 | [001首轮能力](plans/archived/001-durable-inbox.md) | 001可靠Inbox已交付归档/r8、35/35。r9最终复审有Vue31项及API反例；VM当轮boot失败后复用同源旧证据，不表示当前工具首启已验。 |
-| 当前优先 | [NOTES-004：独立启动与原生编辑恢复验收](plans/004-standalone-native-editing.md) | drafting/r1、0/8，未实施；先T-00核实当前工具/SDK与实际owner |
+| 基础 | [001首轮能力](plans/archived/001-durable-inbox.md) | 001可靠Inbox已交付归档。原VM当轮boot限制已由004在当前工具链补齐（原生首启+全套件通过）。 |
+| 当前优先 | [NOTES-004：独立启动与原生编辑恢复验收](plans/004-standalone-native-editing.md) | 双端门已完成：原生首启+autotest 19/19+r7反例11/11；Vue 31/31+battery+scratch 全绿；双端强杀重启下一次保存。execution_done，待独立复审归档。 |
 | 之后 | AutoOS统一装配 | 另立统一OS计划，接收各app单独验证/推送的精确提交；本轮不改pin |
 | 之后 | Linux支持 | WAIT_DISTRO_M1，等Nix＋COSMIC发行版基础；不阻塞本app本机任务 |
 

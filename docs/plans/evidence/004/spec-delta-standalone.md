@@ -9,20 +9,21 @@
 - **before**（现 §回归资产/身份）：「VM 当轮两次 boot 失败，按同源规则复用旧 VM
   19/19 与 11 负例；该裁决保留，但不证明当前工具链独立原生首启」；依赖固定记录
   r9 冻结 CLI（auto-lang e849e06f9 重建）。
-- **after**：依赖固定改记当前工具链（auto 0.1.0+plan-890-verified-r7-t19-5-g55c98c7，
-  tool=auto-ui 2f43b4f；vendor pin c39ac7f9 不变）；新增「当前工具链再验（NOTES-004）」
-  小节：battery S0–S22 fails=0、后端 scratch 52 fails=0、Vue 31/31 passed、
-  N-04 强杀重启后下一次真实编辑成功（rev 推进，SQLite 只读核实）——协议面
-  （提交协议/幂等/revision/错误码/UI 契约）零改动。原生 VM 首启边界以 G4 解除后
-  复跑结果回填（见下「回填位」）。
+- **after**：依赖固定改记当前工具链（auto 0.1.0+plan-890-verified-r7-t19-14-g47d8f7b，
+  tool=auto-ui-tool 重建于 2026-11-02 13:09，auto-ui plan-007 合并线；vendor pin
+  c39ac7f9 不变）；新增「当前工具链再验（NOTES-004）」小节：battery S0–S22
+  fails=0、后端 scratch 52 fails=0、Vue 31/31 passed、原生 015-notes.autotest
+  19/19 + r7 VM 反例 11/11 fails=0、双端 N-04 强杀重启后下一次真实编辑成功
+  （rev 推进，SQLite 只读核实）——协议面（提交协议/幂等/revision/错误码/UI 契约）
+  零改动。
 - **rationale**：001 的冻结 CLI 已失存（r9 债项），协议回归须绑定可重建的当前
-  工具链；本次全绿再验使「协议未回归」不依赖已丢失二进制。
+  工具链；本次双端全绿再验使「协议未回归」不依赖已丢失二进制。
 - **acceptance IDs**：AC-02/03/04。
 
-### 回填位（G4 解除后）
-原生门（015-notes.autotest --mode vm 19 场景 + r7 VM 负例 11 断言，当前 CLI 首证）
-通过后，在 §回归资产 增补「当前工具链原生首启：boot/MCP/19 场景/11 断言 exit 0 +
-证据指针」，并删除「不表示当前工具首启已验」的旧 caveat 行。
+### 回填位（已闭合 2026-11-02）
+原生门在 owner 修复落地后复跑通过：P-N 首启 MCP 就绪 176.4s、015-notes.autotest
+--mode vm **19/19 exit 0**（当前 CLI 首证）、r7 VM 负例 **11/11 fails=0**。§回归资产
+据实增补并删除「不表示当前工具首启已验」caveat；merge 阶段按本稿落 canonical。
 
 ## SD-02 add — docs/specs/notes/standalone-runtime.md（新文档）
 
@@ -40,8 +41,10 @@
 4. **Profile**：
    - P-V（Vue dev，正式 Vue 门）：直启后端 exe + vite dev，调用方 env 全程控制，
      引擎 dev 条件走 src；就绪判定 = `/api/v1/status` + 前端 HTTP（≤150s）。
-   - P-N（原生门，G4 解除后启用）：`auto run -r vm -B <port>` + AUTOUI_MCP_PORT
-     就绪判定（tools/list ≤600s）；015-notes.autotest --mode vm 驱动。
+   - P-N（原生门，已启用）：`auto run -r vm -B <port>` + AUTOUI_MCP_PORT
+     就绪判定（tools/list ≤600s，实测 172–217s）；015-notes.autotest --mode vm
+     驱动；N-04 原生形态 = 建存 → taskkill /T /F 强杀整树 → 同数据目录重启 →
+     重开保真 + 下一次真实编辑保存。
    - P-B（构建健康检查）：`auto build -r vue` 产物构建成功。
 5. **失败控制（N-05）**：坏 exe 路径 → spawn 期命名失败非零；端口被占 → 就绪
    超时/早期退出非零；清理只回收本次 spawn 树；旁观实例/共享 target 不触碰。
@@ -52,7 +55,7 @@
    plan-910 收口后重探）；工具宿主间歇性静默失败与机器并发构建相关（重试纪律）。
 - **acceptance IDs**：AC-01/04。
 
-## 未决（不影响候选稿结构）
+## 未决（已清空）
 
-- SD-01 回填位与 SD-02 P-N 段在 G4 解除后按复跑证据收口——merge 前必须完成
-  （计划 §6：未满足的原生门不能留到 merge）。
+- G4 已由 owner 修复解除（auto-ui plan-007 线，工具 2026-11-02 13:09 重建）；
+  SD-01 回填位与 SD-02 P-N 段均按复跑证据收口。无遗留未决。

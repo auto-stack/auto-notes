@@ -45,6 +45,16 @@
 ### 正式 profile 选择
 Vue 门 = P-V（复用 r9 套件与反例，环境可控）；原生门 = P-N（唯一原生真实页面证据源）。两者都在 verify_standalone.py 中编排（T-04）。
 
+## 6b. G4 解除后的终态复验（2026-11-02 下午，修复落地）
+
+owner 修复落地（auto-ui plan-007 合并线，`auto-ui-tool.exe` 重建 13:09、`auto.exe` 12:18；CLI 版本 `0.1.0+plan-890-verified-r7-t19-14-g47d8f7b`）：
+
+- **P-N 首启 PASS**：MCP 就绪 176.4s，tools/list 正常，5s 稳定存活（t05-vm-reprobe2.log）。
+- **015-notes.autotest 19/19 passed, 0 failed（suite_exit=0）**——当前工具链原生套件首证（t05-vm-suite.log；r9 遗留"不表示当前工具首启已验"caveat 至此可闭）。
+- **r7 线 VM 反例 11/11 fails=0**（t05-vm-negatives.log）。
+- **N-04(native) PASS**：原生窗口真实 UI 建中文标题笔记（rev2，SQLite n-7）→ taskkill /T /F 强杀整树 → 同数据目录重启（172.3s）→ 重开标题保真 + 种子正文保真（Shopping List/Milk）→ 下一次真实编辑保存 rev2→3（t05-n04-native.log + t05/n04_native_driver.py 场景文件）。
+- Vue 聚合门在**最终工具链**上重跑绑定（见 §6 回填区末行）。
+
 ## 5. 冷准备预算（实测回填）
 
 | 阶段 | 就绪判定 | 实测 | 预算上限 |

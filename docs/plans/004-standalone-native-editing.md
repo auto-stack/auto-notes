@@ -6,8 +6,9 @@ author: [Codex]
 created_at: 2026-11-01
 updated_at: 2026-11-01
 plan_revision: 1
-current_step: 1
+current_step: 5
 total_steps: 8
+status: execution_done
 base_branch: main
 base_commit: 82b4d2f4b87e3fc6a3cc455a263b4ab1ef45aa4b
 depends_on: ["NOTES-001"]
@@ -101,11 +102,11 @@ T-00新建决策稿 `docs/plans/evidence/004/standalone-decision.md`：固定源
 ## 8. 执行步骤
 
 - [x] T-00（owner_stage=work；依赖001；AC-01..03）：完成有界运行/依赖探针和决策稿，核实实际数据根/测试模式及最小owner前置。[✅ 已完成] 决策稿 [standalone-decision.md](evidence/004/standalone-decision.md)（G1 npm_deps 对象形态修复、G2 引擎 dist 冷准备、G3 旧生成 member 清理、G4 原生 split 框架缺口+owner=auto-ui）；数据根 `NOTES_DATA_DIR`/默认 `%APPDATA%/auto-notes/data`、门禁 `NOTES_TEST_MODE=1`（源码 repository.at:33/db.at:181 核实）；P-V 首启过 + Vue 31/31；P-N 10+ 次 0 过（merge vm+vm 可过，隔离矩阵在案）。
-- [ ] T-01（owner_stage=work；依赖T-00；AC-01）：收口独立准备/启动和自有进程/数据隔离，明确空缓存与错误结果。**（Vue 半区收口：`tests/basic/verify_standalone.py --case n01` PASS——S1..S5 有界准备、空缓存首启就绪、坏 exe/端口占用两负控非零且不触碰旁观实例；CREATE_NO_WINDOW 会致工具链子进程静默失败已实证绕开；原生半区待 G4 解除）**
-- [ ] T-02（owner_stage=work；依赖T-01和确需的实际前置；AC-02）：完成当前真实Vue/原生编辑与引擎路径；只修实证缺口，保留现有正确能力。**（Vue 半区：31/31 套件 + recovery spec 真实编辑保存 + 引擎 dist（dev/src 与 build/dist 双路径）✓；原生半区待 G4）**
-- [ ] T-03（owner_stage=work；依赖T-02；AC-03）：回放失败保稿/冲突/软删和退出恢复后的下一次保存，关闭N-03/N-04。**（Vue 半区：N-04 PASS——真实 UI 中文/引号/换行落库 rev2 → 硬杀后端 → 同数据目录重启 → 正文逐字保真 + 下一次编辑 rev3（SQLite 磁盘核实）；N-03 由套件 R8/R9 负例 + battery S20..S22 fails=0 + scratch U11..U13 覆盖；原生半区待 G4）**
-- [ ] T-04（owner_stage=work；依赖T-03；AC-04）：建立聚合入口，复用既有门并跑N-01..05及失败控制，准备SD候选。**（Vue 半区收口：`--case all` PASS——n01+n04+套件31+battery S0-S22+scratch 52 exit 0；SD 候选稿 [spec-delta-standalone.md](evidence/004/spec-delta-standalone.md)（SD-01/SD-02，含 G4 回填位）；vm profile 在 G4 解除前命名非零（无静默跳过））**
-- [ ] T-05（owner_stage=work；依赖T-04；AC-01..04）：核对源码/依赖漂移、README/roadmap与证据覆盖，提交execution_done。
+- [x] T-01（owner_stage=work；依赖T-00；AC-01）：收口独立准备/启动和自有进程/数据隔离，明确空缓存与错误结果。[✅ 已完成] `verify_standalone.py --case n01` PASS（S1..S5 有界准备+空缓存首启+坏exe/端口占用负控）；原生 P-N 首启 MCP 就绪 176.4s PASS（G4 解除后复探）。
+- [x] T-02（owner_stage=work；依赖T-01和确需的实际前置；AC-02）：完成当前真实Vue/原生编辑与引擎路径；只修实证缺口，保留现有正确能力。[✅ 已完成] Vue 31/31 + recovery spec 真实编辑保存 + 引擎 dist 双路径；原生 015-notes autotest 19/19（真实窗口点击/输入/保存）+ pac.at npm_deps 形态修复（G1）。
+- [x] T-03（owner_stage=work；依赖T-02；AC-03）：回放失败保稿/冲突/软删和退出恢复后的下一次保存，关闭N-03/N-04。[✅ 已完成] N-03：套件 R8/R9 负例 + battery S20..S22 fails=0 + scratch U11..U13 + r7 VM 反例 11/11；N-04 双端：Vue 强杀重启 rev2→3、原生强杀整树重启 rev2→3（原生另证种子正文保真）。
+- [x] T-04（owner_stage=work；依赖T-03；AC-04）：建立聚合入口，复用既有门并跑N-01..05及失败控制，准备SD候选。[✅ 已完成] `--case all` 聚合门 PASS（n01+n04+套件31+battery+scratch）；SD-01/SD-02 候选稿（回填位已闭合）；vm profile 无静默跳过。
+- [x] T-05（owner_stage=work；依赖T-04；AC-01..04）：核对源码/依赖漂移、README/roadmap与证据覆盖，提交execution_done。[✅ 已完成] G4 由 owner 修复解除（auto-ui plan-007 线，工具 2026-11-02 13:09 重建、CLI r7-t19-14-g47d8f7b）；原生半区补齐：P-N 首启 MCP 就绪 176.4s、015-notes autotest 19/19 exit0、r7 VM 反例 11/11 fails=0、N-04 native 强杀整树重启 rev2→3 + 种子正文保真；Vue 聚合门在最终工具链重跑 PASS（全证据绑定交付工具链）；README/roadmap 漂移已更新；SD 候选稿回填闭合。execution_done。
 - [ ] T-06（owner_stage=review；依赖T-05；AC-05）：同clone独立上下文最终复审。
 - [ ] T-07（owner_stage=merge；依赖T-06 pass；AC-06）：仅app规范/归档/提交push收尾，不集成OS。
 
@@ -119,6 +120,7 @@ T-00新建决策稿 `docs/plans/evidence/004/standalone-decision.md`：固定源
 - stage: goal | plan_id: NOTES-004 | plan_revision: 1 | round: 3 | from: waiting-check | to: waiting | status: executing | outcome: waiting | note: 复探条件未满足——auto-ui master 仅新增 plan-029 文档提交（cc18ef8a/150bab3e，doc-surface 记录），无解析层修复；auto-ui-tool.exe 仍为 11-02 07:21 构建；ui-029 分支在 doc-surface 特性线上。等待计数 1/3，继续挂起（每轮一次落地检查；3 连空转后按协议挂起 blocked）。 | next: waiting（条件=auto-ui master 解析修复+工具重建）
 - stage: goal | plan_id: NOTES-004 | plan_revision: 1 | round: 4 | from: waiting-check | to: waiting | status: executing | outcome: waiting | note: 复探条件仍未满足——auto-ui master 无新提交（仍 150bab3e），auto-ui-tool.exe 仍 07:21 构建。等待计数 2/3，继续挂起。 | next: waiting（条件不变）
 - stage: goal | plan_id: NOTES-004 | plan_revision: 1 | round: 5 | from: waiting-check | to: blocked | status: executing | outcome: blocked | note: 等待 3/3 空转（master 仍 150bab3e、工具仍 07:21、ui-029 仍 57cf408a）——按协议挂起 blocked。**解除条件不变**：auto-ui master 合入 VM 解析层修复（样式名/跨包导入）+ auto-ui-tool.exe 重建后，`/goal resume` 续跑；续跑首件事 = P-N 复探（`run -r vm` + MCP 就绪），通过则解锁原生半区（015-notes autotest 19 场景 + r9 VM 反例 + N-02/N-04 native）→ T-05 execution_done → T-06 独立复审 → T-07 merge 归档 push。Vue 半区既证（n01/n04/suite31/battery/scratch 全绿）不受影响。 | next: user（/goal resume at 解除条件满足）
+- stage: work | plan_id: NOTES-004 | plan_revision: 1 | round: 6 | outcome: pass | worktree: D:/autostack/auto-notes（本仓独立clone main） | branch: main | base_commit: 82b4d2f | code_commit: 本轮=T-05 收口提交（见 git log） | dependency_revisions: **最终工具链** CLI `0.1.0+plan-890-verified-r7-t19-14-g47d8f7b`（auto-man 47d8f7b，12:18 重建）+ auto-ui-tool 13:09 重建（plan-007 合并线，G4 修复内）+ vendor/auto-down c39ac7f9 | task_ids: T-01..T-05 全闭合 | evidence: G4 解除复探（t05-vm-reprobe2.log MCP 就绪 176.4s）；015-notes autotest **19/19 exit0**（t05-vm-suite.log，当前 CLI 原生首证）；r7 VM 反例 **11/11 fails=0**（t05-vm-negatives.log）；**N-04 native PASS**（t05-n04-native.log：原生建存 rev2 → taskkill /T /F 整树 → 同数据目录重启 172.3s → 重开保真 + 种子正文保真 + 下一次编辑 rev2→3，SQLite n-7 核实）；Vue 聚合门在最终工具链重跑 **--case all exit 0**（verify-standalone-1793598065，证据绑定交付工具链）；README/roadmap/决策稿/SD 候选稿全部回填 | blockers: 无 | next_responsible_role: review（T-06 同 clone 独立上下文最终复审）
 
 ## 10. 待澄清事项
 
@@ -130,6 +132,6 @@ T-00新建决策稿 `docs/plans/evidence/004/standalone-decision.md`：固定源
 2. **另立 owner 最小前置**：按计划 §2 在 auto-ui 仓新建最小修复计划（跨仓写入范围扩大，需明确授权）；
 3. **调整验收**：临时以 Vue 轨 + 001 r9 同源旧 VM 证据收口（削减 AC-02/04 的当前工具链原生半区——验收变更，需明确批准）。
 
-**重探条件精化（2026-11-02 轮2末）**：用户裁决的"plan-910 收口"已发生（auto-ui master 01f99fd + 工具 07:21 重建），原生门仍红但诊断精化——**G4a 宿主静默死亡已被 plan-910 修复**（现给出具名错误）；**G4b 现存**：当前 VM 解析层拒绝本仓 r9 有效源码的样式名构造（`sidebar.at:111` 条件分支样式名、`editor.at:106` 跨包命名导入配方名；Reader/Musk 同族构造可行），owner=auto-ui，其 ui-029 线（更新工具构建）可能已含修复。**重探条件 = auto-ui master 含 ui-029 线解析修复（或等价）+ 工具重建**；届时每轮一次 `run -r vm` 有界复探（MCP 就绪判定），仍红则继续等待计数。Vue 轨全部完成不受影响。
+**重探条件精化（2026-11-02 轮2末）→ 已解除（2026-11-02 午后）**：owner 修复落地（auto-ui plan-007 合并线，`auto-ui-tool.exe` 13:09 重建、`auto.exe` 12:18、CLI `r7-t19-14-g47d8f7b`），原生门复探通过，G4a/G4b 均闭合。§10 无待决事项。
 
 其余事项：当前没有需要用户重复确认的产品方向。技术不确定性由T-00记录真实证据、owner与依赖任务；若需要改变目标、削减必需验收或扩大跨仓写入范围，先明确报告，受影响任务保持未完成。归档/merge只完成本app的Spec/计划/提交push与自有临时产物收尾，不更新AutoOS gitlink、manifest或.gitmodules；后续OS统一计划接收已单独验证的固定SHA。
