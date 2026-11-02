@@ -117,6 +117,7 @@ T-00新建决策稿 `docs/plans/evidence/004/standalone-decision.md`：固定源
 - stage: goal | plan_id: NOTES-004 | plan_revision: 1 | round: 2 | from: blocked | to: work | status: executing | outcome: pass | note: 用户裁决选 §10 选项1——等 plan-910 收口+工具重建后重探原生门（P-N），期间 Vue 轨 T-01..T-05 继续推进；G4 保持挂起、受影响原生半区任务保持未完成。 | next: work/T-01（Vue 半区收口）
 - stage: work | plan_id: NOTES-004 | plan_revision: 1 | round: 2 | outcome: pass（Vue 半区） | worktree: D:/autostack/auto-notes | branch: main | code_commit: 0f44298 + 本轮聚合/SD 稿 | task_ids: T-01/T-02/T-03/T-04（Vue 半区收口） | evidence: D:/autostack/plan-artifacts/plan-004/（t01-n01-vue.log N-01 三控 PASS；t03-n04-vue.log N-04 rev2→3；t03-battery-retry3.log S0-S22 fails=0；t03-scratch.log 52 fails=0；t04-all-vue.log 聚合 exit 0） | blockers: 原生半区待 G4（plan-910 未落地，轮末复查） | next_responsible_role: work（G4 解除→原生半区；未解除→waiting）
 - stage: goal | plan_id: NOTES-004 | plan_revision: 1 | round: 3 | from: waiting-check | to: waiting | status: executing | outcome: waiting | note: 复探条件未满足——auto-ui master 仅新增 plan-029 文档提交（cc18ef8a/150bab3e，doc-surface 记录），无解析层修复；auto-ui-tool.exe 仍为 11-02 07:21 构建；ui-029 分支在 doc-surface 特性线上。等待计数 1/3，继续挂起（每轮一次落地检查；3 连空转后按协议挂起 blocked）。 | next: waiting（条件=auto-ui master 解析修复+工具重建）
+- stage: goal | plan_id: NOTES-004 | plan_revision: 1 | round: 4 | from: waiting-check | to: waiting | status: executing | outcome: waiting | note: 复探条件仍未满足——auto-ui master 无新提交（仍 150bab3e），auto-ui-tool.exe 仍 07:21 构建。等待计数 2/3，继续挂起。 | next: waiting（条件不变）
 
 ## 10. 待澄清事项
 
