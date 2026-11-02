@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-01
 updated_at: 2026-11-01
 plan_revision: 1
-current_step: 0
+current_step: 1
 total_steps: 8
 base_branch: main
 base_commit: 82b4d2f4b87e3fc6a3cc455a263b4ab1ef45aa4b
@@ -100,8 +100,8 @@ T-00新建决策稿 `docs/plans/evidence/004/standalone-decision.md`：固定源
 
 ## 8. 执行步骤
 
-- [ ] T-00（owner_stage=work；依赖001；AC-01..03）：完成有界运行/依赖探针和决策稿，核实实际数据根/测试模式及最小owner前置。
-- [ ] T-01（owner_stage=work；依赖T-00；AC-01）：收口独立准备/启动和自有进程/数据隔离，明确空缓存与错误结果。
+- [x] T-00（owner_stage=work；依赖001；AC-01..03）：完成有界运行/依赖探针和决策稿，核实实际数据根/测试模式及最小owner前置。[✅ 已完成] 决策稿 [standalone-decision.md](evidence/004/standalone-decision.md)（G1 npm_deps 对象形态修复、G2 引擎 dist 冷准备、G3 旧生成 member 清理、G4 原生 split 框架缺口+owner=auto-ui）；数据根 `NOTES_DATA_DIR`/默认 `%APPDATA%/auto-notes/data`、门禁 `NOTES_TEST_MODE=1`（源码 repository.at:33/db.at:181 核实）；P-V 首启过 + Vue 31/31；P-N 10+ 次 0 过（merge vm+vm 可过，隔离矩阵在案）。
+- [ ] T-01（owner_stage=work；依赖T-00；AC-01）：收口独立准备/启动和自有进程/数据隔离，明确空缓存与错误结果。**（Vue 半区证据已备：pv-first/、vue-full/；原生半区被 G4 阻塞，见 §10）**
 - [ ] T-02（owner_stage=work；依赖T-01和确需的实际前置；AC-02）：完成当前真实Vue/原生编辑与引擎路径；只修实证缺口，保留现有正确能力。
 - [ ] T-03（owner_stage=work；依赖T-02；AC-03）：回放失败保稿/冲突/软删和退出恢复后的下一次保存，关闭N-03/N-04。
 - [ ] T-04（owner_stage=work；依赖T-03；AC-04）：建立聚合入口，复用既有门并跑N-01..05及失败控制，准备SD候选。
@@ -113,7 +113,16 @@ T-00新建决策稿 `docs/plans/evidence/004/standalone-decision.md`：固定源
 
 - stage: new | plan_id: NOTES-004 | plan_revision: 1 | outcome: pass（有界T-00准备就绪；本轮没有实现或产品验收） | next: work/T-00（等待后续实施指令）。
 - 已归档001、现实现Spec和产品源码保持不变；规划结构/链接通过不等于功能通过。review以同一clone的独立上下文核验，不自动创建agent/chat或指定模型。
+- stage: work | plan_id: NOTES-004 | plan_revision: 1 | round: 1 | outcome: blocked | worktree: D:/autostack/auto-notes（本仓独立clone main，计划§2规约） | branch: main | base_commit: 82b4d2f | code_commit: （本轮实现提交=pac.at npm_deps 形态修复+决策稿+本记录） | dependency_revisions: vendor/auto-down c39ac7f9；工具链 auto 0.1.0+plan-890-verified-r7-t19-5-g55c98c7（auto-man 67add3c，tool=auto-ui 2f43b4f 含 plan-910 rust-ui 重写）；后端依赖 auto-lang 5923d4dee/auto-web | task_ids: T-00（完成）；T-01..T-05 Vue 半区部分推进、原生半区未开 | evidence: docs/plans/evidence/004/standalone-decision.md + D:/autostack/plan-artifacts/plan-004/t00/（P-V 首启 PASS 0.9s；Vue 全套 31/31 exit0；P-N 10+ 次 0 过：`run -r vm` split vm↔rust 工具宿主静默死亡，4s 速死与 96–132s 生成后死亡两形态；隔离矩阵 merge vm+vm 过/hello 过/stub-back 可达 cargo 具名错误） | blockers: G4 原生门=auto-ui owner 缺口（plan-910 rust-ui 重写当日落地强相关；auto-database plan-002 同症先例在案），跨仓修复超出本计划授权（§2），验收调整需用户裁决（§10） | next_responsible_role: user（裁决后回 work：T-01 起）
 
 ## 10. 待澄清事项
 
-当前没有需要用户重复确认的产品方向。技术不确定性由T-00记录真实证据、owner与依赖任务；若需要改变目标、削减必需验收或扩大跨仓写入范围，先明确报告，受影响任务保持未完成。归档/merge只完成本app的Spec/计划/提交push与自有临时产物收尾，不更新AutoOS gitlink、manifest或.gitmodules；后续OS统一计划接收已单独验证的固定SHA。
+**当前阻断（2026-11-02，T-00 后）：原生门被工具链框架缺口 G4 阻塞，需要用户裁决。**
+现状：`auto run -r vm`（vm↔rust split，原生真实页面唯一入口）在当前工具链（auto g55c98c7 + auto-ui 2f43b4f 含当日落地的 plan-910 rust-ui 重写）上 10+ 次有界尝试 0 次成功——工具宿主静默死亡；merged vm+vm、Vue 轨、最小 hello、直启后端全部正常（隔离矩阵见决策稿 G4/§6）。owner=auto-ui（跨仓修复本计划不授权）；auto-database plan-002 有同症记录与 owner 前置先例。
+
+请裁决原生门走法（受影响任务保持未完成，不做静默降级）：
+1. **等 plan-910 收口**：auto-ui 的 rust-ui 重写正在另一会话进行（review R1 修复已落），待其合并+工具重建后重探原生门（推荐——不动验收，最小新增范围）；
+2. **另立 owner 最小前置**：按计划 §2 在 auto-ui 仓新建最小修复计划（跨仓写入范围扩大，需明确授权）；
+3. **调整验收**：临时以 Vue 轨 + 001 r9 同源旧 VM 证据收口（削减 AC-02/04 的当前工具链原生半区——验收变更，需明确批准）。
+
+其余事项：当前没有需要用户重复确认的产品方向。技术不确定性由T-00记录真实证据、owner与依赖任务；若需要改变目标、削减必需验收或扩大跨仓写入范围，先明确报告，受影响任务保持未完成。归档/merge只完成本app的Spec/计划/提交push与自有临时产物收尾，不更新AutoOS gitlink、manifest或.gitmodules；后续OS统一计划接收已单独验证的固定SHA。

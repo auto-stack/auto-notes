@@ -9,7 +9,9 @@ title_zh: "备忘录"
 theme: "dark"
 accent: "indigo"
 api: "rust"
-npm_deps: ["@autodown/engine:file:../../../vendor/auto-down/autodown/packages/engine"]
+# NOTES-004 T-00：当前工具链（auto-ui-tools npm_deps_from_value）的数组形态
+# 按 '@' 裸切分，scoped 名解析失败；改用受支持的对象形态 { file: path }。
+npm_deps: { "@autodown/engine": { file: "../../../vendor/auto-down/autodown/packages/engine" } }
 
 dep stylekit {
     path: "vendor/stylekit"
