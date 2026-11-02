@@ -12,7 +12,8 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path.cwd()
-EXE = ROOT / 'rust-workspace/target/debug/auto-notes-back.exe'
+# NOTES-004 T-01：exe 身份随生成 crate 变化，支持环境覆盖（r9 AUTO_CLI 同款）
+EXE = Path(os.environ.get('NOTES_BACK_EXE', str(ROOT / 'rust-workspace/target/debug/auto-notes-back.exe')))
 WEDGE = ROOT / 'tests/probe/evidence/v1/wedge-snapshot'
 RUN = Path(os.environ.get('R5_WORK', ROOT / '.auto' / ('r5-work-' + str(time.time_ns()))))
 RUN.mkdir(parents=True, exist_ok=True)

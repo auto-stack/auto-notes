@@ -22,7 +22,7 @@ processes = []
 logs = []
 try:
     commands = [
-        ([str(root / 'rust-workspace/target/debug/auto-notes-back.exe')], root, 'backend'),
+        ([os.environ.get('NOTES_BACK_EXE', str(root / 'rust-workspace/target/debug/auto-notes-back.exe'))], root, 'backend'),
         (['node', str(root / 'gen/front/vue/node_modules/vite/bin/vite.js'),
           '--host', '127.0.0.1', '--port', str(front_port), '--strictPort'], root / 'gen/front/vue', 'frontend'),
     ]
