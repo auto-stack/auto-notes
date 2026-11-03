@@ -32,7 +32,12 @@ def main():
                         help="Path to .autotest file (default: 015-notes.autotest)")
     parser.add_argument("--mode", default="vm", choices=["vm", "rust"],
                         help="Rendering mode (controls skip_if behavior)")
-    parser.add_argument("--url", default="http://localhost:9247/mcp",
+    # PLAN-056 T-02 harness adaptation: honor AUTOUI_MCP_PORT (matches the
+    # runtime's env override) so a pinned-port run stays hermetic against
+    # same-machine races on the default range.
+    import os as _os
+    _mcp = _os.environ.get("AUTOUI_MCP_PORT", "9247")
+    parser.add_argument("--url", default=f"http://localhost:{_mcp}/mcp",
                         help="MCP server URL")
     parser.add_argument("--screenshot-baseline", action="store_true",
                         help="Save baseline screenshots for each scenario (Task 20)")

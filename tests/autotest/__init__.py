@@ -207,7 +207,10 @@ class McpAdapter:
             verdict = f"error: {e}"
         self.screenshot_results.append((sid, verdict))
 
-    def wait_ready(self, timeout: float = 180.0) -> bool:
+    def wait_ready(self, timeout: float = 420.0) -> bool:
+        # PLAN-056 T-02: 180s could not cover this toolchain generation's
+        # per-boot front regeneration + back relink (measured 107-348s).
+        # Readiness criteria unchanged.
         """PLAN-619 F-1（验收基建）：等 app **真正就绪**再跑场景。
 
         历史坑：只等 MCP 端口就开跑时，前序场景会在「空树」上执行——`autoui_state`

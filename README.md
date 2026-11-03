@@ -39,3 +39,23 @@ AutoOS 通过 [`apps/auto-notes`](https://github.com/auto-stack/auto-os/tree/mai
 [路线图](docs/roadmap-v0.6.md) · [现实现规范](docs/specs/notes/durable-inbox.md)。开发与顺序复审在D:/autostack/auto-notes独立clone main，一app一写入者；不在OS组合子模块开发，不建junction/symlink。各app独立验收后由统一OS计划装配，Linux仍WAIT_DISTRO_M1。
 
 002快速卡片/多媒体/剪贴板接收、003入口/知识交接保留drafting/r2原文，004不等待它们。旧草案中的apps/015-notes、v0.6-dev及自动升级OSpin工作条款由现行独立clone/统一集成安排替代，继续维护时再修订。当前原生/普通dev引擎路径由004验证，不把Blog历史问题直接当本app故障。
+
+## 主题（auto-os/PLAN-056 接入）
+
+本产品已接入 AutoUI **官方主题包**正式消费面（2026-11-03，PLAN-056 T-02）：
+
+- `vendor/themes` 为 UI 管理渠道发布的固定版本快照（`themes` 0.2.0，内容
+  digest `9fa07742dc68aa5377ae06cb2d966386002063f184c515b6c5dddf8a6bef838e`），
+  经 `pac.at` `dep themes` 消费；快照不可二次编辑、非第二权威源。
+- 主合同（宿主策略/通知/持久化/拒绝语义）在 **auto-os/PLAN-056**
+  （`auto-os` 仓 `docs/plans/056-productivity-products-theme-adoption.md`
+  与其 canonical specs）：本产品 pac `theme` 键移除（原 `dark` 显式值退役）
+  = **follow 宿主**（宿主策略完整快照 > 本 `design` 默认 > legacy 回退）；
+  `src/front/app.at` `design { theme: "Auto", mode: dark_mode 派生 }` 为
+  独立/无宿主环境的默认腿（默认暗色语义不变，`use themes.themes: Auto`
+  注册收集链——C-11 合同）。
+- 品牌与外观面板四色板（indigo/coral/ocean/sage）为 App 命名空间固定值
+  豁免，不随主题映射；store `dark_mode`/`accent_color` 业务语义原样。
+- 测试设施适配：`tests/desktop_mcp.py` 启动等待 30s→180s（本工具链代次
+  back server 每次运行再生成+大仓重链 ~107s，unmodified todo 基线同现
+  regen 行为——非本包回归；检查与不变量未改）。

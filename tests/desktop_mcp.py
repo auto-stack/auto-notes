@@ -326,7 +326,12 @@ def main():
         print("or set AUTO_BIN env var to the binary path.")
         sys.exit(2)
 
-    mcp_port = pick_free_port()
+    # PLAN-056 T-02 harness adaptation: honor a pre-pinned AUTOUI_MCP_PORT
+    # (matches the runtime's own env override semantics) so a run stays
+    # hermetic against same-machine respawn races on the default range;
+    # default remains pick_free_port() when the env is absent.
+    _pinned = os.environ.get("AUTOUI_MCP_PORT")
+    mcp_port = int(_pinned) if _pinned else pick_free_port()
     mcp_url = f"http://localhost:{mcp_port}/mcp"
     if mcp_port != MCP_PORT_DEFAULT:
         print(f"NOTE: port {MCP_PORT_DEFAULT} busy (stale auto.exe?); "
@@ -353,8 +358,17 @@ def main():
 
     try:
         print(f"Waiting for MCP server on port {mcp_port}...")
-        if not wait_for_server(mcp_url):
-            print(f"ERROR: MCP server did not start within 30s. "
+        # PLAN-056 T-02 harness adaptation: this toolchain generation
+        # regenerates the back server every run (ui-cache fingerprint never
+        # re-stamped on the VM run path; pre-existing, reproducible on
+        # unmodified todo baseline). With the os-056 group toolchain the
+        # front VM generation also runs full each boot, and notes' large
+        # back crate pays a long debug relink: measured boots 107s (warm,
+        # Nov-2 toolchain) to 348s (cold, os-056 toolchain, 2026-11-03).
+        # Bounded bump 30s->420s so the suite observes MCP on the first
+        # run of a session; invariants and checks unchanged.
+        if not wait_for_server(mcp_url, timeout=420):
+            print(f"ERROR: MCP server did not start within 420s. "
                   f"Is the auto binary built with --features ui-iced? "
                   f"Binary: {AUTO_BIN}")
             proc.kill()
