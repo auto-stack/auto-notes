@@ -1746,7 +1746,14 @@ fn fs_mkdir(p str) bool {
 }
 
 fn fs_write(p str, c str) bool {
-    return fs.write_text(p, c)
+    if fs.is_dir(p) {
+        return false
+    }
+    fs.write_text(p, c)
+    if !fs.exists(p) {
+        return false
+    }
+    return fs.read_text(p) == c
 }
 
 fn fs_copy(a str, b str) bool {

@@ -59,3 +59,6 @@ AutoOS 通过 [`apps/auto-notes`](https://github.com/auto-stack/auto-os/tree/mai
 - 测试设施适配：`tests/desktop_mcp.py` 启动等待 30s→180s（本工具链代次
   back server 每次运行再生成+大仓重链 ~107s，unmodified todo 基线同现
   regen 行为——非本包回归；检查与不变量未改）。
+
+
+当前 SDK 的文件写入确认兼容由 [计划 005](docs/plans/005-current-sdk-file-write-confirmation.md) 跟踪，作为 [AutoOS PLAN-054](../auto-os/docs/plans/054-basic-apps-unified-assembly.md) 的具名组合前置。
