@@ -1,12 +1,12 @@
 ---
 plan_id: NOTES-005
-status: reviewed
+status: archived
 feature_name: 当前SDK文件写入确认兼容
 author: [Codex]
 created_at: 2026-11-06
-updated_at: 2026-11-06
+updated_at: 2026-11-07
 plan_revision: 2
-current_step: 3
+current_step: 4
 total_steps: 4
 base_branch: main
 base_commit: 38c7c8703a2f9fd4558684d5b80ee2765fedc040
@@ -72,7 +72,7 @@ T00定位已观察的真实调用与失败；T01完成 `fs_write` 及同因调�
 - [x] T00 owner_stage=work：复核失败/生产路径/现行SDK，确认有界方案。
 - [x] T01 owner_stage=work：实现兼容与永久V02，正式生成编译V01，提交工作完成。
 - [x] T02 owner_stage=review：同一clone独立上下文复审当前源/Spec提案及结果。
-- [ ] T03 owner_stage=merge：规范、父集成、提交push与归档；保留永久开发clone。
+- [x] T03 owner_stage=merge：规范、父集成、提交push与归档；保留永久开发clone。
 
 ## 9. 复审记录
 
@@ -134,3 +134,8 @@ T00定位已观察的真实调用与失败；T01完成 `fs_write` 及同因调�
   Independent final source/Spec pass retained from recorded review; this successor changes only approved canonical documentation and Plan bookkeeping. Parent054 actual SDK195 Vue/iced both8required8pass0fail, all6nativev15 formally rebuilt/18artifactbindings/67inputhashes. Current task/reopen/next native andVue independent receipts are in D:/autostack/plan-artifacts/plan-054/t04; native notes oracle and canonical-vue-notes-oracle-r195.json bind full current consumer behavior. Notes id9rev3 fullChinese, Calendar ev4delete/allversionsabsent/reopen/generationg-new/rev11→12/ev5next/oldev3exact, Todo id1edit/done1/reopen/nextedit, Blog workw-1793988759935-1fulltitle/multiline/reopen/nextSave/current+revision8; relevant app behavior is verified, not substituted by API prewrite. Blog oldnativework titles remain complete; sourcephase unchanged.
   Parent permanentpacket gates: icedSHA cd232e671e0aa7a3c1e0637a5a98e055eb9343345756faf231ca442e1e2cc042; VueSHA 9c91aadc95570bc78e24251bfa44939b99b7c12fed25cd096de55360eb09db1d. Each current validator actual8/8exit0; Vue description-only metadata corrected from copied194label without changingcases/SDK/data/frames. Work source tree 7dc6f336a81a1060aac95ce7af31b69cd4b81f3a / pacblob 48668e619a7519bf242d73b6801b587db36eb87e frozen for final Doc descendant check. No wholecatalog rerun. Canonical delta matches reviewed proposal; Todo no-impact Spec conclusion retained because privatecleanup result annotation only and all6callers ignore result.
   Permanent independent app clone is retained per user policy. Foreign untracked WIP is untouched. Shared raw evidence remains protected by active parent054 for its finalreview, not a separate archived-child raw scope or indefinite hold. Final push/archive and parentfinalpin are not yet claimed.
+
+
+- stage:merge | completion_kind:delivered | checkpoints:landed/canonical_verified/archived/cleaned | delivery_commit:c4b363756b95ec7ceb5a5529774679762860958d | outcome:pass | archive:docs/plans/archived/005-current-sdk-file-write-confirmation.md
+  Independent merge-document audit /root/review_app_sdk passed this exact prepared commit: approved canonical delta accurate, src/pac byte-equivalent to reviewedsource, actualparent195Vue/native V03 complete, no new source/Specgap. Current canonical hashes {"docs\\specs\\notes\\durable-inbox.md": "5593db0924667b343f618d190860dc70a376099b9d6625879ccf081ae76e4a80"}. Permanentclone retained by explicit user app rule; no temporary appworktree toremove. Foreign untracked WIP preserved, not mislabeled clean; allPlan-owned tracked changes committed. Sharedraw stays inside activeparent054scope until its own finalreview/cleanup, no duplicatechildscope/legacyledger/index write. FinalREADME/source links resolve to actualarchivedPlan.
+  Production-facing artifact observation (landing is documentation/source publication, not deployment): parent fixedSDK195 candidate formally rebuilt and actually ran this app on bothtracks. Permanentclone local generated executables were not redeployed by this docs-only closeout: rust-workspace\auto-notes-30db9907\bin\debug\notes.exe modified 2026-11-06T22:00:24.589885. They must be regenerated through the standard current SDK before standalone production use; no foreignservice restart.
