@@ -1,0 +1,4 @@
+name: "fpack"
+version: "0.1.0"
+namespace: "notes"
+description: "NOTES-006 FeaturePack embeddable components (FpNoteEditor)"

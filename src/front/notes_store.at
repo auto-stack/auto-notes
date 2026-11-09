@@ -88,6 +88,17 @@ store NotesStore {
         var dirty bool = false
         var confirm_delete bool = false
 
+        // ── NOTES-006 T-03：FeaturePack 编辑组件消费面（主应用第一消费者）──
+        // 草稿经 prop 往返承载（组件 fp_editor.at；T-03 实测裁定：本地 model
+        // + Init 臂与冲突保输入互斥——Vue 端 Init 深监听回放语义）。每实例
+        // 一对独立宿主字段 = 实例隔离；冲突时宿主不写回 draft 字段 = 保输入。
+        // edit 实例草稿即 .draft_body（与主编辑器同源同修订——AC-02 同一修订）。
+        var fp_edit_state str = "idle"
+        var fp_edit_conflict_rev int = 0
+        var fp_edit_server_body str = ""
+        var fp_create_state str = "idle"
+        var fp_create_text str = ""
+
         // 恢复槽（SD-10/SD-14）：冲突下导航时，失败草稿整体入槽，可恢复/放弃。
         // r5/T-19（F-R5-03）：双槽可恢复集合——Recover 时当前 dirty 草稿入空闲
         // 槽，绝不覆盖正要装载的槽；两份内容同时可恢复。容量 2，保最旧
@@ -2014,6 +2025,75 @@ store NotesStore {
 
         .ToggleSettings -> {
             .show_settings = !.show_settings
+        }
+
+        // ── NOTES-006 T-03：FeaturePack 编辑组件宿主回调 ────────────────
+        // 组件经 prop 往返双向绑定草稿（on_draft_edit 出、draft_text 进），
+        // 提交经 on_submit_text 投递全文；I/O 在宿主 store 入口内联（文件头
+        // ⑤ 纪律）。edit 实例草稿即 .draft_body（与主编辑器同源）；冲突只
+        // 投影 save_state=conflict + 重读服务器版本入 fp_edit_server_body，
+        // **不写回** .draft_body = 用户输入保留（供重读、比较和再次提交）。
+        // v0 消费面走既有全权路径：主应用数据归属全量（featurepack-v0 §2.3），
+        // fp 服务端点+policy 由 Reader 宿主消费（READER-013）。
+
+        .FpEditDraft(v) -> {
+            .draft_body = v
+        }
+
+        .FpEditSubmit(text) -> {
+            if .draft_id == 0 {
+                return
+            }
+            .fp_edit_state = "saving"
+            var rid str = next_request_id("fp-edit")
+            var fr RepoResult = update_note_r(.draft_id, .draft_revision, .draft_title, text, rid)
+            if fr.ok {
+                .fp_edit_state = "saved"
+                .draft_revision = fr.doc.revision
+                .notes = list_notes()
+                .ApplyFilter()
+                return
+            }
+            if fr.err_code == "revision_conflict" {
+                .fp_edit_state = "conflict"
+                var srv RepoResult = get_note_r(.draft_id)
+                if srv.ok {
+                    .fp_edit_conflict_rev = srv.doc.revision
+                    .fp_edit_server_body = srv.doc.body
+                }
+                return
+            }
+            .fp_edit_state = "conflict"
+        }
+
+        .FpEditRebase -> {
+            // 宿主已重读（冲突臂内，服务器版本入 fp_edit_conflict_rev）。
+            // Rebase = 认领服务器修订为新基底（draft_revision 跟随），用户
+            // 输入（.draft_body）不动——供重读、比较和再次提交。
+            .draft_revision = .fp_edit_conflict_rev
+            .fp_edit_state = "idle"
+        }
+
+        .FpCreateDraft(v) -> {
+            .fp_create_text = v
+        }
+
+        .FpCreateSubmit(text) -> {
+            .fp_create_state = "saving"
+            var rid str = next_request_id("fp-create")
+            var n Note = create_note("FP 新建", text, "", rid)
+            if n.id != 0 {
+                .fp_create_state = "saved"
+                .fp_create_text = ""
+                .notes = list_notes()
+                .ApplyFilter()
+                return
+            }
+            .fp_create_state = "conflict"
+        }
+
+        .FpCreateRebase -> {
+            .fp_create_state = "idle"
         }
     }
 }

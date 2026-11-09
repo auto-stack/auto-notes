@@ -1,0 +1,96 @@
+// components/fp_editor.at — FeaturePack 可嵌入编辑组件（NOTES-006 T-03 发布）。
+//
+// 契约（NOTES-006 §5 + auto-os featurepack-v0.md；T-03 实测定形）：
+//   * 双输入：mode="create"（新建共享便签）/ mode="edit"（编辑既有正文）。
+//   * 草稿经 **prop 往返**承载：draft_text 进、on_draft_edit 出——宿主每实例
+//     一对独立字段，实例隔离由此成立；冲突时宿主**不写回**该字段 = 用户输入
+//     保留（供重读、比较和再次提交）。
+//     【T-03 实测裁定】本地 model + Init 臂播种与冲突保输入互斥：Vue 端
+//     Init 臂编译为 onMounted + props 深监听回放（任一 prop 变化即重放
+//     Init），宿主投影 save_state 必然改 prop → 本地草稿被回播覆写。故 v0
+//     草稿由宿主字段承载（PLAN-041 实例 model 不承载草稿）——AC-02 的全部
+//     可观察结果（双实例隔离/迟到不扰/冲突保输入）逐条保住，机制偏差记录
+//     于 NOTES-006 §9。
+//   * 结果经 props 投影：save_state（idle|saving|saved|conflict）与
+//     conflict_revision / server_body（宿主重读的服务器版本，供比较）。
+//   * 发出宿主回调：on_draft_edit(v)/on_submit_text(text)/on_rebase——I/O
+//     由宿主执行（组件零网络依赖，宿主负责渲染与调用）。
+//
+// 导入形态：目录包（components 先例）——同仓 `use { package: official from
+// "./components" }`；跨仓宿主 `dep notes-fp { path: "<auto-notes>/src/front/
+// components" }` 后同款 package use 或点名 use。
+
+widget FpNoteEditor (mode: str, note_label: str, draft_text: str, save_state: str, conflict_revision: int, server_body: str, on_draft_edit: msg, on_submit_text: msg, on_rebase: msg) {
+    msg { DraftEdit(str), SubmitText(str), RebaseTap }
+
+    model {
+        // 提取镜像：仅作 @input 实参类型证据（生成器按臂体对 v 的字符串
+        // 用法产出 target.value 提取——纯 emit 通道无臂则绑定裸事件对象，
+        // T-03 实测）。不承载契约状态：草稿权威在宿主 draft_text 往返。
+        var last_text str = ""
+    }
+
+    view {
+        col {
+            style: "items-stretch gap-2 px-3 py-2 rounded-md border border-border bg-card w-auto min-w-72"
+
+            // ── 头：模式标签 + 状态徽标 ─────────────────────────────
+            row {
+                style: "items-center gap-2 w-auto"
+                if .mode == "create" {
+                    text "New shared note" { style: "text-xs font-semibold text-primary" }
+                } else {
+                    text .note_label { style: "text-xs font-semibold text-primary" }
+                }
+                if .save_state == "saving" {
+                    text "Saving…" { style: "text-xs text-muted-foreground" }
+                }
+                if .save_state == "saved" {
+                    text "Saved ✓" { style: "text-xs text-emerald-600" }
+                }
+                if .save_state == "conflict" {
+                    text "Conflict" { style: "text-xs text-amber-600" }
+                }
+            }
+
+            // ── 冲突横幅：输入保留 + 服务器版本供比较 + rebase ──────
+            if .save_state == "conflict" {
+                col {
+                    style: "items-start gap-1 px-2 py-1 rounded-md bg-amber-500/10 w-auto"
+                    row {
+                        style: "items-center gap-2 w-auto"
+                        icon (name: "alert-triangle", size: 13, style: "text-amber-600")
+                        text "Server revision:" { style: "text-xs text-amber-700" }
+                        text .conflict_revision { style: "text-xs text-amber-700" }
+                        button {
+                            onclick: .RebaseTap
+                            text "Rebase" { style: "text-xs" }
+                        }
+                    }
+                    text .server_body { style: "text-xs text-amber-700 line-clamp-2" }
+                }
+            }
+
+            // ── 草稿正文（prop 往返双向绑定） ───────────────────────
+            textarea {
+                value: .draft_text
+                oninput: .DraftEdit
+                placeholder: "FP body"
+                style: "w-full h-24 text-sm leading-6 bg-transparent border-0 outline-none resize-none text-foreground"
+            }
+
+            // ── 提交 ────────────────────────────────────────────────
+            row {
+                style: "items-center justify-end gap-2 w-auto"
+                button {
+                    onclick: .SubmitText(.draft_text)
+                    text "Submit" { style: "text-xs font-medium" }
+                }
+            }
+        }
+    }
+
+    on {
+        .DraftEdit(v) -> { .last_text = v }
+    }
+}

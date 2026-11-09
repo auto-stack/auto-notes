@@ -501,16 +501,20 @@ pub fn search_notes(query str) []Note {
 // 路径（/api/notes*）不经过本门，数据归属不变。
 // ═══════════════════════════════════════════════════════════
 
-pub const FP_INTERFACE_VERSION str = "notes.fpack/1"
+/// 接口版本串（wire 门与健康探针同源；const 语法会使 VM 面解析中断——
+/// T-03 实测，fn 形态替代）。
+pub fn fp_interface_version() str {
+    return "notes.fpack/1"
+}
 
 fn fp_version_gate(interface_version str) str {
-    if interface_version != FP_INTERFACE_VERSION {
+    if interface_version != fp_interface_version() {
         return "{\"ok\":false,\"err_code\":\"unsupported_version\"}"
     }
     return ""
 }
 
-fn fp_attempt_gate(attempt_id str) str {
+pub fn fp_attempt_gate(attempt_id str) str {
     if attempt_id == "" {
         return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"attempt_id required (per-attempt, distinct from operation_id)\"}"
     }
