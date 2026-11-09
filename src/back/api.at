@@ -278,3 +278,49 @@ pub fn p2_rollback() str {
 pub fn p2_escape() str {
     return p2probe.escape_probe()
 }
+
+// ═══════════════════════════════════════════════════════════
+// FeaturePack v0 端点（NOTES-006 T-02，notes.fpack/1；契约见 auto-os
+// docs/specs/communication/featurepack-v0.md）。返回仓储信封 JSON 串
+// （与 v1_status 同风格）；wire 门（版本/尝试 ID）在 db.fp_*。
+// ═══════════════════════════════════════════════════════════
+
+/// 就绪探针（桌面 daemon ensure 链固定契约 GET /api/health，AGENTS §3；
+/// body interface 字段供版本就绪核验，featurepack-v0 §2.2）
+#[api(method = "GET", path = "/api/health")]
+pub fn fp_health() str {
+    return db.fp_health()
+}
+
+/// 捕获：来源快照 + 可编辑正文 → note_id/revision/收据（幂等按 operation_id）
+#[api(method = "POST", path = "/api/fp/v1/capture")]
+pub fn fp_capture(cred str, interface_version str, attempt_id str, operation_id str, source_json str, text str) str {
+    return db.fp_capture(cred, interface_version, attempt_id, operation_id, source_json, text)
+}
+
+/// 读取单个 fp 文档（含来源字段；按授权书裁剪）。
+/// 参数形态（T-02 实测裁定）：全部 POST + body 信封——生成服务器对
+/// 「路径参数 + query/body 混合」不绑定非路径参数（capture 纯 body 同批
+/// 实测可用）；REST 形态让位给统一可用的信封形态（契约 §5 只冻结信封）。
+#[api(method = "POST", path = "/api/fp/v1/get")]
+pub fn fp_get_note(cred str, interface_version str, note_id str) str {
+    return db.fp_get_note(cred, interface_version, note_id)
+}
+
+/// 按书分页（seq 降序；cursor=上一页末行 seq，0=首页）
+#[api(method = "POST", path = "/api/fp/v1/list")]
+pub fn fp_list_by_book(cred str, interface_version str, book_id str, cursor int, limit int) str {
+    return db.fp_list_by_book(cred, interface_version, book_id, cursor, limit)
+}
+
+/// 条件更新（仅正文；expected_revision 不符 → revision_conflict）
+#[api(method = "POST", path = "/api/fp/v1/update")]
+pub fn fp_update_note(cred str, interface_version str, attempt_id str, note_id str, expected_revision int, text str, operation_id str) str {
+    return db.fp_update_note(cred, interface_version, attempt_id, note_id, expected_revision, text, operation_id)
+}
+
+/// 回执查询：committed（原收据）| not_observed
+#[api(method = "POST", path = "/api/fp/v1/receipt")]
+pub fn fp_receipt(cred str, interface_version str, operation_id str) str {
+    return db.fp_receipt(cred, interface_version, operation_id)
+}

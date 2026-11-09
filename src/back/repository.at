@@ -239,6 +239,11 @@ fn ensure_schema(db SqliteDb) {
     db.exec("ALTER TABLE requests ADD COLUMN rev INTEGER NOT NULL DEFAULT 0")
     db.exec("ALTER TABLE requests ADD COLUMN doc_json TEXT NOT NULL DEFAULT ''")
     db.exec("ALTER TABLE requests ADD COLUMN intent TEXT NOT NULL DEFAULT ''")
+    // NOTES-006 T-02：FeaturePack 来源列（附加式，不动 schema_v——v2c| 迁移
+    // 门与 legacy 升级状态机不受扰）。book_id='' = 既有无来源便签（主应用
+    // 全量，FeaturePack 宿主不可见）；source_json = 不可变来源快照原文。
+    db.exec("ALTER TABLE notes ADD COLUMN book_id TEXT NOT NULL DEFAULT ''")
+    db.exec("ALTER TABLE notes ADD COLUMN source_json TEXT NOT NULL DEFAULT ''")
     // schema v3（SD-13/T-18）：r4 管道拼接意图 → 规范表示（从持久 doc 快照
     // 确定性重导），版本化一次性迁移；v2c| 前缀行不再重跑。
     var sv str = meta_get_on(db, "schema_v")
@@ -1912,4 +1917,449 @@ pub fn test_reset() {
 
 pub fn test_load_manifest() bool {
     return true
+}
+
+// ═══════════════════════════════════════════════════════════
+// FeaturePack v0（NOTES-006 T-02）：notes.fpack/1 服务入口。
+// 契约：auto-os docs/specs/communication/featurepack-v0.md（OS-T-01 冻结草案）。
+// 授权：凭据 → (principal, operations, book_scopes) 绑定在服务侧 policy 文件
+// （NOTES_FP_POLICY env 覆盖，缺省 <data>/fp-policy.json；文件缺席 = 全拒绝，
+// FeaturePack 关闭态）。body 自报身份不可信——主体只来自 policy 绑定。
+// 版本拒绝在 db.at 门（wire 面）；本层只认已授权主体。
+// 去重键 = "fp:" + principal + ":" + operation_id（requests 表复用，
+// intent 规范化含全部载荷——同键异义 → request_conflict，即契约的
+// operation_conflict 语义）。调用尝试 ID（attempt_id）只做 wire 校验，
+// 不入存储——跨重试稳定的是 operation_id（featurepack-v0 §3）。
+// 事务：与既有门禁同律（BEGIN IMMEDIATE → 重放/检查 → 写 → 收据行 →
+// COMMIT；任一失败 ROLLBACK，绝无部分状态）。
+// ═══════════════════════════════════════════════════════════
+
+fn fp_policy_path() str {
+    var p str = env.get("NOTES_FP_POLICY")
+    if p == "" {
+        p = data_dir() + "/fp-policy.json"
+    }
+    return p
+}
+
+/// 凭据查找：命中且 operation ∈ 授权表 → 返回条目 JSON 串；否则 ""（拒绝）。
+/// policy 文件格式：
+/// {"entries":[{"cred":"<hex>","principal":"fp-reader",
+///   "operations":["capture","read"],"book_scopes":["book:abc"]}]}
+fn fp_policy_entry(cred str, operation str) str {
+    if cred == "" {
+        return ""
+    }
+    var raw str = fs_read(fp_policy_path())
+    if raw == "" {
+        return ""
+    }
+    var root = json.parse(raw)
+    var entries = json.get(root, "entries")
+    var n int = json.len(entries)
+    for i in 0..n {
+        var e = json.get_at(entries, i)
+        var v_cred = json.get(e, "cred")
+        if json.as_string(v_cred) == cred {
+            var ops = json.get(e, "operations")
+            var m int = json.len(ops)
+            var found bool = false
+            for j in 0..m {
+                var op = json.get_at(ops, j)
+                if json.as_string(op) == operation {
+                    found = true
+                }
+            }
+            if found {
+                return json.encode(e)
+            }
+            return ""
+        }
+    }
+    return ""
+}
+
+/// 条目 JSON → principal（未命中/缺字段 → ""）。
+fn fp_entry_principal(entry_json str) str {
+    if entry_json == "" {
+        return ""
+    }
+    var e = json.parse(entry_json)
+    var v = json.get(e, "principal")
+    return json.as_string(v)
+}
+
+/// 条目 JSON → book_scopes JSON 数组串（缺字段 → "[]"）。
+fn fp_entry_scopes(entry_json str) str {
+    if entry_json == "" {
+        return "[]"
+    }
+    var e = json.parse(entry_json)
+    var v = json.get(e, "book_scopes")
+    return json.encode(v)
+}
+
+/// 作用域判定：book_id ∈ scopes JSON 数组。book_id 为空 = 无来源便签，
+/// FeaturePack 宿主不可见（数据归属：主应用全量，宿主按授权书）。
+fn fp_scope_allows(scopes_json str, book_id str) bool {
+    if book_id == "" {
+        return false
+    }
+    var scopes = json.parse(scopes_json)
+    var n int = json.len(scopes)
+    for i in 0..n {
+        var s = json.get_at(scopes, i)
+        if json.as_string(s) == book_id {
+            return true
+        }
+    }
+    return false
+}
+
+fn fp_deny(detail str) str {
+    return "{\"ok\":false,\"err_code\":\"permission_denied\",\"err_detail\":" + json.encode(detail) + "}"
+}
+
+fn fp_not_found() str {
+    return "{\"ok\":false,\"err_code\":\"not_found\"}"
+}
+
+/// fp 请求键：principal 化的 operation_id（requests 表主键字符集律同
+/// valid_request_id；组合键 ≤100 字符）。
+fn fp_request_key(principal str, operation_id str) str {
+    return "fp:" + principal + ":" + operation_id
+}
+
+/// 来源快照校验 + 提取 book_id：source_json 必须是含非空 book_id（≤128）
+/// 的对象（quote/author/chapter/locator 原样保存，不校验内部形状——不可变
+/// 快照按 Unicode 原文存储，锚语义归 Reader）。返回 "" 表示拒绝。
+fn fp_source_book_id(source_json str) str {
+    if source_json == "" {
+        return ""
+    }
+    var src = json.parse(source_json)
+    var v = json.get(src, "book_id")
+    var b str = json.as_string(v)
+    if b == "" {
+        return ""
+    }
+    if b.len() > 128 {
+        return ""
+    }
+    return b
+}
+
+/// 文本上限（契约 §5：1..=16384 字节，保留原 Unicode）。
+fn fp_text_ok(text str) bool {
+    var n int = text.len()
+    if n < 1 {
+        return false
+    }
+    if n > 16384 {
+        return false
+    }
+    return true
+}
+
+/// 13 列标准文档 → fp 文档信封（去 doc 尾 } 接 book_id/source 进 note，
+/// 再闭 note + 信封——三重收尾括号，缺一即坏 JSON）。
+fn fp_doc_envelope(doc str, book_id str, source_raw str) str {
+    var source_obj str = source_raw
+    if source_obj == "" {
+        source_obj = "null"
+    }
+    var head str = doc.substr(0, doc.len() - 1)
+    var s str = "{\"ok\":true,\"err_code\":\"\",\"note\":" + head
+    s = s + ",\"book_id\":" + json.encode(book_id) + ",\"source\":" + source_obj
+    s = s + ",\"receipt\":{\"schema_version\":1,\"request_id\":\"\",\"note_id\":\"\",\"revision\":0,\"status\":\"\"}}}"
+    return s
+}
+
+/// fp 文档读取（含来源字段）。
+fn fp_doc_json_on(db SqliteDb, note_id str) str {
+    var sql str = "SELECT " + note_select_cols() + ", book_id, source_json FROM notes WHERE note_id=" + sql_str(note_id)
+    var rows List<List<str>> = db.query(sql)
+    if rows.len() < 1 {
+        return ""
+    }
+    var row = rows[0]
+    var doc str = row_to_doc_json(row)
+    return fp_doc_envelope(doc, row[13], row[14])
+}
+
+/// 捕获：来源快照 + 可编辑正文 → 新便签（title=quote 原句，body=text）。
+/// 幂等：同 (principal, operation_id) 同载荷重放返回原收据与文档；异载荷
+/// request_conflict（契约 operation_conflict 语义）。
+pub fn fp_capture(cred str, operation_id str, source_json str, text str) str {
+    var oerr str = open_repository()
+    if oerr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
+    }
+    if fp_text_ok(text) == false {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"text length out of 1..=16384\"}"
+    }
+    var book_id str = fp_source_book_id(source_json)
+    if book_id == "" {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"source.book_id required\"}"
+    }
+    var entry str = fp_policy_entry(cred, "capture")
+    if entry == "" {
+        return fp_deny("capture not authorized for this credential")
+    }
+    var scopes str = fp_entry_scopes(entry)
+    if fp_scope_allows(scopes, book_id) == false {
+        return fp_deny("book not in authorization scopes")
+    }
+    var principal str = fp_entry_principal(entry)
+    if principal == "" {
+        return fp_deny("policy entry missing principal")
+    }
+    var rid str = fp_request_key(principal, operation_id)
+    if valid_request_id(rid) == false {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\"}"
+    }
+    var src = json.parse(source_json)
+    var v_quote = json.get(src, "quote")
+    var quote str = json.as_string(v_quote)
+    if quote == "" {
+        quote = text
+    }
+    if quote.len() > 256 {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"source.quote length out of 1..=256\"}"
+    }
+    var intent str = "fp1|capture|" + json.encode(principal) + "|" + json.encode(operation_id) + "|" + json.encode(source_json) + "|" + json.encode(text)
+    var db SqliteDb = sqlite.open(db_path())
+    var begin int = db.exec("BEGIN IMMEDIATE")
+    if begin < 0 {
+        return "{\"ok\":false,\"err_code\":\"second_writer\"}"
+    }
+    var dup = replay_in_txn(db, rid, "fp_capture", "", intent)
+    if dup != "" {
+        var fin int = db.exec("COMMIT")
+        return dup
+    }
+    var handle int = next_counter_on(db)
+    var note_id str = nid_of(handle)
+    var seq int = handle
+    var ins int = db.exec("INSERT INTO notes(note_id, legacy_id, revision, title, body, tags_json, color, pinned, state, folder, seq, created_at, updated_at, book_id, source_json) VALUES(" + sql_str(note_id) + ", " + json.encode(handle) + ", 1, " + sql_str(quote) + ", " + sql_str(text) + ", '[]', '', 0, 'active', '', " + json.encode(seq) + ", '', '', " + sql_str(book_id) + ", " + sql_str(source_json) + ")")
+    if ins < 0 {
+        db.exec("ROLLBACK")
+        return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
+    }
+    var cdoc str = load_doc_json_on(db, note_id)
+    var ir int = db.exec("INSERT OR IGNORE INTO requests(request_id, note_id, kind, rev, doc_json, intent) VALUES(" + sql_str(rid) + ", " + sql_str(note_id) + ", 'fp_capture', 1, " + sql_str(cdoc) + ", " + sql_str(intent) + ")")
+    if ir < 0 {
+        db.exec("ROLLBACK")
+        return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
+    }
+    var nv int = handle + 1
+    var bump int = db.exec("INSERT INTO meta(k,v) VALUES('counter'," + json.encode(nv) + ") ON CONFLICT(k) DO UPDATE SET v=" + json.encode(nv))
+    var commit int = db.exec("COMMIT")
+    if commit < 0 {
+        return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
+    }
+    var doc = load_doc_json_on(db, note_id)
+    var rc str = "{\"schema_version\":1,\"request_id\":" + json.encode(rid)
+    rc = rc + ",\"note_id\":" + json.encode(note_id) + ",\"revision\":1,\"status\":\"committed\"}"
+    return "{\"ok\":true,\"err_code\":\"\",\"note\":" + doc + ",\"receipt\":" + rc + ",\"replayed\":false}"
+}
+
+/// 读取（含来源字段）：授权书 read + 作用域核对后返回 fp 文档投影。
+pub fn fp_get(cred str, note_id str) str {
+    var oerr str = open_repository()
+    if oerr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
+    }
+    var entry str = fp_policy_entry(cred, "read")
+    if entry == "" {
+        return fp_deny("read not authorized for this credential")
+    }
+    var scopes str = fp_entry_scopes(entry)
+    var db SqliteDb = sqlite.open(db_path())
+    var brows List<List<str>> = db.query("SELECT book_id FROM notes WHERE note_id=" + sql_str(note_id))
+    if brows.len() < 1 {
+        return fp_not_found()
+    }
+    var brow = brows[0]
+    if fp_scope_allows(scopes, brow[0]) == false {
+        return fp_deny("book not in authorization scopes")
+    }
+    return fp_doc_json_on(db, note_id)
+}
+
+/// 按书分页（seq 降序，cursor = 上一页末行 seq；0 = 首页；lim+1 探测 has_more）。
+pub fn fp_list_by_book(cred str, book_id str, cursor int, limit int) str {
+    var oerr str = open_repository()
+    if oerr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
+    }
+    var entry str = fp_policy_entry(cred, "list_by_book")
+    if entry == "" {
+        return fp_deny("list_by_book not authorized for this credential")
+    }
+    var scopes str = fp_entry_scopes(entry)
+    if fp_scope_allows(scopes, book_id) == false {
+        return fp_deny("book not in authorization scopes")
+    }
+    var lim int = limit
+    if lim < 1 {
+        lim = 20
+    }
+    if lim > 100 {
+        lim = 100
+    }
+    var db SqliteDb = sqlite.open(db_path())
+    var sql str = "SELECT " + note_select_cols() + ", book_id, source_json FROM notes WHERE book_id=" + sql_str(book_id) + " AND state='active'"
+    if cursor > 0 {
+        sql = sql + " AND seq < " + json.encode(cursor)
+    }
+    var lim1 int = lim + 1
+    sql = sql + " ORDER BY seq DESC LIMIT " + json.encode(lim1)
+    var rows List<List<str>> = db.query(sql)
+    var n int = rows.len()
+    var has_more bool = false
+    if n > lim {
+        has_more = true
+        n = lim
+    }
+    var out str = "{\"ok\":true,\"err_code\":\"\",\"items\":["
+    var i int = 0
+    var last_seq int = 0
+    while i < n {
+        var row = rows[i]
+        var doc str = row_to_doc_json(row)
+        var one str = doc.substr(0, doc.len() - 1)
+        var source_raw str = row[14]
+        if source_raw == "" {
+            source_raw = "null"
+        }
+        if i > 0 {
+            out = out + ","
+        }
+        out = out + one + ",\"book_id\":" + json.encode(row[13]) + ",\"source\":" + source_raw + "}"
+        last_seq = parse_int(row[10])
+        i = i + 1
+    }
+    out = out + "]"
+    if has_more {
+        out = out + ",\"next_cursor\":" + json.encode(last_seq)
+    }
+    out = out + "}"
+    return out
+}
+
+/// 条件更新（仅 body；来源快照与 title 不可变）：expected_revision 不符 →
+/// revision_conflict（信封带 current_revision）；幂等重放先于 revision 检查。
+pub fn fp_update(cred str, note_id str, expected_revision int, text str, operation_id str) str {
+    var oerr str = open_repository()
+    if oerr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
+    }
+    if fp_text_ok(text) == false {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"text length out of 1..=16384\"}"
+    }
+    var entry str = fp_policy_entry(cred, "update")
+    if entry == "" {
+        return fp_deny("update not authorized for this credential")
+    }
+    var scopes str = fp_entry_scopes(entry)
+    var db SqliteDb = sqlite.open(db_path())
+    var brows List<List<str>> = db.query("SELECT book_id FROM notes WHERE note_id=" + sql_str(note_id))
+    if brows.len() < 1 {
+        return fp_not_found()
+    }
+    var brow = brows[0]
+    if fp_scope_allows(scopes, brow[0]) == false {
+        return fp_deny("book not in authorization scopes")
+    }
+    var principal str = fp_entry_principal(entry)
+    if principal == "" {
+        return fp_deny("policy entry missing principal")
+    }
+    var rid str = fp_request_key(principal, operation_id)
+    if valid_request_id(rid) == false {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\"}"
+    }
+    var intent str = "fp1|update|" + json.encode(principal) + "|" + json.encode(operation_id) + "|" + json.encode(note_id) + "|" + json.encode(expected_revision) + "|" + json.encode(text)
+    var begin int = db.exec("BEGIN IMMEDIATE")
+    if begin < 0 {
+        return "{\"ok\":false,\"err_code\":\"second_writer\"}"
+    }
+    var dup = replay_in_txn(db, rid, "fp_update", note_id, intent)
+    if dup != "" {
+        var fin int = db.exec("COMMIT")
+        return dup
+    }
+    var rows List<List<str>> = db.query("SELECT revision FROM notes WHERE note_id=" + sql_str(note_id))
+    if rows.len() < 1 {
+        db.exec("ROLLBACK")
+        return fp_not_found()
+    }
+    var row0 = rows[0]
+    var cur_rev int = parse_int(row0[0])
+    if cur_rev != expected_revision {
+        db.exec("ROLLBACK")
+        return "{\"ok\":false,\"err_code\":\"revision_conflict\",\"current_revision\":" + json.encode(cur_rev) + "}"
+    }
+    var new_rev int = expected_revision + 1
+    var upd int = db.exec("UPDATE notes SET revision=" + json.encode(new_rev) + ", body=" + sql_str(text) + " WHERE note_id=" + sql_str(note_id))
+    if upd < 0 {
+        db.exec("ROLLBACK")
+        return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
+    }
+    var udoc str = load_doc_json_on(db, note_id)
+    var urc int = db.exec("INSERT OR IGNORE INTO requests(request_id, note_id, kind, rev, doc_json, intent) VALUES(" + sql_str(rid) + ", " + sql_str(note_id) + ", 'fp_update', " + json.encode(new_rev) + ", " + sql_str(udoc) + ", " + sql_str(intent) + ")")
+    if urc < 0 {
+        db.exec("ROLLBACK")
+        return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
+    }
+    var commit int = db.exec("COMMIT")
+    if commit < 0 {
+        return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
+    }
+    var doc = load_doc_json_on(db, note_id)
+    var rc str = "{\"schema_version\":1,\"request_id\":" + json.encode(rid)
+    rc = rc + ",\"note_id\":" + json.encode(note_id) + ",\"revision\":" + json.encode(new_rev) + ",\"status\":\"committed\"}"
+    return "{\"ok\":true,\"err_code\":\"\",\"note\":" + doc + ",\"receipt\":" + rc + ",\"replayed\":false}"
+}
+
+/// 回执查询：requests 行存在且 rev 可恢复 → 存储的原收据；无行/rev 不可
+/// 恢复 → not_observed（不证明在途请求永不提交——契约 §5 同语）。
+pub fn fp_receipt(cred str, operation_id str) str {
+    var oerr str = open_repository()
+    if oerr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
+    }
+    var entry str = fp_policy_entry(cred, "receipt")
+    if entry == "" {
+        return fp_deny("receipt not authorized for this credential")
+    }
+    var principal str = fp_entry_principal(entry)
+    if principal == "" {
+        return fp_deny("policy entry missing principal")
+    }
+    var rid str = fp_request_key(principal, operation_id)
+    if valid_request_id(rid) == false {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\"}"
+    }
+    var db SqliteDb = sqlite.open(db_path())
+    var rows List<List<str>> = db.query("SELECT note_id, kind, rev, doc_json FROM requests WHERE request_id=" + sql_str(rid))
+    if rows.len() < 1 {
+        return "{\"ok\":true,\"err_code\":\"\",\"status\":\"not_observed\"}"
+    }
+    var row = rows[0]
+    var s_note str = row[0]
+    var s_rev str = row[2]
+    var s_doc str = row[3]
+    var rev_unknown bool = s_rev == "" || s_rev == "0"
+    if rev_unknown {
+        return "{\"ok\":true,\"err_code\":\"\",\"status\":\"not_observed\"}"
+    }
+    var doc str = s_doc
+    if doc == "" {
+        doc = load_doc_json_on(db, s_note)
+    }
+    var rc str = "{\"schema_version\":1,\"request_id\":" + json.encode(rid)
+    rc = rc + ",\"note_id\":" + json.encode(s_note) + ",\"revision\":" + s_rev + ",\"status\":\"committed\"}"
+    return "{\"ok\":true,\"err_code\":\"\",\"status\":\"committed\",\"receipt\":" + rc + ",\"note\":" + doc + "}"
 }

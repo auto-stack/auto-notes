@@ -492,3 +492,80 @@ pub fn search_notes(query str) []Note {
     }
     return out
 }
+
+// ═══════════════════════════════════════════════════════════
+// FeaturePack v0（NOTES-006 T-02）：notes.fpack/1 wire 门 + 委托。
+// 版本拒绝（业务前，契约 §2.2）：interface_version ≠ notes.fpack/1 →
+// unsupported_version，不触仓储。凭据/作用域/去重/事务在 repository.fp_*。
+// 授权书语义：fp 端点面向外部宿主（按 policy 文件裁剪）；主应用自有
+// 路径（/api/notes*）不经过本门，数据归属不变。
+// ═══════════════════════════════════════════════════════════
+
+pub const FP_INTERFACE_VERSION str = "notes.fpack/1"
+
+fn fp_version_gate(interface_version str) str {
+    if interface_version != FP_INTERFACE_VERSION {
+        return "{\"ok\":false,\"err_code\":\"unsupported_version\"}"
+    }
+    return ""
+}
+
+fn fp_attempt_gate(attempt_id str) str {
+    if attempt_id == "" {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"attempt_id required (per-attempt, distinct from operation_id)\"}"
+    }
+    return ""
+}
+
+/// 就绪探针体（daemon ensure 链固定契约；版本就绪核验读 interface 字段）
+pub fn fp_health() str {
+    return "{\"status\":\"ok\",\"interface\":\"notes.fpack/1\"}"
+}
+
+pub fn fp_capture(cred str, interface_version str, attempt_id str, operation_id str, source_json str, text str) str {
+    var g1 str = fp_version_gate(interface_version)
+    if g1 != "" {
+        return g1
+    }
+    var g2 str = fp_attempt_gate(attempt_id)
+    if g2 != "" {
+        return g2
+    }
+    return repository.fp_capture(cred, operation_id, source_json, text)
+}
+
+pub fn fp_get_note(cred str, interface_version str, note_id str) str {
+    var g1 str = fp_version_gate(interface_version)
+    if g1 != "" {
+        return g1
+    }
+    return repository.fp_get(cred, note_id)
+}
+
+pub fn fp_list_by_book(cred str, interface_version str, book_id str, cursor int, limit int) str {
+    var g1 str = fp_version_gate(interface_version)
+    if g1 != "" {
+        return g1
+    }
+    return repository.fp_list_by_book(cred, book_id, cursor, limit)
+}
+
+pub fn fp_update_note(cred str, interface_version str, attempt_id str, note_id str, expected_revision int, text str, operation_id str) str {
+    var g1 str = fp_version_gate(interface_version)
+    if g1 != "" {
+        return g1
+    }
+    var g2 str = fp_attempt_gate(attempt_id)
+    if g2 != "" {
+        return g2
+    }
+    return repository.fp_update(cred, note_id, expected_revision, text, operation_id)
+}
+
+pub fn fp_receipt(cred str, interface_version str, operation_id str) str {
+    var g1 str = fp_version_gate(interface_version)
+    if g1 != "" {
+        return g1
+    }
+    return repository.fp_receipt(cred, operation_id)
+}
