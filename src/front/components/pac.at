@@ -1,0 +1,10 @@
+// notesfp —— FeaturePack 组件库跨仓 dep 面（NOTES-006 T-03 发布）。
+// 同目录 package.at 服务本仓目录包 use（official 先例）；本 pac.at 服务
+// 跨仓宿主 `dep notesfp { path: <本目录> }` 的物化/fetch 面（reader 先例）。
+// 组件：FpNoteEditor（fp_editor.at）——契约见 auto-os featurepack-v0.md。
+name: "notesfp"
+version: "0.1.0"
+scene: "ui"
+render: "vue"
+title: "Notes FeaturePack"
+title_zh: "笔记特性包"
