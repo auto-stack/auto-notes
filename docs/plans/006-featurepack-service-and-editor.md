@@ -1,12 +1,12 @@
 ---
 plan_id: NOTES-006
-status: executing
+status: execution_done
 feature_name: 共享笔记服务与可嵌入编辑器
 author: [Codex]
 created_at: 2026-11-07
 updated_at: 2026-11-10
 plan_revision: 2
-current_step: 4
+current_step: 8
 total_steps: 8
 supersedes_spec_components: [docs/specs/notes/durable-inbox.md]
 new_spec_components: [docs/specs/notes/featurepack-service-and-editor.md]
