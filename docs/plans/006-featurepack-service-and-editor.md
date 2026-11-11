@@ -1,12 +1,12 @@
 ---
 plan_id: NOTES-006
-status: execution_done
+status: executing
 feature_name: 共享笔记服务与可嵌入编辑器
 author: [Codex]
 created_at: 2026-11-07
 updated_at: 2026-11-10
 plan_revision: 2
-current_step: 8
+current_step: 7
 total_steps: 8
 supersedes_spec_components: [docs/specs/notes/durable-inbox.md]
 new_spec_components: [docs/specs/notes/featurepack-service-and-editor.md]
@@ -110,10 +110,13 @@ Notes 后台是持久笔记唯一写入者。编辑组件接收来源或 note_id
    提交、服务端逐字核对），**条件分支实例**（`if .store.draft_id != 0` 内的
    edit 实例）type_text/clear 后 store 状态恒 idle（M-3c/M-5a0 红，现取快照
    id + 3× 重试 + clear 分辨非空初值后仍死）；Vue 轨同结构全绿（25/25）。
-   键控重挂假设已排除（初始选中即靶行、无中途重挂仍死）。最小反例 =
+   键控重挂假设已排除（初始选中即靶行、无中途重挂仍死）。**伴生泄漏面
+   （复审 F-1 实证）**：对条件分支实例 textarea 的物理键入事件会泄漏路由到
+   无条件实例（create 槽被 edit 键入文本污染，input_ver 串号）——VM 边界外
+   用例一律零物理输入、只读观察（脚本已按此收紧）。最小反例 =
    015-notes FP 区（app.at if 分支内 FpNoteEditor）双实例差分。owner=AutoUI
-   （VM 条件子树内组件回调注册）；按 §10 预案评估单独立项。r2「由双端同一
-   测试输入复核」要求的复核在本缺口上完成并留证。
+   （VM 条件子树内组件回调注册与事件路由）；按 §10 预案评估单独立项。
+   r2「由双端同一测试输入复核」要求的复核在本缺口上完成并留证。
 
 ### r2 规范增量补充
 
@@ -172,7 +175,7 @@ V-01 / AC-01：对隔离旧库取升级前后快照，实际 API 重放、改正
 | T-03 | work | T-02、T-07 | [x] 两实例（edit/create）经 fpack.fp_host 公共机制（fp_state_next 七态/draft_key 命名空间/OpenSource 统一出口载荷）；组件七态徽标投影（pending/error 增补）；主应用来源卡（source_status=ok 才可回访，incomplete 明确不可回访）+ OpenSource 消费卡。[✅ 已完成 2026-11-12] verify_featurepack_editor.py --profile vue **25 PASS / 0 FAIL / 0 SKIP**（E-0..E-6 + S-3a 保存中键入只清已提交版 + S-3b 关页重启恢复 + S-3c 丢回包→重启→pending→同 ID 重试 saved + 冲突保输入 Rebase 再提交）。实测修订四条见 §5 r2 增补：①store 用点路径 components.fp_host（fpack 包名形态在 use-fn 池静默跳过→ReferenceError）；②vue 生成面 store 池不映射 json.*（键组装移服务端 note-scoped 端点）；③组件内部消息名=派生监听名（RebaseTap→Rebase，裁定③复证；`#` 注释破坏解析致组件静默回退旧产物，须 // 且手清 .auto/ui-cache.json）；④vue 客户端传输失败为异常中断，回包未观察恢复走重启映射 pending。 | AC-02/06/07 |
 | T-06 | work | T-01、OS-067 T-01 | [x] 冻结来源schema、ID/草稿状态、FpNoteEditor参数/事件/配置；新建共享适配的实际路径在本步列明，确认两个宿主可导入。[✅ 已完成 2026-11-11] 冻结落§5 T-06 冻结节：来源 schema（book_id/source_hash/title/author/quote/chapter/locator）、操作身份（operation_id 单元意图 / attempt_id 每次新 / 去重键 fp:<principal>:<operation_id>）、草稿状态机（draft_key/generation/note_id/base_revision/operation_id/payload/输入版本/save_state；state=idle|dirty|saving|saved|pending|error|conflict）、FpNoteEditor 参数/事件表。共享适配路径=src/front/components/fp_host.at + package.at 导出；导入形态：主应用 `use { package: official from "./components" }`，reader `use notesfp.fp_host: <函数>`（跨仓 dep notesfp 已指 components 目录）。 | AC-05/06/07 |
 | T-07 | work | T-06、T-02 | [x] fp_host.at 共享适配（七态状态机/守卫/draft_key/OpenSource 载荷，纯逻辑零网络）+ notes_store.at 接入（意图稳定 op 兼主路径 rid、输入版本守卫、成功只清已提交版、检查点持久/恢复、Discard 显式清槽）+ fp_drafts 表（分列存，64KiB/槽）+ /api/fp/draft/*（通用键）与 /api/fp/draft/*/note（int id 服务端组装键——前端无 int→str 原语）+ /api/fp/source/of[/note] 来源投影。[✅ 已完成 2026-11-12] 服务 67/0/0 + Vue 25/0/0 实证；S-3 系列断言检查点落盘/恢复/清槽与服务端终态。editor.at 无需改动（fp edit 实例与主编辑器同源 draft_body，共享机制在 store 层）。 | AC-02/06/07 |
-| T-08 | work | T-03 | [x] partial——脚本重写完成：VM 轨接真实输入（autoui type_text，r1「无输入面」系测试入口未接）、press/type 至状态生效（vnode 换代现取 id）、必需 case 无 skip（缺失即 FAIL 非零）、进程清理只回收自有 PID 树（全局 /IM 清扫移除，OS-067 G-04/G-05 关闭）、资源隔离（隔离目录/policy/端口自检）。S-01/02 服务脚本 67/0/0、S-03(S-3a/b/c)+冲突 Rebase Vue 轨 25/0/0、S-05 VM 轨 create 链真实输入绿。SD-01/03=docs/specs/notes/featurepack-service-and-editor.md、SD-02=durable-inbox.md FeaturePack 共存节、三仓消费清单入 spec。**[✅ 子面经用户裁定②关闭 2026-11-12]** VM edit 实例输入面：AutoUI 引擎对条件子树内组件回调注册失效（§5 实测修订 ⑦ 最小反例）——用户裁定 v0 边界=「VM 真实输入以 create 链+状态面为准，edit 实例输入以 Vue 轨 25/0/0 为准」（§10）；VM 轨按裁定编码边界（边界外用例 BOUNDARY 打印不进退出码），并增补裁定范围内 create 槽重启恢复真实输入用例。AutoUI 反例留证待单独立项。 | AC-01/02/05/06/07/08 |
+| T-08 | work | T-03 | [x] partial——脚本重写完成：VM 轨接真实输入（autoui type_text，r1「无输入面」系测试入口未接）、press/type 至状态生效（vnode 换代现取 id）、必需 case 无 skip（缺失即 FAIL 非零）、进程清理只回收自有 PID 树（全局 /IM 清扫移除，OS-067 G-04/G-05 关闭）、资源隔离（隔离目录/policy/端口自检）。S-01/02 服务脚本 67/0/0、S-03(S-3a/b/c)+冲突 Rebase Vue 轨 25/0/0、S-05 VM 轨 create 链真实输入绿。SD-01/03=docs/specs/notes/featurepack-service-and-editor.md、SD-02=durable-inbox.md FeaturePack 共存节、三仓消费清单入 spec。**[✅ 子面经用户裁定②关闭 2026-11-12；复审 F-1 需去除 VM 对 edit textarea 的物理键入（泄漏源）——见 F-1 修复轮]** VM edit 实例输入面：AutoUI 引擎对条件子树内组件回调注册失效（§5 实测修订 ⑦ 最小反例）——用户裁定 v0 边界=「VM 真实输入以 create 链+状态面为准，edit 实例输入以 Vue 轨 25/0/0 为准」（§10）；VM 轨按裁定编码边界（边界外用例 BOUNDARY 打印不进退出码），并增补裁定范围内 create 槽重启恢复真实输入用例。AutoUI 反例留证待单独立项。 | AC-01/02/05/06/07/08 |
 | T-04 | review | T-08 | 独立上下文在同实现提交复演 S-01～05，核全部 work AC 与 Spec；OS 联合验收另在067进行。 | AC-03 |
 | T-05 | merge | T-04 pass | 按固定版本落地与 Spec 核对，发布组件/适配清单并回填 OS M2。 | AC-04 |
 
@@ -197,6 +200,8 @@ V-01 / AC-01：对隔离旧库取升级前后快照，实际 API 重放、改正
 2026-11-10 文档自检通过。四份计划各有0～10节；任务数依次为7/8/8/8，ID唯一、当前相对文档链接有效、限定仓归属后的任务依赖图无环，改动文件 diff --check 通过。仅记录文档检查，产品验收待work。
 2026-11-12 · stage: work | plan_id: NOTES-006 | plan_revision: r2 | round: 1 | outcome: blocked（局部：VM edit 实例输入面待 AutoUI/用户裁定；其余 work 交付完成并验证） | worktree: D:/autostack/auto-notes（独立 clone，main） | branch: main | base_commit: 1aa2e72 | code_commit: 8b4dba6 | dependency_revisions: auto 0.1.0+plan-890-verified-r7-t19-20-g347c29f-dirty · auto-os main 868c80d（OS-067 M1 冻结）· auto-reader main 8f57fd9（dep notesfp 在案） | task_ids: T-02、T-03、T-06（前轮）、T-07、T-08(partial) | evidence: python tests/basic/verify_featurepack_service.py → **67 PASS / 0 FAIL / 0 SKIP**（退出码 0；F-01..11 全数保持 + S-01 重启重放 11 例 + S-02 冻结校验/半途故障自愈/incomplete 投影 17 例）；python tests/basic/verify_featurepack_editor.py --profile vue → **25 PASS / 0 FAIL / 0 SKIP**（E-0..E-6 + S-3a 保存中键入只清已提交版 + S-3b 关页重启恢复 + S-3c 丢回包→重启→pending→同 ID 重试 saved + 冲突保输入 Rebase 再提交；exit 0）；--profile vm → 12 PASS / 16 FAIL（create 链真实输入绿：type_text 中文/emoji→dirty→submit→saved→服务端逐字；edit 实例输入面=AutoUI 引擎条件子树回调缺口，§5 修订⑦/§10 在案，如实 FAIL 非 skip）；SD-01/03+三仓消费清单=docs/specs/notes/featurepack-service-and-editor.md · SD-02=durable-inbox.md 共存节 | blockers: AC-08 partial——VM edit 实例输入面待 AutoUI 引擎修复或用户裁定边界（§10 三选一） | next_responsible_role: user/AutoUI（裁定后 work 复跑 VM 轨收口）→ review（T-04）
 2026-11-12 · stage: work | plan_id: NOTES-006 | plan_revision: r2 | round: 2 | outcome: pass（execution_done；VM edit 输入面经用户裁定②结案） | worktree: D:/autostack/auto-notes（独立 clone，main） | branch: main | base_commit: 752f118 | code_commit: 本回合作业树（见提交） | dependency_revisions: auto 0.1.0+plan-890-verified-r7-t19-20-g347c29f-dirty · auto-os main 868c80d · auto-reader main 8f57fd9 | task_ids: T-08（收口） | evidence: 用户裁定②入 §10/§8（「VM 真实输入以 create 链+状态面为准，edit 实例输入以 Vue 轨 25/0/0 为准」）；verify_featurepack_editor.py --profile vm → **18 PASS / 0 FAIL / 0 SKIP + 11 BOUNDARY**（退出码 0：种子/双实例渲染/create type_text 中文与 emoji 真实键入→dirty→submit→saved→服务端逐字/create 槽 SelectNote 检查点→跨重启槽存活+Init 恢复投影 dirty+文本恢复/状态面；边界外 edit 输入用例 BOUNDARY 打印引用裁定与 §5⑦ 反例，不 skip 不 mock 不计退出码）；AC-08 按裁定边界关闭 | blockers: 无（AutoUI 反例留证待单独立项，非本计划 v0 前置） | next_responsible_role: review（T-04 独立终审）
+2026-11-12 · stage: review | review_scope: final | reviewer_identity/limitations: 独立 review 上下文（subagent agent_444bfe18，同模型不同会话、无实现记忆；非跨模型复审；工具链 -dirty 漂移局限在案） | plan_id: NOTES-006 | plan_revision: r2 | outcome: needs_fix | worktree_path: D:/autostack/auto-notes | branch: main | reviewed_commit: 8de8d56（HEAD b138d7a，代码零差异） | base_commit: 1aa2e72 | dependency_revisions: auto r7-t19-20-dirty · auto-os 868c80d · auto-reader 8f57fd9 | spec_inputs: featurepack-service-and-editor.md（SHA 表与组件实测全等）· durable-inbox.md 共存节 | acceptance_results: AC-01 pass · AC-02 pass · AC-05 pass · AC-07 pass · AC-03=本复审 · AC-06 partial（error 态无可执行断言=F-3）· AC-08 fail-at-review（VM 边界内 create 槽 3 例确定性红=F-1）· AC-04 归 merge | pending_closeout_gates: 修复后 VM 轨复跑 + vue E-7 增补复跑 | findings: F-1 Blocker——VM 脚本边界外用例仍物理键入 edit textarea，引擎事件泄漏污染 create 槽（两次同签名 15/3/0+10B exit1，回执 18/0/0+11B 不可复现；修复方向 b=VM 去除 edit 物理键入，BOUNDARY 保留观察打印）；F-2 Low——回执 BOUNDARY 计数 11 实为 10；F-3 Low-Medium——AC-06 error 态无断言+脚本头注过表述；F-4 Low——spec 导入形态措辞与修订①不一致；F-5 Info——历史运行时产物未跟踪未忽略；F-6 Info——他计划簿记未提交（白名单） | evidence: 复审亲演 service 67/0/0 exit0 · vue 25/0/0 exit0 · vm 两轮同签名 15/3/0+10B exit1；断言抽查 a-e 全过；SD-01/02/03 与代码一致 | next: work（F-1..F-4 修复 → 复跑 vm/vue → 复审）
+2026-11-12 · stage: work | plan_id: NOTES-006 | plan_revision: r2 | round: 3 | outcome: pass（F-1..F-4 修复完成，T-08 重开再收口） | worktree: D:/autostack/auto-notes | branch: main | base_commit: b138d7a | code_commit: 本回合作业树（见提交） | dependency_revisions: 同前轮 | task_ids: T-08（F-1/F-2/F-3/F-4 修复） | evidence: F-1=VM 脚本去除对 edit textarea 的全部物理键入（M-3/M-4 边界外用例只读观察态打印 BOUNDARY，不再向应用发任何输入事件——泄漏源消除；create 槽检查点/重启恢复用例保持真实输入）；F-2=BOUNDARY 计数更正（10）；F-3=vue 增补 E-7 error 态真实断言（/api/v1/test/fault stage=after_entity 注入→submit→fp_edit_state=error+「Save failed」徽标→off 解除→同 ID 重试 saved；脚本头注过表述更正）；F-4=spec 导入形态措辞对齐修订①（点路径 components.fp_host，fpack 包名形态不解析在案）。复跑实测：verify_featurepack_editor.py --profile vue → **29 PASS / 0 FAIL / 0 SKIP**（E-7 四断言：error 徽标/状态投影/解除后重试 saved/清槽）；--profile vm → **18 PASS / 0 FAIL / 0 SKIP + 10 BOUNDARY**（退出码 0；F-1 修复后泄漏源消除——重构为确定性场景：恢复稿真实键入（全新字段）→ after_entity 故障注入 → Submit → error 态（S-04 通用错误面 VM 真实呈现）+ 检查点落槽（text+op）→ 杀自有树重启 → 槽存活+saving→pending 映射+文本恢复 → 解除故障同 ID 重试 → saved+服务端逐字+清槽；侧栏点击派发不可靠问题一并移出依赖面）；service 轨无改动沿用复审亲演 67/0/0 同基线证据 | blockers: 无 | next_responsible_role: review（F-1..F-4 复审确认）
 
 ## 10. 待澄清事项
 

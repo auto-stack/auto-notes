@@ -82,9 +82,12 @@
   `save_state`（七态字符串；组件渲染 saving/saved/pending/error/conflict
   徽标，dirty/idle 无徽标）、`conflict_revision`、`server_body`。
 - 回调：`on_draft_edit(v)`、`on_submit_text(text)`、`on_rebase`。
-- 组件零网络依赖（I/O 宿主执行）；导入形态：同仓 `use fpack.fp_host: <函数>`
-  + `use { package: official from "./components" }`；跨仓 `dep notesfp
-  { path: <auto-notes>/src/front/components }`（pac.at）。
+- 组件零网络依赖（I/O 宿主执行）；导入形态：同仓 store 点路径
+  `use components.fp_host: <函数>`（`fpack` 包名形态在 vue 生成器 use-fn 池
+  静默跳过——实测修订①，勿用）+ 组件包
+  `use { package: official from "./components" }`；跨仓 `dep notesfp
+  { path: <auto-notes>/src/front/components }`（pac.at）后
+  `use notesfp.fp_host: <函数>`。
 
 ## 来源回访统一出口（T-06 唯一出口）
 
