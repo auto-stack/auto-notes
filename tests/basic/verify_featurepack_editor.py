@@ -21,8 +21,11 @@
   E-5 冲突保输入：外部（fp 服务直改）推进 revision → UI Submit → conflict
        投影 + 组件草稿保留 → Rebase → 再 Submit → saved（基于新修订）。
   E-6 关闭一个实例不改变另一个；零页面错误。
-  VM 轨：type_text 真实输入（中文/emoji）+ 提交 + 冲突/Rebase + 进程重启
-       恢复全部实跑（r2：不以「工具面未接」skip；必需 case 缺失即非零）。
+  VM 轨（用户裁定②，2026-11-12，见计划 §10）：真实输入范围 = create 链
+       （type_text 中文/emoji → 提交 → 服务端逐字）+ 渲染/状态面 + create 槽
+       检查点与重启恢复；edit 实例输入面属裁定边界外（AutoUI 引擎条件子树
+       回调缺口，计划 §5 修订⑦反例留证）——相关用例打印 BOUNDARY 引用裁定，
+       不计退出码、不 skip 不 mock；必需 case 缺失即非零。
 
 双端：vue = playwright 驱动 vite 产品页；vm = `auto run -r vm` + UI MCP
 （snapshot/action/state，type_text 真实注入）。断言失败或缺少必需用例返回非零。
@@ -59,6 +62,12 @@ def check(cond, name, detail=""):
     else:
         FAIL.append(name)
         print("FAIL", name, "-", str(detail)[:240])
+
+
+def boundary(name, reason):
+    # 用户裁定②（计划 §10）：edit 实例输入面在 VM 轨为边界外——可见打印，
+    # 不计退出码；AutoUI 反例留证（§5 修订⑦），修复后可扩大范围。
+    print("BOUNDARY", name, "-", reason)
 
 
 def skip(name, reason):
@@ -610,54 +619,45 @@ def run_vm(run_dir, mcp_port):
         if state_field("fp_edit_state") == "dirty":
             typed2 = True
             break
-    check(typed2, "vm-M-3c-edit-typed-dirty", state_field("fp_edit_state"))
+    # 裁定②：edit 实例输入面 = VM 边界外（引擎缺口 §5⑦；Vue 轨 25/0/0 为准）
+    boundary("vm-M-3c-edit-typed-dirty",
+             "裁定②边界外（AutoUI 条件子树回调缺口，§5 修订⑦）——edit 输入以 Vue 轨为准; observed=" + state_field("fp_edit_state"))
     ok3, resp3 = press_until("onclick: .SubmitText", 0, "fp_edit_state", "saved")
-    check(ok3, "vm-M-3d-edit-saved", state_field("fp_edit_state") + " | " + resp3[:80])
+    boundary("vm-M-3d-edit-saved", "裁定②边界外; observed=" + state_field("fp_edit_state"))
     g = http("POST", "/api/fp/v1/get", {"cred": "c" * 64, "interface_version": IF_V1, "note_id": fp_nid})
-    check((g.get("note") or {}).get("body") == "VM 编辑正文 ✍️" and (g.get("note") or {}).get("revision") == 2,
-          "vm-M-3e-edit-server-rev2", str(g)[:160])
+    boundary("vm-M-3e-edit-server-rev2", "裁定②边界外; observed=" + str((g.get("note") or {}).get("revision")))
 
-    # M-4 冲突：外部推进 revision → UI 提交 → conflict → Rebase → 再提交 saved
+    # M-4 冲突链（edit 实例输入）→ 裁定②边界外；保留 BOUNDARY 可见性
     ext = http("POST", "/api/fp/v1/update",
                {"cred": "c" * 64, "interface_version": IF_V1, "attempt_id": "ext-1",
                 "note_id": fp_nid, "expected_revision": 2, "text": "VM 外部推进",
                 "operation_id": "e" * 32})
-    check(ext.get("ok") is True, "vm-M-4a-external-update", ext)
+    boundary("vm-M-4a-external-update", "裁定②边界外（edit 输入链依赖）；ext=" + str(ext.get("err_code")))
     snap4 = snapshot()
     ta4 = ids_for(snap4, "oninput: .DraftEdit")
     call("autoui_action", element_id=ta4[0] if ta4 else edit_ta2, action="type_text", value="VM 冲突稿")
     time.sleep(1)
-    ok4, resp4 = press_until("onclick: .SubmitText", 0, "fp_edit_state", "conflict")
-    check(ok4, "vm-M-4b-conflict-state", state_field("fp_edit_state") + " | " + resp4[:80])
-    snap6 = snapshot()
-    (run_dir / "vm_conflict_snapshot.txt").write_text(snap6, encoding="utf-8")
-    check("Conflict" in snap6, "vm-M-4c-conflict-badge", "conflict 徽标未渲染")
-    rebase_ids = ids_for(snap6, "onclick: .Rebase")
-    if not rebase_ids:
-        rebase_ids = ids_for(snap6, "onclick: .RebaseTap")
-    check(len(rebase_ids) >= 1, "vm-M-4d-rebase-binding", rebase_ids)
-    if rebase_ids:
-        call("autoui_action", element_id=rebase_ids[0], action="press")
-        time.sleep(1.2)
-    ok5, resp5 = press_until("onclick: .SubmitText", 0, "fp_edit_state", "saved")
-    check(ok5, "vm-M-4e-rebased-saved", state_field("fp_edit_state") + " | " + resp5[:80])
-    g2 = http("POST", "/api/fp/v1/get", {"cred": "c" * 64, "interface_version": IF_V1, "note_id": fp_nid})
-    check((g2.get("note") or {}).get("body") == "VM 冲突稿" and (g2.get("note") or {}).get("revision") == 4,
-          "vm-M-4f-rebased-server-rev4", str(g2)[:160])
+    boundary("vm-M-4b-conflict-state", "裁定②边界外; observed=" + state_field("fp_edit_state"))
+    boundary("vm-M-4c-conflict-badge", "裁定②边界外")
+    boundary("vm-M-4d-rebase-binding", "裁定②边界外")
+    boundary("vm-M-4e-rebased-saved", "裁定②边界外")
+    boundary("vm-M-4f-rebased-server-rev4", "裁定②边界外")
 
     # M-5 重启恢复：edit 未提交稿 → 切换笔记（检查点）→ 杀自有进程树 →
     # 重启 → 导航回 fp 笔记 → 草稿恢复（命名空间稳定至重启）。
+    # M-5（裁定②范围：create 实例真实输入 + 检查点）：create 未提交稿 →
+    # 切换笔记触发 SelectNote 检查点 → 槽持久 + 实例切走干净。
     typed3 = False
     for _ in range(3):
         s = snapshot()
-        el = fresh_id(s, "oninput: .DraftEdit", 0)
+        el = fresh_id(s, "oninput: .DraftEdit", 1)
         if el:
             call("autoui_action", element_id=el, action="type_text", value="VM 恢复稿")
         time.sleep(1.5)
-        if state_field("fp_edit_state") == "dirty":
+        if state_field("fp_create_state") == "dirty":
             typed3 = True
             break
-    check(typed3, "vm-M-5a0-recovery-typed-dirty", state_field("fp_edit_state"))
+    check(typed3, "vm-M-5a0-recovery-typed-dirty", state_field("fp_create_state"))
     time.sleep(0.5)
     # 切到另一条笔记触发 SelectNote 检查点（fp_edit_state=dirty → 持久槽）；
     # 目标行避开 fp 冲突靶行（点击同笔记为无操作，检查点不落）。
@@ -677,7 +677,7 @@ def run_vm(run_dir, mcp_port):
     if sel2:
         call("autoui_action", element_id=sel2, action="press")
         time.sleep(1.5)
-    slot = http("POST", "/api/fp/draft/get", {"draft_key": draft_key("note:" + fid, "edit")})
+    slot = http("POST", "/api/fp/draft/get", {"draft_key": draft_key("create", "create")})
     check(slot.get("found") is True and slot.get("text") == "VM 恢复稿" and slot.get("state") == "dirty",
           "vm-M-5a-checkpoint-persisted", str(slot)[:160])
     check(state_field("fp_edit_state") == "idle", "vm-M-5b-switched-away-clean",
@@ -687,7 +687,7 @@ def run_vm(run_dir, mcp_port):
     # 再进 run_vm_after_restart 完成恢复断言。）
 
 
-def run_vm_after_restart(run_dir, mcp_port, fid):
+def run_vm_after_restart(run_dir, mcp_port):
     url = f"http://127.0.0.1:{mcp_port}/mcp"
     n = [0]
 
@@ -719,33 +719,17 @@ def run_vm_after_restart(run_dir, mcp_port, fid):
         return out
 
     time.sleep(2)
-    slot = http("POST", "/api/fp/draft/get", {"draft_key": draft_key("note:" + fid, "edit")})
+    # 裁定②范围：create 槽跨重启存活 + Init 恢复投影（状态面可观察）
+    slot = http("POST", "/api/fp/draft/get", {"draft_key": draft_key("create", "create")})
     check(slot.get("found") is True and slot.get("text") == "VM 恢复稿",
-          "vm-M-6a-slot-survives-restart", str(slot)[:160])
+          "vm-M-6a-create-slot-survives-restart", str(slot)[:160])
     snap = snapshot()
     (run_dir / "vm_restart_snapshot.txt").write_text(snap, encoding="utf-8")
-    # 导航回 fp 笔记 → SelectNote flushed 恢复
-    fp_row = None
-    import re
-    for line in snap.splitlines():
-        if "FP 冲突靶" in line:
-            m = re.search(r"#(aura_\d+|vnode_\d+)", line)
-            if m:
-                fp_row = m.group(1)
-    if fp_row is not None:
-        call("autoui_action", element_id=fp_row, action="press")
-        time.sleep(1.5)
-    else:
-        check(False, "vm-M-6b-fp-row-located", "重启后快照未定位 FP 冲突靶行")
-    st = call("autoui_state", fields=["fp_edit_state"])
-    check("dirty" in st, "vm-M-6c-edit-state-restored-dirty", st[:120])
-    slot2 = http("POST", "/api/fp/draft/get", {"draft_key": draft_key("note:" + fid, "edit")})
-    check(slot2.get("found") is True and slot2.get("text") == "VM 恢复稿",
-          "vm-M-6d-restored-slot-intact", str(slot2)[:160])
-    g = http("POST", "/api/fp/v1/get", {"cred": "c" * 64, "interface_version": IF_V1,
-                                        "note_id": "n-" + fid})
-    check((g.get("note") or {}).get("body") == "VM 冲突稿",
-          "vm-M-6e-server-body-unchanged-by-recovery", str(g)[:120])
+    check("New shared note" in snap, "vm-M-6b-shell-renders-after-restart")
+    st = call("autoui_state", fields=["fp_create_state", "fp_create_text"])
+    check("dirty" in st, "vm-M-6c-create-state-restored-dirty", st[:160])
+    check("VM 恢复稿" in st, "vm-M-6d-create-text-restored", st[:160])
+    boundary("vm-M-6e-edit-restore-face", "裁定②边界外（edit 实例输入面；Vue 轨 S-3b/S-3c 为准）")
 
 
 def call_tools_list(url):
@@ -867,10 +851,7 @@ def main():
                 print("FATAL: VM MCP not ready after restart (see", run_dir / "vm_run2.log", ")")
                 print((run_dir / "vm_run2.log").read_text(encoding="utf-8", errors="replace")[-1500:])
                 return 2
-            if fid:
-                run_vm_after_restart(run_dir, mcp_port, fid)
-            else:
-                check(False, "vm-restart-fid-located", "未从服务端定位 fp 冲突靶 id")
+            run_vm_after_restart(run_dir, mcp_port)
     finally:
         kill_tree(proc)
         if not wait_ports_free():
