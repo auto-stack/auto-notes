@@ -1,0 +1,131 @@
+// components/fp_host.at — FeaturePack 共享宿主适配（NOTES-006 T-07 发布）。
+//
+// 契约：NOTES-006 §5/T-06 冻结 + auto-os featurepack-v0.md §2/§3。Notes 提供
+// 共享宿主适配逻辑，集中维护草稿状态机、操作身份与请求构造；两宿主（Notes
+// 主应用 / Reader）逐实例持状态字段，经本模块函数转移状态并构造请求。
+//
+// 本模块为**纯逻辑**（零网络、零组件依赖）：I/O 由宿主执行（沿 fp_editor.at
+// 组件零网络纪律）。组件（FpNoteEditor）只管渲染与回调；草稿权威在宿主字段
+// （draft_text prop 往返），本模块只给状态转移/守卫/请求构造提供公共语义，
+// 避免两宿主各自实现另一套保存协议。
+//
+// 状态机（T-06 冻结）：state ∈ idle|dirty|saving|saved|pending|error|conflict。
+//   * idle: 无未提交内容。
+//   * dirty: 用户已键入（输入版本 v 递增；外部结果不写回 = 保输入）。
+//   * saving: 提交已发出，等待回包。
+//   * saved: 回包确认（只清除已提交那一版输入；提交后继续键入保持 dirty）。
+//   * pending: 回包丢失/未观察（已提交但未确认；可 receipt 查询或同 ID 重试）。
+//   * error: 传输/磁盘失败（不投影为可 Rebase 的修订冲突）。
+//   * conflict: 修订冲突（保留用户稿与服务端稿；Rebase 后新意图）。
+//
+// 守卫：异步结果先核 draft_key/generation/输入版本——过期结果不写回宿主状态。
+// 每宿主实例持：draft_key、generation、note_id、base_revision、operation_id、
+// 待提交 payload、用户输入版本。成功只清除已提交那一版输入。
+
+// ── 状态机转移 ─────────────────────────────────────────────
+// event: "type" | "submit" | "ack" | "receipt_not_observed" |
+//        "error" | "conflict" | "rebase" | "discard"
+// 返回新 state；宿主据此投影组件 save_state 并维护自身字段。
+fn fp_state_next(state str, event str) str {
+    if event == "type" {
+        // 输入事件：dirty/saving/error/conflict 下都保留输入（不清）。
+        if state == "idle" || state == "saved" {
+            return "dirty"
+        }
+        return state
+    }
+    if event == "submit" {
+        // 提交：saving 已在途则不变（防重复提交）；其余进入 saving。
+        if state == "saving" {
+            return "saving"
+        }
+        return "saving"
+    }
+    if event == "ack" {
+        // 回包确认：只清已提交版（宿主清 payload/输入基线）；若已继续键入
+        // 宿主把新输入版本与 ack 版比较——ack 只对匹配版生效（守卫在宿主）。
+        return "saved"
+    }
+    if event == "receipt_not_observed" {
+        // 已提交但回包未观察：保留待确认，宿主可 receipt 查询或同 ID 重试。
+        return "pending"
+    }
+    if event == "error" {
+        return "error"
+    }
+    if event == "conflict" {
+        return "conflict"
+    }
+    if event == "rebase" {
+        // Rebase = 认领服务器修订为新基底；用户输入不动（保输入）——
+        // 输入仍未提交，转移 dirty（非 idle）；再次提交是新意图（宿主换
+        // operation_id）。
+        return "dirty"
+    }
+    if event == "discard" {
+        return "idle"
+    }
+    return state
+}
+
+// ── 操作身份（T-06 冻结）──────────────────────────────────
+// operation_id：单元意图稳定 ID——新建/用户确认更新每次新；同意图重试复用。
+// 去重键（服务端）：fp:<principal>:<operation_id>；attempt_id 每次调用新。
+fn fp_op_key(principal str, operation_id str) str {
+    return "fp:" + principal + ":" + operation_id
+}
+
+// ── 持久草稿命名空间（r2 冻结）────────────────────────────
+// draft_key = fpdraft|本地用户|宿主|书目或笔记|实例——命名空间稳定至重启
+// 恢复；保留或丢弃须有明确用户动作。target 形如 "note:<id>" 或 "create"；
+// instance ∈ edit|create。v0 本地服务单用户诚实边界：user 传宿主决定的
+// 本地身份（Notes 主应用 "local"；OS 用户/policy 身份不引入登录前置）。
+fn fp_draft_key(user str, host str, target str, instance str) str {
+    return "fpdraft|" + user + "|" + host + "|" + target + "|" + instance
+}
+
+// ── 来源回访统一出口（T-06 冻结唯一出口）──────────────────
+// OpenSource(note_id, source)：组件事件或宿主来源卡统一经此构造载荷，
+// 两个应用一致消费（Notes v0 = 来源卡展示；Reader = locator 重验定位）。
+// source_json 原样内嵌（不可变快照，不重组不规范化）。纯拼接不用
+// json.encode——vue 生成面对 store/use-fn 池的 json.* 不映射（r2 实测），
+// note_id 走受限字符集（nid_of：[a-z0-9-]）无需转义。
+fn fp_open_source_payload(note_id str, source_json str) str {
+    return "{\"note_id\":\"" + note_id + "\",\"source\":" + source_json + "}"
+}
+
+// ── 请求构造（纯 body；cred/interface_version 信封由宿主注入）──────
+// 捕获 payload（来源不可变快照 + 可编辑正文）。
+fn fp_capture_payload(operation_id str, attempt_id str, source_json str, text str) str {
+    var o str = "{\"operation_id\":" + json.encode(operation_id)
+    o = o + ",\"attempt_id\":" + json.encode(attempt_id)
+    o = o + ",\"source_json\":" + json.encode(source_json)
+    o = o + ",\"text\":" + json.encode(text) + "}"
+    return o
+}
+
+// 更新 payload（仅正文；来源/title 不可变）。
+fn fp_update_payload(operation_id str, attempt_id str, note_id str, expected_revision int, text str) str {
+    var o str = "{\"operation_id\":" + json.encode(operation_id)
+    o = o + ",\"attempt_id\":" + json.encode(attempt_id)
+    o = o + ",\"note_id\":" + json.encode(note_id)
+    o = o + ",\"expected_revision\":" + json.encode(expected_revision)
+    o = o + ",\"text\":" + json.encode(text) + "}"
+    return o
+}
+
+// 读取/回执 payload。
+fn fp_get_payload(note_id str) str {
+    return "{\"note_id\":" + json.encode(note_id) + "}"
+}
+
+fn fp_receipt_payload(operation_id str) str {
+    return "{\"operation_id\":" + json.encode(operation_id) + "}"
+}
+
+// ── 守卫判定（宿主在异步结果回落后调用）────────────────────
+// 结果是否仍属当前实例/代：draft_key 未变且 generation 未变才接受。
+// 宿主用 (key, gen) 与实际 (cur_key, cur_gen) 比较——纯比较语义，无副作用。
+fn fp_result_current(key str, gen int, cur_key str, cur_gen int) bool {
+    return key == cur_key && gen == cur_gen
+}

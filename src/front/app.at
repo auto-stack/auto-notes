@@ -29,7 +29,8 @@ widget App {
 
     msg { Init, NewNote, ToggleDarkMode, SetMode(str), SetAccent(str), ToggleSettings,
           FpEditDraft(str), FpEditSubmit(str), FpEditRebase,
-          FpCreateDraft(str), FpCreateSubmit(str), FpCreateRebase }
+          FpCreateDraft(str), FpCreateSubmit(str), FpCreateRebase,
+          FpOpenSource }
 
     model {
         var dark_mode bool = true
@@ -144,6 +145,52 @@ widget App {
                                   on_submit_text: .FpCreateSubmit,
                                   on_rebase: .FpCreateRebase) {}
                 }
+                // ── 来源卡（NOTES-006 r2 来源回访面；T-06 统一出口）────────
+                // 配置与默认值：来源回访仅在 source_status=ok 时可用（冻结
+                // 校验过的来源）；incomplete 显示「来源不完整」且回访入口
+                // 不可用（明确不可回访状态）；none 不渲染。配置不提升服务
+                // 权限——只投影本地已读数据。
+                if .store.fp_src_status == "ok" {
+                    col {
+                        style: "items-start gap-1 px-3 py-2 rounded-md bg-muted w-auto"
+                        row {
+                            style: "items-center gap-2 w-auto"
+                            icon (name: "book-open", size: 13, style: "text-muted-foreground")
+                            text .store.fp_src_title { style: "text-xs font-medium text-foreground" }
+                            text .store.fp_src_book { style: "text-xs text-muted-foreground" }
+                        }
+                        row {
+                            style: "items-center gap-2 w-auto"
+                            text .store.fp_src_quote { style: "text-xs text-muted-foreground" }
+                            button {
+                                onclick: .FpOpenSource
+                                text "Open source" { style: "text-xs" }
+                            }
+                        }
+                    }
+                } else {
+                    if .store.fp_src_status == "incomplete" {
+                        row {
+                            style: "items-center gap-2 px-3 py-1 rounded-md bg-amber-500/10 w-auto"
+                            icon (name: "alert-triangle", size: 13, style: "text-amber-600")
+                            text "Source incomplete (legacy) - revisit unavailable" { style: "text-xs text-amber-700" }
+                        }
+                    }
+                }
+                if .store.fp_open_active {
+                    // OpenSource 消费投影（主应用 v0 = 来源详情卡；Reader 消费
+                    // 同一出口做 locator 重验定位）。
+                    col {
+                        style: "items-start gap-1 px-3 py-2 rounded-md border border-border w-auto"
+                        row {
+                            style: "items-center gap-2 w-auto"
+                            text "Source" { style: "text-xs font-semibold text-primary" }
+                            text .store.fp_open_note { style: "text-xs text-muted-foreground" }
+                        }
+                        text .store.fp_src_author { style: "text-xs text-muted-foreground" }
+                        text .store.fp_src_locator { style: "text-xs text-muted-foreground" }
+                    }
+                }
             }
         }
     }
@@ -172,5 +219,6 @@ widget App {
         .FpCreateDraft(v) -> { store.FpCreateDraft(v) }
         .FpCreateSubmit(text) -> { store.FpCreateSubmit(text) }
         .FpCreateRebase -> { store.FpCreateRebase() }
+        .FpOpenSource -> { store.FpOpenSource() }
     }
 }

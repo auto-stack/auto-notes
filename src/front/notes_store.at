@@ -45,7 +45,8 @@
 //      rid；revision 冲突时按服务器内容裁决旧提交是否落地，落地则采用其
 //      revision 重试新意图，保留新草稿（不再沿用陈旧 revision 卡死）。
 
-use back.api: list_notes, create_note, update_note_r, get_note_r, delete_note, toggle_pin_result, update_tags_result, search_notes, next_request_id
+use back.api: list_notes, create_note, update_note_r, get_note_r, delete_note, toggle_pin_result, update_tags_result, search_notes, next_request_id, fp_draft_put, fp_draft_get, fp_draft_delete, fp_draft_put_note, fp_draft_get_note, fp_draft_delete_note, fp_source_of_note
+use components.fp_host: fp_state_next, fp_draft_key, fp_open_source_payload
 
 store NotesStore {
     model {
@@ -88,16 +89,50 @@ store NotesStore {
         var dirty bool = false
         var confirm_delete bool = false
 
-        // ── NOTES-006 T-03：FeaturePack 编辑组件消费面（主应用第一消费者）──
-        // 草稿经 prop 往返承载（组件 fp_editor.at；T-03 实测裁定：本地 model
-        // + Init 臂与冲突保输入互斥——Vue 端 Init 深监听回放语义）。每实例
-        // 一对独立宿主字段 = 实例隔离；冲突时宿主不写回 draft 字段 = 保输入。
+        // ── NOTES-006 T-03/T-07：FeaturePack 共享宿主适配消费面 ─────────
+        // 两实例经同一公共机制（fpack.fp_host：fp_state_next 状态转移、
+        // fp_draft_key 持久命名空间、fp_open_source_payload 统一出口）：
+        //   * 状态机 idle|dirty|saving|saved|pending|error|conflict（T-06 冻结）。
+        //   * operation_id 意图稳定：同意图（同文同基修订）重试复用；换文/
+        //     换基/成功即换新——主应用路径以 rid 复用实现同 ID 幂等恢复。
+        //   * fp_*_sent = 已提交那一版输入；ack 只清这版，提交后继续键入
+        //     （input_ver 递增）保留并仍为未保存。
+        //   * 冲突不写回草稿字段 = 保输入；传输/磁盘失败 → error（不投影为
+        //     修订冲突）；err_code 空（传输未知）→ pending（可同 ID 重试续查）。
+        //   * 持久暂存经 /api/fp/draft/*（检查点：提交/冲突/切换/恢复；Init
+        //     恢复 saving→pending）。草稿权威仍在宿主字段（prop 往返，
+        //     T-03 实测裁定维持）。
         // edit 实例草稿即 .draft_body（与主编辑器同源同修订——AC-02 同一修订）。
         var fp_edit_state str = "idle"
+        var fp_edit_op str = ""
+        var fp_edit_sent str = ""
+        var fp_edit_base_rev int = 0
+        var fp_edit_input_ver int = 0
+        var fp_edit_gen int = 0
         var fp_edit_conflict_rev int = 0
         var fp_edit_server_body str = ""
         var fp_create_state str = "idle"
         var fp_create_text str = ""
+        var fp_create_op str = ""
+        var fp_create_sent str = ""
+        var fp_create_input_ver int = 0
+        var fp_create_gen int = 0
+        // 来源卡（r2 来源回访面）：选中笔记的来源投影（/api/fp/source/of，
+        // 主应用本地全权面）。source_status = ok 可回访 / incomplete 残缺
+        // （回访入口不可用）/ none 无来源便签。OpenSource 统一出口经
+        // FpOpenSource（fp_host.fp_open_source_payload 构造载荷）。
+        var fp_src_note int = 0
+        var fp_src_nid str = ""
+        var fp_src_book str = ""
+        var fp_src_status str = "none"
+        var fp_src_title str = ""
+        var fp_src_author str = ""
+        var fp_src_quote str = ""
+        var fp_src_locator str = ""
+        var fp_src_raw str = ""
+        var fp_open_active bool = false
+        var fp_open_note str = ""
+        var fp_open_json str = ""
 
         // 恢复槽（SD-10/SD-14）：冲突下导航时，失败草稿整体入槽，可恢复/放弃。
         // r5/T-19（F-R5-03）：双槽可恢复集合——Recover 时当前 dirty 草稿入空闲
@@ -182,6 +217,7 @@ store NotesStore {
         TagAdded(str), TagRemoved(str),
         StashDraft, RecoverDraft, RecoverDraft2, DiscardRecovery, DiscardRecovery2, DiscardDraft,
         BindIntent,
+        FpOpenSource,
         ToggleDarkMode, SetMode(str), SetAccent(str), ToggleSettings
     }
 
@@ -196,6 +232,65 @@ store NotesStore {
             .active_id = 0
             .LoadDraft()
             .ApplyFilter()
+            // ── NOTES-006 T-07：FP 草稿恢复（检查点恢复；命名空间稳定至重启）──
+            // create 槽与活动笔记 edit 槽；持久态 saving = 回包未观察 → pending。
+            // 编辑槽与服务器已同文 = 已随主路径提交 → 清槽记 saved（不误报脏）。
+            var ck FpDraftRow = fp_draft_get(fp_draft_key("local", "notes-main", "create", "create"))
+            if ck.found {
+                .fp_create_text = ck.text
+                .fp_create_input_ver = ck.input_ver
+                .fp_create_op = ck.op
+                if ck.state == "saving" {
+                    .fp_create_state = "pending"
+                } else {
+                    .fp_create_state = ck.state
+                }
+                .fp_create_gen = .fp_create_gen + 1
+            }
+            if .draft_id != 0 {
+                var ek FpDraftRow = fp_draft_get_note(.draft_id, "edit")
+                if ek.found {
+                    if ek.text == .draft_body {
+                        fp_draft_delete_note(.draft_id, "edit")
+                        .fp_edit_state = "saved"
+                        .fp_edit_op = ""
+                    } else {
+                        if .dirty == false {
+                            .draft_body = ek.text
+                            // pending/saving 恢复绑定原操作基修订（同 ID 重试
+                            // 完整性）；dirty/error/conflict 保持服务器现修订
+                            // ——不回卷已知修订（回卷会让新意图撞过期冲突）。
+                            if ek.state == "pending" {
+                                .draft_revision = ek.base_rev
+                            }
+                            if ek.state == "saving" {
+                                .draft_revision = ek.base_rev
+                            }
+                            .dirty = true
+                        }
+                        .fp_edit_state = ek.state
+                        if ek.state == "saving" {
+                            .fp_edit_state = "pending"
+                            fp_draft_put_note(.draft_id, "edit", ek.text, "pending", ek.op, ek.base_rev, ek.input_ver)
+                        }
+                        .fp_edit_op = ek.op
+                        .fp_edit_base_rev = ek.base_rev
+                        .fp_edit_input_ver = ek.input_ver
+                        .fp_edit_gen = .fp_edit_gen + 1
+                    }
+                }
+                // 来源卡投影（主应用本地全权面；主应用按本地 OS 用户查询）。
+                var sv FpSourceView = fp_source_of_note(.draft_id)
+                .fp_src_note = .draft_id
+                .fp_src_nid = sv.note_id
+                .fp_src_book = sv.book_id
+                .fp_src_status = sv.source_status
+                .fp_src_title = sv.title
+                .fp_src_author = sv.author
+                .fp_src_quote = sv.quote
+                .fp_src_locator = sv.locator
+                .fp_src_raw = sv.source_json
+            }
         }
 
         // ── 纯同步工具族（无 API 调用，可被任何 handler 复用）─────────────────
@@ -313,6 +408,27 @@ store NotesStore {
                 .has_pend = false
                 .has_prev = false
                 .has_prev2 = false
+                // FP 每实例状态随笔记装载复位（NOTES-006 T-03：实例状态绑定
+                // 当前笔记）。持久槽不受扰——恢复由 Init/SelectNote 异步上下文
+                // 覆盖（同步 handler 禁 HTTP，文件头 ⑤）。
+                .fp_edit_state = "idle"
+                .fp_edit_op = ""
+                .fp_edit_sent = ""
+                .fp_edit_base_rev = 0
+                .fp_edit_input_ver = 0
+                .fp_edit_gen = .fp_edit_gen + 1
+                .fp_edit_conflict_rev = 0
+                .fp_edit_server_body = ""
+                .fp_src_note = 0
+                .fp_src_nid = ""
+                .fp_src_book = ""
+                .fp_src_status = "none"
+                .fp_src_title = ""
+                .fp_src_author = ""
+                .fp_src_quote = ""
+                .fp_src_locator = ""
+                .fp_src_raw = ""
+                .fp_open_active = false
             }
             .confirm_delete = false
         }
@@ -706,7 +822,11 @@ store NotesStore {
 
         // 放弃当前草稿 = 显式选择服务器版本（SD-14：先刷新工作集再按
         // draft_id 装载最新版——不得用陈旧列表冒充服务器版本，F-R5-03）。
+        // FP edit 槽随显式丢弃清除（T-07：保留或丢弃须有明确用户动作）。
         .DiscardDraft -> {
+            if .draft_id != 0 {
+                fp_draft_delete_note(.draft_id, "edit")
+            }
             if .search == "" {
                 .notes = list_notes()
             } else {
@@ -753,6 +873,40 @@ store NotesStore {
                     target_id = n0.id
                 }
                 k0 = k0 + 1
+            }
+            // ── FP 槽检查点（NOTES-006 T-07）：fp 实例有未提交/未确认内容时
+            // 先持久（键 = 当前笔记/实例）；切回时经 flushed 分支恢复。纯同步
+            // 输入 handler 禁 HTTP——检查点固定在异步入口（此处/提交路径）。
+            var need_save bool = false
+            if .fp_edit_state == "dirty" {
+                need_save = true
+            }
+            if .fp_edit_state == "pending" {
+                need_save = true
+            }
+            if .fp_edit_state == "error" {
+                need_save = true
+            }
+            if .fp_edit_state == "conflict" {
+                need_save = true
+            }
+            if need_save {
+                if .draft_id != 0 {
+                    fp_draft_put_note(.draft_id, "edit", .draft_body, .fp_edit_state, .fp_edit_op, .fp_edit_base_rev, .fp_edit_input_ver)
+                }
+            }
+            var cneed_save bool = false
+            if .fp_create_state == "dirty" {
+                cneed_save = true
+            }
+            if .fp_create_state == "pending" {
+                cneed_save = true
+            }
+            if .fp_create_state == "error" {
+                cneed_save = true
+            }
+            if cneed_save {
+                fp_draft_put(fp_draft_key("local", "notes-main", "create", "create"), .fp_create_text, .fp_create_state, .fp_create_op, 0, .fp_create_input_ver)
             }
             var flushed bool = true
             // F-R8-03：flush 成功时 notes 已刷新且 active_id 已按目标 id 重定位，
@@ -880,6 +1034,50 @@ store NotesStore {
                 }
                 .LoadDraft()
                 .ApplyFilter()
+                // ── FP edit 槽恢复（切回已检查点笔记）+ 来源卡刷新（T-07）──
+                if .draft_id != 0 {
+                    var ek2 FpDraftRow = fp_draft_get_note(.draft_id, "edit")
+                    if ek2.found {
+                        if ek2.text == .draft_body {
+                            // 已随主路径提交（同文）——清槽记 saved，不误报脏。
+                            fp_draft_delete_note(.draft_id, "edit")
+                            .fp_edit_state = "saved"
+                            .fp_edit_op = ""
+                        } else {
+                            if .dirty == false {
+                                .draft_body = ek2.text
+                                // pending/saving 恢复绑定原操作基修订；其余保持
+                                // 服务器现修订（不回卷已知修订，见 Init 同注）。
+                                if ek2.state == "pending" {
+                                    .draft_revision = ek2.base_rev
+                                }
+                                if ek2.state == "saving" {
+                                    .draft_revision = ek2.base_rev
+                                }
+                                .dirty = true
+                            }
+                            .fp_edit_state = ek2.state
+                            if ek2.state == "saving" {
+                                .fp_edit_state = "pending"
+                                fp_draft_put_note(.draft_id, "edit", ek2.text, "pending", ek2.op, ek2.base_rev, ek2.input_ver)
+                            }
+                            .fp_edit_op = ek2.op
+                            .fp_edit_base_rev = ek2.base_rev
+                            .fp_edit_input_ver = ek2.input_ver
+                            .fp_edit_gen = .fp_edit_gen + 1
+                        }
+                    }
+                    var sv2 FpSourceView = fp_source_of_note(.draft_id)
+                    .fp_src_note = .draft_id
+                    .fp_src_nid = sv2.note_id
+                    .fp_src_book = sv2.book_id
+                    .fp_src_status = sv2.source_status
+                    .fp_src_title = sv2.title
+                    .fp_src_author = sv2.author
+                    .fp_src_quote = sv2.quote
+                    .fp_src_locator = sv2.locator
+                    .fp_src_raw = sv2.source_json
+                }
             }
         }
 
@@ -2027,73 +2225,155 @@ store NotesStore {
             .show_settings = !.show_settings
         }
 
-        // ── NOTES-006 T-03：FeaturePack 编辑组件宿主回调 ────────────────
+        // ── NOTES-006 T-03/T-07：FeaturePack 编辑组件宿主回调 ────────────
         // 组件经 prop 往返双向绑定草稿（on_draft_edit 出、draft_text 进），
         // 提交经 on_submit_text 投递全文；I/O 在宿主 store 入口内联（文件头
         // ⑤ 纪律）。edit 实例草稿即 .draft_body（与主编辑器同源）；冲突只
         // 投影 save_state=conflict + 重读服务器版本入 fp_edit_server_body，
         // **不写回** .draft_body = 用户输入保留（供重读、比较和再次提交）。
         // v0 消费面走既有全权路径：主应用数据归属全量（featurepack-v0 §2.3），
-        // fp 服务端点+policy 由 Reader 宿主消费（READER-013）。
+        // fp cred 端点+policy 由 Reader 宿主消费（READER-013）；状态机/意图
+        // 身份/持久槽经 fpack.fp_host 公共语义（两宿主同一机制）。
 
         .FpEditDraft(v) -> {
+            .fp_edit_input_ver = .fp_edit_input_ver + 1
             .draft_body = v
+            .fp_edit_state = fp_state_next(.fp_edit_state, "type")
         }
 
         .FpEditSubmit(text) -> {
             if .draft_id == 0 {
                 return
             }
-            .fp_edit_state = "saving"
-            var rid str = next_request_id("fp-edit")
-            var fr RepoResult = update_note_r(.draft_id, .draft_revision, .draft_title, text, rid)
+            // 防重复提交（saving 在途忽略——fp_state_next 同语）。
+            if .fp_edit_state == "saving" {
+                return
+            }
+            // 意图身份（T-06 冻结）：同文同基 = 同意图复用 op；换文/换基 =
+            // 新意图换 op。op 即主路径 rid——同 ID 重试经服务端意图重放幂等。
+            if .fp_edit_op != "" {
+                if text != .fp_edit_sent {
+                    .fp_edit_op = ""
+                } else {
+                    if .draft_revision != .fp_edit_base_rev {
+                        .fp_edit_op = ""
+                    }
+                }
+            }
+            if .fp_edit_op == "" {
+                .fp_edit_op = next_request_id("fp-edit")
+            }
+            .fp_edit_sent = text
+            .fp_edit_base_rev = .draft_revision
+            .fp_edit_state = fp_state_next(.fp_edit_state, "submit")
+            // 检查点持久（提交前落盘——丢回包/关页后同操作恢复重试）。
+            fp_draft_put_note(.draft_id, "edit", text, .fp_edit_state, .fp_edit_op, .fp_edit_base_rev, .fp_edit_input_ver)
+            var fr RepoResult = update_note_r(.draft_id, .fp_edit_base_rev, .draft_title, text, .fp_edit_op)
             if fr.ok {
-                .fp_edit_state = "saved"
+                // ack：成功只清已提交那一版输入（sent==text）；提交后继续
+                // 键入（input_ver 已增、draft_body 已新）保留并仍为未保存。
+                .fp_edit_state = fp_state_next(.fp_edit_state, "ack")
                 .draft_revision = fr.doc.revision
+                .fp_edit_op = ""
+                if text == .draft_body {
+                    .fp_edit_sent = ""
+                    fp_draft_delete_note(.draft_id, "edit")
+                } else {
+                    // 提交后继续键入：保留新输入，槽记 dirty（命名空间不变）。
+                    .fp_edit_state = fp_state_next(.fp_edit_state, "type")
+                    fp_draft_put_note(.draft_id, "edit", .draft_body, "dirty", "", .draft_revision, .fp_edit_input_ver)
+                }
                 .notes = list_notes()
                 .ApplyFilter()
                 return
             }
+            if fr.err_code == "" {
+                // 传输层未知（可能已提交）→ pending：保留待确认状态，同 ID
+                // 重试续查（原操作可续查——重放幂等）。
+                .fp_edit_state = fp_state_next(.fp_edit_state, "receipt_not_observed")
+                return
+            }
             if fr.err_code == "revision_conflict" {
-                .fp_edit_state = "conflict"
+                .fp_edit_state = fp_state_next(.fp_edit_state, "conflict")
                 var srv RepoResult = get_note_r(.draft_id)
                 if srv.ok {
                     .fp_edit_conflict_rev = srv.doc.revision
                     .fp_edit_server_body = srv.doc.body
                 }
+                // 冲突检查点：用户稿（.draft_body）与服务端稿并存，槽保留。
+                fp_draft_put_note(.draft_id, "edit", .draft_body, "conflict", .fp_edit_op, .fp_edit_base_rev, .fp_edit_input_ver)
                 return
             }
-            .fp_edit_state = "conflict"
+            // 磁盘/其他存储失败 → error（不投影为可 Rebase 的修订冲突）。
+            .fp_edit_state = fp_state_next(.fp_edit_state, "error")
         }
 
         .FpEditRebase -> {
             // 宿主已重读（冲突臂内，服务器版本入 fp_edit_conflict_rev）。
             // Rebase = 认领服务器修订为新基底（draft_revision 跟随），用户
-            // 输入（.draft_body）不动——供重读、比较和再次提交。
+            // 输入（.draft_body）不动——再提交是新意图（换 op，state=dirty）。
             .draft_revision = .fp_edit_conflict_rev
-            .fp_edit_state = "idle"
+            .fp_edit_state = fp_state_next(.fp_edit_state, "rebase")
+            .fp_edit_op = ""
         }
 
         .FpCreateDraft(v) -> {
+            .fp_create_input_ver = .fp_create_input_ver + 1
             .fp_create_text = v
+            .fp_create_state = fp_state_next(.fp_create_state, "type")
         }
 
         .FpCreateSubmit(text) -> {
-            .fp_create_state = "saving"
-            var rid str = next_request_id("fp-create")
-            var n Note = create_note("FP 新建", text, "", rid)
+            if .fp_create_state == "saving" {
+                return
+            }
+            if .fp_create_op != "" {
+                if text != .fp_create_sent {
+                    .fp_create_op = ""
+                }
+            }
+            if .fp_create_op == "" {
+                .fp_create_op = next_request_id("fp-create")
+            }
+            .fp_create_sent = text
+            .fp_create_state = fp_state_next(.fp_create_state, "submit")
+            // 检查点持久（提交前落盘——丢回包/关页后同操作恢复重试）。
+            fp_draft_put(fp_draft_key("local", "notes-main", "create", "create"), text, .fp_create_state, .fp_create_op, 0, .fp_create_input_ver)
+            var n Note = create_note("FP 新建", text, "", .fp_create_op)
             if n.id != 0 {
-                .fp_create_state = "saved"
-                .fp_create_text = ""
+                .fp_create_state = fp_state_next(.fp_create_state, "ack")
+                .fp_create_op = ""
+                if text == .fp_create_text {
+                    // 成功只清已提交那一版输入；提交后继续键入保留。
+                    .fp_create_sent = ""
+                    .fp_create_text = ""
+                    fp_draft_delete(fp_draft_key("local", "notes-main", "create", "create"))
+                } else {
+                    .fp_create_state = fp_state_next(.fp_create_state, "type")
+                    fp_draft_put(fp_draft_key("local", "notes-main", "create", "create"), .fp_create_text, "dirty", "", 0, .fp_create_input_ver)
+                }
                 .notes = list_notes()
                 .ApplyFilter()
                 return
             }
-            .fp_create_state = "conflict"
+            // 创建失败（id==0）：无修订语义，记 error（非 conflict）。
+            .fp_create_state = fp_state_next(.fp_create_state, "error")
         }
 
         .FpCreateRebase -> {
-            .fp_create_state = "idle"
+            .fp_create_state = fp_state_next(.fp_create_state, "discard")
+        }
+
+        // ── 来源回访统一出口（T-06 冻结：OpenSource(note_id, source) 唯一
+        // 出口；载荷经 fp_host.fp_open_source_payload 构造，两应用一致消费。
+        // Notes 主应用 v0 消费 = 展示来源卡（quote/书目/locator 原文）；
+        // 配置不得提升服务权限——只投影已授权读取的本地数据）。
+        .FpOpenSource -> {
+            if .fp_src_raw != "" {
+                .fp_open_note = .fp_src_nid
+                .fp_open_json = fp_open_source_payload(.fp_open_note, .fp_src_raw)
+                .fp_open_active = true
+            }
         }
     }
 }

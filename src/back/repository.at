@@ -244,6 +244,11 @@ fn ensure_schema(db SqliteDb) {
     // 全量，FeaturePack 宿主不可见）；source_json = 不可变来源快照原文。
     db.exec("ALTER TABLE notes ADD COLUMN book_id TEXT NOT NULL DEFAULT ''")
     db.exec("ALTER TABLE notes ADD COLUMN source_json TEXT NOT NULL DEFAULT ''")
+    // NOTES-006 T-07：宿主草稿持久暂存（本地 scratch 面，非 notes 行）。
+    // draft_key 命名空间 = 本地用户|宿主|书目/笔记|实例（fp_host.fp_draft_key），
+    // 稳定至重启恢复；text/state/op/base_rev/input_ver 分列存（前端免 JSON
+    // 解析）。保留或丢弃须有明确用户动作；提交成功清槽由宿主显式 delete。
+    db.exec("CREATE TABLE IF NOT EXISTS fp_drafts(draft_key TEXT PRIMARY KEY, text TEXT NOT NULL DEFAULT '', state TEXT NOT NULL DEFAULT 'dirty', op TEXT NOT NULL DEFAULT '', base_rev INTEGER NOT NULL DEFAULT 0, input_ver INTEGER NOT NULL DEFAULT 0)")
     // schema v3（SD-13/T-18）：r4 管道拼接意图 → 规范表示（从持久 doc 快照
     // 确定性重导），版本化一次性迁移；v2c| 前缀行不再重跑。
     var sv str = meta_get_on(db, "schema_v")
@@ -339,9 +344,20 @@ fn meta_get_on(db SqliteDb, k str) str {
 // 行 → 文档 JSON（13 列固定序）
 // ═══════════════════════════════════════════════════════════
 
-fn row_to_doc_json(row List<str>) str {
+/// 13 列字段段（不闭 }）。fp 信封（NOTES-006 T-02/r2）在字段段后直接续接
+/// book_id/source/status——**免 substr/len 截断**：G-10 实测（2026-11-11，
+/// OS-067 M1）当前生成器对局部字符串变量的 len() 产出字符数而 substr 按
+/// 字节截断，含中文 doc 的 `substr(0, len()-1)` 错位产坏 JSON（服务脚本
+/// F-09a 崩溃复现）。纯拼接不依赖 len/substr 语义，两端一致。
+fn row_to_doc_fields(row List<str>) str {
     var s str = "{\"schema_version\":1,\"note_id\":" + json.encode(row[0])
-    s = s + ",\"legacy_id\":" + row[1]
+    // legacy_id 为 nullable 列（UNIQUE）——NULL 行（注入/探针面）投影为 0，
+    // 不产 "legacy_id":, 坏 JSON（S-02 实证）；真实行恒有计数器值不受扰。
+    var lid str = row[1]
+    if lid == "" {
+        lid = "0"
+    }
+    s = s + ",\"legacy_id\":" + lid
     s = s + ",\"revision\":" + row[2]
     s = s + ",\"title\":" + json.encode(row[3])
     s = s + ",\"body\":" + json.encode(row[4])
@@ -357,8 +373,12 @@ fn row_to_doc_json(row List<str>) str {
     s = s + ",\"folder\":" + json.encode(row[9])
     s = s + ",\"seq\":" + row[10]
     s = s + ",\"created_at\":" + json.encode(row[11])
-    s = s + ",\"updated_at\":" + json.encode(row[12]) + "}"
+    s = s + ",\"updated_at\":" + json.encode(row[12])
     return s
+}
+
+fn row_to_doc_json(row List<str>) str {
+    return row_to_doc_fields(row) + "}"
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2030,9 +2050,88 @@ fn fp_request_key(principal str, operation_id str) str {
     return "fp:" + principal + ":" + operation_id
 }
 
-/// 来源快照校验 + 提取 book_id：source_json 必须是含非空 book_id（≤128）
-/// 的对象（quote/author/chapter/locator 原样保存，不校验内部形状——不可变
-/// 快照按 Unicode 原文存储，锚语义归 Reader）。返回 "" 表示拒绝。
+/// 来源快照校验（NOTES-006 r2 / T-06 冻结 schema，闭集）：book_id、
+/// source_hash（真实内容哈希——禁固定 "v1"/空，G-06 在案）、title、author、
+/// quote、locator 必需，chapter 可选。类型按 json 哨兵语义核（缺失/非字符串
+/// → as_string=""，嵌套 get 非 object → 链式空）；长度界 1..=128 / 1..=256 /
+/// kind 1..=64 / value 1..=1024；未知字段以计数界拒绝（6 必需 + 1 可选 = 最多
+/// 7 键；超出 = 未知来源结构/版本，前向冲突显式拒绝，升版走 interface 升级）。
+/// 返回 "" = 合法，否则 err_detail（业务前拒绝，无写入）。锚语义仍归 Reader。
+/// 局限（在案）：chapter 的 int 类型性与数值型字符串的 as_int 宽容度未核——
+/// 错类型反例走 locator/数组/缺字段面（S-02 实证）。
+fn fp_source_validate(source_json str) str {
+    var src = json.parse(source_json)
+    var bid str = json.as_string(json.get(src, "book_id"))
+    if bid == "" {
+        return "source.book_id required (string 1..128)"
+    }
+    if bid.len() > 128 {
+        return "source.book_id length out of 1..=128"
+    }
+    var sh str = json.as_string(json.get(src, "source_hash"))
+    if sh == "" {
+        return "source.source_hash required (real content hash, 1..128)"
+    }
+    if sh == "v1" {
+        return "source.source_hash must be a real content hash (not a fixed sentinel)"
+    }
+    if sh.len() > 128 {
+        return "source.source_hash length out of 1..=128"
+    }
+    var ti str = json.as_string(json.get(src, "title"))
+    if ti == "" {
+        return "source.title required (book title, 1..256)"
+    }
+    if ti.len() > 256 {
+        return "source.title length out of 1..=256"
+    }
+    var au str = json.as_string(json.get(src, "author"))
+    if au == "" {
+        return "source.author required (1..256)"
+    }
+    if au.len() > 256 {
+        return "source.author length out of 1..=256"
+    }
+    var q str = json.as_string(json.get(src, "quote"))
+    if q == "" {
+        return "source.quote required (immutable, 1..256)"
+    }
+    if q.len() > 256 {
+        return "source.quote length out of 1..=256"
+    }
+    var loc = json.get(src, "locator")
+    var lk str = json.as_string(json.get(loc, "kind"))
+    if lk == "" {
+        return "source.locator.kind required (canonical locator object)"
+    }
+    if lk.len() > 64 {
+        return "source.locator.kind length out of 1..=64"
+    }
+    var lv str = json.as_string(json.get(loc, "value"))
+    if lv == "" {
+        return "source.locator.value required (1..1024)"
+    }
+    if lv.len() > 1024 {
+        return "source.locator.value length out of 1..=1024"
+    }
+    if json.len(src) > 7 {
+        return "source envelope has unknown fields (frozen schema, max 7 keys)"
+    }
+    return ""
+}
+
+/// 读投影来源状态（r2「旧投影兼容」）：存量来源过冻结校验 = ok（OpenSource
+/// 回访出口可用）；旧 fp 行（只有 book_id）/残缺/异构来源 = incomplete——
+/// 行保持可读，宿主显示「来源不完整」且回访入口不可用（明确不可回访状态，
+/// 绝不静默丢弃或伪装 ok）。
+fn fp_source_status(source_raw str) str {
+    if fp_source_validate(source_raw) == "" {
+        return "ok"
+    }
+    return "incomplete"
+}
+
+/// 来源快照提取 book_id（校验通过后调用，非空有保证）。
 fn fp_source_book_id(source_json str) str {
     if source_json == "" {
         return ""
@@ -2061,30 +2160,31 @@ fn fp_text_ok(text str) bool {
     return true
 }
 
-/// 13 列标准文档 → fp 文档信封（去 doc 尾 } 接 book_id/source 进 note，
-/// 再闭 note + 信封——三重收尾括号，缺一即坏 JSON）。
-fn fp_doc_envelope(doc str, book_id str, source_raw str) str {
-    var source_obj str = source_raw
+/// 15 列 fp 行（13 标准列 + book_id + source_json）→ fp 文档信封。
+/// 字段段直接续接 book_id/source/status 再闭 note + 信封——免 substr/len
+/// 截断（G-10 规避，见 row_to_doc_fields 注）。
+fn fp_doc_envelope(row List<str>) str {
+    var fields str = row_to_doc_fields(row)
+    var source_obj str = row[14]
     if source_obj == "" {
         source_obj = "null"
     }
-    var head str = doc.substr(0, doc.len() - 1)
-    var s str = "{\"ok\":true,\"err_code\":\"\",\"note\":" + head
-    s = s + ",\"book_id\":" + json.encode(book_id) + ",\"source\":" + source_obj
+    var sst str = fp_source_status(row[14])
+    var s str = "{\"ok\":true,\"err_code\":\"\",\"note\":" + fields
+    s = s + ",\"book_id\":" + json.encode(row[13]) + ",\"source\":" + source_obj
+    s = s + ",\"source_status\":\"" + sst + "\""
     s = s + ",\"receipt\":{\"schema_version\":1,\"request_id\":\"\",\"note_id\":\"\",\"revision\":0,\"status\":\"\"}}}"
     return s
 }
 
-/// fp 文档读取（含来源字段）。
+/// fp 文档读取（含来源字段与来源状态）。
 fn fp_doc_json_on(db SqliteDb, note_id str) str {
     var sql str = "SELECT " + note_select_cols() + ", book_id, source_json FROM notes WHERE note_id=" + sql_str(note_id)
     var rows List<List<str>> = db.query(sql)
     if rows.len() < 1 {
         return ""
     }
-    var row = rows[0]
-    var doc str = row_to_doc_json(row)
-    return fp_doc_envelope(doc, row[13], row[14])
+    return fp_doc_envelope(rows[0])
 }
 
 /// 捕获：来源快照 + 可编辑正文 → 新便签（title=quote 原句，body=text）。
@@ -2097,6 +2197,10 @@ pub fn fp_capture(cred str, operation_id str, source_json str, text str) str {
     }
     if fp_text_ok(text) == false {
         return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"text length out of 1..=16384\"}"
+    }
+    var serr str = fp_source_validate(source_json)
+    if serr != "" {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"" + serr + "\"}"
     }
     var book_id str = fp_source_book_id(source_json)
     if book_id == "" {
@@ -2119,14 +2223,9 @@ pub fn fp_capture(cred str, operation_id str, source_json str, text str) str {
         return "{\"ok\":false,\"err_code\":\"invalid_request\"}"
     }
     var src = json.parse(source_json)
-    var v_quote = json.get(src, "quote")
-    var quote str = json.as_string(v_quote)
-    if quote == "" {
-        quote = text
-    }
-    if quote.len() > 256 {
-        return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"source.quote length out of 1..=256\"}"
-    }
+    // quote 已过冻结校验（非空 1..=256，不可变原句）——旧「空 quote 回落
+    // text」行为随 r2 冻结 schema 移除：title 与 quote 的关系固定为原句。
+    var quote str = json.as_string(json.get(src, "quote"))
     var intent str = "fp1|capture|" + json.encode(principal) + "|" + json.encode(operation_id) + "|" + json.encode(source_json) + "|" + json.encode(text)
     var db SqliteDb = sqlite.open(db_path())
     var begin int = db.exec("BEGIN IMMEDIATE")
@@ -2227,16 +2326,16 @@ pub fn fp_list_by_book(cred str, book_id str, cursor int, limit int) str {
     var last_seq int = 0
     while i < n {
         var row = rows[i]
-        var doc str = row_to_doc_json(row)
-        var one str = doc.substr(0, doc.len() - 1)
+        var fields str = row_to_doc_fields(row)
         var source_raw str = row[14]
         if source_raw == "" {
             source_raw = "null"
         }
+        var sst str = fp_source_status(row[14])
         if i > 0 {
             out = out + ","
         }
-        out = out + one + ",\"book_id\":" + json.encode(row[13]) + ",\"source\":" + source_raw + "}"
+        out = out + fields + ",\"book_id\":" + json.encode(row[13]) + ",\"source\":" + source_raw + ",\"source_status\":\"" + sst + "\"}"
         last_seq = parse_int(row[10])
         i = i + 1
     }
@@ -2362,4 +2461,171 @@ pub fn fp_receipt(cred str, operation_id str) str {
     var rc str = "{\"schema_version\":1,\"request_id\":" + json.encode(rid)
     rc = rc + ",\"note_id\":" + json.encode(s_note) + ",\"revision\":" + s_rev + ",\"status\":\"committed\"}"
     return "{\"ok\":true,\"err_code\":\"\",\"status\":\"committed\",\"receipt\":" + rc + ",\"note\":" + doc + "}"
+}
+
+// ═══════════════════════════════════════════════════════════
+// 宿主草稿持久暂存（NOTES-006 T-07 本地 scratch 面；非 notes.fpack/1 外部
+// 契约——主应用前端经自有路径消费，Reader 宿主草稿自持）。draft_key 自带
+// 本地用户命名空间（fp_host.fp_draft_key：user|host|target|instance），数据
+// 归属与 /api/notes 同源，不经过 fp policy 门。上限 64KiB/槽（正文 16KiB 界
+// 的 4 倍余量）；检查点写入由宿主在异步安全点执行（提交/冲突/切换/恢复）。
+// ═══════════════════════════════════════════════════════════
+
+fn fp_draft_key_ok(draft_key str) bool {
+    if draft_key.len() < 1 {
+        return false
+    }
+    if draft_key.len() > 256 {
+        return false
+    }
+    return true
+}
+
+/// 草稿槽 upsert。state ∈ idle|dirty|saving|saved|pending|error|conflict
+/// （宿主投影；服务端不解释只存取）。
+pub fn fp_draft_put(draft_key str, text str, state str, op str, base_rev int, input_ver int) str {
+    if fp_draft_key_ok(draft_key) == false {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"draft_key required (1..256)\"}"
+    }
+    if text.len() > 65536 {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"draft text out of 1..=65536\"}"
+    }
+    var oerr str = open_repository()
+    if oerr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
+    }
+    var db SqliteDb = sqlite.open(db_path())
+    var r int = db.exec("INSERT INTO fp_drafts(draft_key, text, state, op, base_rev, input_ver) VALUES(" + sql_str(draft_key) + ", " + sql_str(text) + ", " + sql_str(state) + ", " + sql_str(op) + ", " + json.encode(base_rev) + ", " + json.encode(input_ver) + ") ON CONFLICT(draft_key) DO UPDATE SET text=" + sql_str(text) + ", state=" + sql_str(state) + ", op=" + sql_str(op) + ", base_rev=" + json.encode(base_rev) + ", input_ver=" + json.encode(input_ver))
+    if r < 0 {
+        return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
+    }
+    return "{\"ok\":true,\"err_code\":\"\"}"
+}
+
+/// 草稿槽读取。信封字段与 fp_drafts 列一一对应；无槽 = found:false 全零值。
+pub fn fp_draft_get(draft_key str) str {
+    if fp_draft_key_ok(draft_key) == false {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"draft_key required (1..256)\"}"
+    }
+    var oerr str = open_repository()
+    if oerr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
+    }
+    var db SqliteDb = sqlite.open(db_path())
+    var rows List<List<str>> = db.query("SELECT text, state, op, base_rev, input_ver FROM fp_drafts WHERE draft_key=" + sql_str(draft_key))
+    if rows.len() < 1 {
+        return "{\"ok\":true,\"err_code\":\"\",\"found\":false,\"text\":\"\",\"state\":\"\",\"op\":\"\",\"base_rev\":0,\"input_ver\":0}"
+    }
+    var row = rows[0]
+    var s str = "{\"ok\":true,\"err_code\":\"\",\"found\":true,\"text\":" + json.encode(row[0])
+    s = s + ",\"state\":" + json.encode(row[1]) + ",\"op\":" + json.encode(row[2])
+    s = s + ",\"base_rev\":" + row[3] + ",\"input_ver\":" + row[4] + "}"
+    return s
+}
+
+/// 草稿槽删除（提交成功清槽/用户显式丢弃）。
+pub fn fp_draft_delete(draft_key str) str {
+    if fp_draft_key_ok(draft_key) == false {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"draft_key required (1..256)\"}"
+    }
+    var oerr str = open_repository()
+    if oerr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
+    }
+    var db SqliteDb = sqlite.open(db_path())
+    var r int = db.exec("DELETE FROM fp_drafts WHERE draft_key=" + sql_str(draft_key))
+    if r < 0 {
+        return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
+    }
+    return "{\"ok\":true,\"err_code\":\"\"}"
+}
+
+// ── note-scoped 草稿面（NOTES-006 r2 实测修订）：主应用前端 store 无
+// int→str 原语（vue 生成面 json.encode 不映射、VM json 为后端原生）——
+// 键的 int 段在服务端组装（nid 同源 json.encode），前端传 int + 实例即可。
+// 命名空间与 fp_host.fp_draft_key 同式：fpdraft|local|notes-main|note:<id>|<instance>。
+
+fn fp_draft_note_key(note_id int, instance str) str {
+    if instance.len() < 1 {
+        return ""
+    }
+    if instance.len() > 64 {
+        return ""
+    }
+    return "fpdraft|local|notes-main|note:" + json.encode(note_id) + "|" + instance
+}
+
+pub fn fp_draft_put_note(note_id int, instance str, text str, state str, op str, base_rev int, input_ver int) str {
+    var key str = fp_draft_note_key(note_id, instance)
+    if key == "" {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"instance required (1..64)\"}"
+    }
+    return fp_draft_put(key, text, state, op, base_rev, input_ver)
+}
+
+pub fn fp_draft_get_note(note_id int, instance str) str {
+    var key str = fp_draft_note_key(note_id, instance)
+    if key == "" {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"instance required (1..64)\"}"
+    }
+    return fp_draft_get(key)
+}
+
+pub fn fp_draft_delete_note(note_id int, instance str) str {
+    var key str = fp_draft_note_key(note_id, instance)
+    if key == "" {
+        return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"instance required (1..64)\"}"
+    }
+    return fp_draft_delete(key)
+}
+
+/// 来源投影（按 int id；"n-" 前缀服务端组装——同 fp_note_key 理由）。
+pub fn fp_source_view_of_note(note_id int) str {
+    return fp_source_of_view("n-" + json.encode(note_id))
+}
+
+// ═══════════════════════════════════════════════════════════
+// 来源投影（NOTES-006 T-03 来源卡数据源；主应用本地全权面——不经过 fp
+// policy 门：主应用按本地 OS 用户全量读取，featurepack-v0 §2.3 数据归属；
+// Reader 读写仍走 cred 端点按书籍范围校验）。
+// ═══════════════════════════════════════════════════════════
+
+/// 来源投影信封。found=false=笔记不存在；source_status=ok|incomplete|none；
+/// title/author/quote/locator 从不可变快照提取（缺失留空）；source_json =
+/// 快照原文（OpenSource 载荷，不重组不规范化）。
+pub fn fp_source_of_view(note_id str) str {
+    var oerr str = open_repository()
+    if oerr != "" {
+        return "{\"found\":false,\"book_id\":\"\",\"source_status\":\"error\",\"title\":\"\",\"author\":\"\",\"quote\":\"\",\"locator\":\"\",\"source_json\":\"\"}"
+    }
+    var db SqliteDb = sqlite.open(db_path())
+    var rows List<List<str>> = db.query("SELECT book_id, source_json FROM notes WHERE note_id=" + sql_str(note_id) + " AND state='active'")
+    if rows.len() < 1 {
+        return "{\"found\":false,\"note_id\":" + json.encode(note_id) + ",\"book_id\":\"\",\"source_status\":\"none\",\"title\":\"\",\"author\":\"\",\"quote\":\"\",\"locator\":\"\",\"source_json\":\"\"}"
+    }
+    var row = rows[0]
+    var bid str = row[0]
+    if bid == "" {
+        // 既有无来源便签（主应用普通便签）：来源面显式 none。
+        return "{\"found\":true,\"note_id\":" + json.encode(note_id) + ",\"book_id\":\"\",\"source_status\":\"none\",\"title\":\"\",\"author\":\"\",\"quote\":\"\",\"locator\":\"\",\"source_json\":\"\"}"
+    }
+    var raw str = row[1]
+    if raw == "" {
+        // 旧 fp 行只有 book_id：残缺来源可读，回访入口不可用。
+        return "{\"found\":true,\"note_id\":" + json.encode(note_id) + ",\"book_id\":" + json.encode(bid) + ",\"source_status\":\"incomplete\",\"title\":\"\",\"author\":\"\",\"quote\":\"\",\"locator\":\"\",\"source_json\":\"\"}"
+    }
+    var src = json.parse(raw)
+    var ti str = json.as_string(json.get(src, "title"))
+    var au str = json.as_string(json.get(src, "author"))
+    var q str = json.as_string(json.get(src, "quote"))
+    var loc str = json.encode(json.get(src, "locator"))
+    if json.as_string(json.get(src, "book_id")) == "" {
+        loc = ""
+    }
+    var sst str = fp_source_status(raw)
+    var s str = "{\"found\":true,\"note_id\":" + json.encode(note_id) + ",\"book_id\":" + json.encode(bid) + ",\"source_status\":\"" + sst + "\""
+    s = s + ",\"title\":" + json.encode(ti) + ",\"author\":" + json.encode(au)
+    s = s + ",\"quote\":" + json.encode(q) + ",\"locator\":" + json.encode(loc)
+    s = s + ",\"source_json\":" + json.encode(raw) + "}"
+    return s
 }

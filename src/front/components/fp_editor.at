@@ -11,8 +11,10 @@
 //     草稿由宿主字段承载（PLAN-041 实例 model 不承载草稿）——AC-02 的全部
 //     可观察结果（双实例隔离/迟到不扰/冲突保输入）逐条保住，机制偏差记录
 //     于 NOTES-006 §9。
-//   * 结果经 props 投影：save_state（idle|saving|saved|conflict）与
-//     conflict_revision / server_body（宿主重读的服务器版本，供比较）。
+//   * 结果经 props 投影：save_state（T-06 冻结七态 idle|dirty|saving|saved|
+//     pending|error|conflict；组件渲染 saving/saved/pending/error/conflict
+//     徽标，dirty/idle 为无徽标常态）与 conflict_revision / server_body
+//     （宿主重读的服务器版本，供比较）。
 //   * 发出宿主回调：on_draft_edit(v)/on_submit_text(text)/on_rebase——I/O
 //     由宿主执行（组件零网络依赖，宿主负责渲染与调用）。
 //
@@ -21,7 +23,9 @@
 // components" }` 后同款 package use 或点名 use。
 
 widget FpNoteEditor (mode: str, note_label: str, draft_text: str, save_state: str, conflict_revision: int, server_body: str, on_draft_edit: msg, on_submit_text: msg, on_rebase: msg) {
-    msg { DraftEdit(str), SubmitText(str), RebaseTap }
+    // Rebase 内部消息名 = on_rebase 派生监听名（T-03 裁定③：内部名≠派生名则
+    // 回调死路；r7-t19-20 工具链实测复证）。
+    msg { DraftEdit(str), SubmitText(str), Rebase }
 
     model {
         // 提取镜像：仅作 @input 实参类型证据（生成器按臂体对 v 的字符串
@@ -48,6 +52,12 @@ widget FpNoteEditor (mode: str, note_label: str, draft_text: str, save_state: st
                 if .save_state == "saved" {
                     text "Saved ✓" { style: "text-xs text-emerald-600" }
                 }
+                if .save_state == "pending" {
+                    text "Pending…" { style: "text-xs text-amber-600" }
+                }
+                if .save_state == "error" {
+                    text "Save failed" { style: "text-xs text-destructive" }
+                }
                 if .save_state == "conflict" {
                     text "Conflict" { style: "text-xs text-amber-600" }
                 }
@@ -63,7 +73,7 @@ widget FpNoteEditor (mode: str, note_label: str, draft_text: str, save_state: st
                         text "Server revision:" { style: "text-xs text-amber-700" }
                         text .conflict_revision { style: "text-xs text-amber-700" }
                         button {
-                            onclick: .RebaseTap
+                            onclick: .Rebase
                             text "Rebase" { style: "text-xs" }
                         }
                     }

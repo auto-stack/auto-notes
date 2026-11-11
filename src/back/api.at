@@ -82,6 +82,34 @@ pub type RepoResult = {
     replayed: bool
 }
 
+/// 宿主草稿持久行（NOTES-006 T-07 本地 scratch 面）：fp_drafts 表的类型化
+/// 投影。found=false = 无槽（零值）；state ∈ idle|dirty|saving|saved|pending|
+/// error|conflict（fp_host 状态机值，服务端不解释只存取）。
+pub type FpDraftRow = {
+    found: bool
+    text: str
+    state: str
+    op: str
+    base_rev: int
+    input_ver: int
+}
+
+/// 选中笔记的来源投影（NOTES-006 T-03 来源卡数据源；主应用本地全权面——
+/// 不经过 fp policy 门）。found=false = 笔记不存在；source_status =
+/// ok（冻结校验过，回访入口可用）| incomplete（残缺/异构旧来源，可读、
+/// 回访入口不可用）| none（无来源便签）。locator/source_json 为原文串。
+pub type FpSourceView = {
+    found: bool
+    note_id: str
+    book_id: str
+    source_status: str
+    title: str
+    author: str
+    quote: str
+    locator: str
+    source_json: str
+}
+
 // ═══════════════════════════════════════════════════════════
 // API Endpoints
 // ═══════════════════════════════════════════════════════════
@@ -323,4 +351,52 @@ pub fn fp_update_note(cred str, interface_version str, attempt_id str, note_id s
 #[api(method = "POST", path = "/api/fp/v1/receipt")]
 pub fn fp_receipt(cred str, interface_version str, operation_id str) str {
     return db.fp_receipt(cred, interface_version, operation_id)
+}
+
+// ── 宿主草稿持久暂存（NOTES-006 T-07 本地 scratch 面）────────────────
+// 不属于 notes.fpack/1 外部契约：主应用前端经自有路径消费（与 /api/notes
+// 同归属、同单写者门）；Reader 宿主草稿自持（READER-013）。put 返回仓储
+// 信封串，get 返回类型化 FpDraftRow（前端免 JSON 解析）。
+
+#[api(method = "POST", path = "/api/fp/draft/put")]
+pub fn fp_draft_put(draft_key str, text str, state str, op str, base_rev int, input_ver int) str {
+    return db.fp_draft_put(draft_key, text, state, op, base_rev, input_ver)
+}
+
+#[api(method = "POST", path = "/api/fp/draft/get")]
+pub fn fp_draft_get(draft_key str) FpDraftRow {
+    return db.fp_draft_row(draft_key)
+}
+
+#[api(method = "POST", path = "/api/fp/draft/delete")]
+pub fn fp_draft_delete(draft_key str) str {
+    return db.fp_draft_delete(draft_key)
+}
+
+/// 选中笔记的来源投影（来源卡；主应用本地全权面）。
+#[api(method = "POST", path = "/api/fp/source/of")]
+pub fn fp_source_of_view(note_id str) FpSourceView {
+    return db.fp_source_view(note_id)
+}
+
+/// note-scoped 面（主应用 store 消费）：键的 int 段在服务端组装——前端
+/// store 无 int→str 原语（r2 实测：vue 生成面 json.encode 不映射）。
+#[api(method = "POST", path = "/api/fp/draft/put/note")]
+pub fn fp_draft_put_note(note_id int, instance str, text str, state str, op str, base_rev int, input_ver int) str {
+    return db.fp_draft_put_note(note_id, instance, text, state, op, base_rev, input_ver)
+}
+
+#[api(method = "POST", path = "/api/fp/draft/get/note")]
+pub fn fp_draft_get_note(note_id int, instance str) FpDraftRow {
+    return db.fp_draft_row_note(note_id, instance)
+}
+
+#[api(method = "POST", path = "/api/fp/draft/delete/note")]
+pub fn fp_draft_delete_note(note_id int, instance str) str {
+    return db.fp_draft_delete_note(note_id, instance)
+}
+
+#[api(method = "POST", path = "/api/fp/source/of/note")]
+pub fn fp_source_of_note(note_id int) FpSourceView {
+    return db.fp_source_view_note(note_id)
 }

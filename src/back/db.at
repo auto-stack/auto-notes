@@ -13,6 +13,8 @@ use api: RepoResult
 use api: CaptureReceipt
 use api: MigrationReport
 use api: CorruptItem
+use api: FpDraftRow
+use api: FpSourceView
 use auto.env
 
 use repository
@@ -572,4 +574,87 @@ pub fn fp_receipt(cred str, interface_version str, operation_id str) str {
         return g1
     }
     return repository.fp_receipt(cred, operation_id)
+}
+
+// ═══════════════════════════════════════════════════════════
+// 宿主草稿持久暂存（NOTES-006 T-07 本地 scratch 面）：不经 fp version/
+// policy 门——主应用前端自有路径消费（与 /api/notes 同归属）；Reader
+// 宿主草稿自持。fp_draft_row 把仓储信封解析为类型化行（零值 = 无槽）。
+// ═══════════════════════════════════════════════════════════
+
+pub fn fp_draft_put(draft_key str, text str, state str, op str, base_rev int, input_ver int) str {
+    return repository.fp_draft_put(draft_key, text, state, op, base_rev, input_ver)
+}
+
+pub fn fp_draft_delete(draft_key str) str {
+    return repository.fp_draft_delete(draft_key)
+}
+
+pub fn fp_draft_put_note(note_id int, instance str, text str, state str, op str, base_rev int, input_ver int) str {
+    return repository.fp_draft_put_note(note_id, instance, text, state, op, base_rev, input_ver)
+}
+
+pub fn fp_draft_delete_note(note_id int, instance str) str {
+    return repository.fp_draft_delete_note(note_id, instance)
+}
+
+fn parse_draft_row(js str) FpDraftRow {
+    var it = json.parse(js)
+    var v_ok = json.get(it, "ok")
+    var okb bool = v_ok == true
+    if okb == false {
+        var e FpDraftRow = FpDraftRow { found: false, text: "", state: "error", op: "", base_rev: 0, input_ver: 0 }
+        return e
+    }
+    var v_found = json.get(it, "found")
+    var fb bool = v_found == true
+    var r FpDraftRow = FpDraftRow {
+        found: fb,
+        text: json.as_string(json.get(it, "text")),
+        state: json.as_string(json.get(it, "state")),
+        op: json.as_string(json.get(it, "op")),
+        base_rev: json.as_int(json.get(it, "base_rev")),
+        input_ver: json.as_int(json.get(it, "input_ver")),
+    }
+    return r
+}
+
+pub fn fp_draft_row(draft_key str) FpDraftRow {
+    var js str = repository.fp_draft_get(draft_key)
+    return parse_draft_row(js)
+}
+
+pub fn fp_draft_row_note(note_id int, instance str) FpDraftRow {
+    var js str = repository.fp_draft_get_note(note_id, instance)
+    return parse_draft_row(js)
+}
+
+fn parse_source_view(js str) FpSourceView {
+    var it = json.parse(js)
+    var v_found = json.get(it, "found")
+    var fb bool = v_found == true
+    var v_loc = json.get(it, "locator")
+    var v_raw = json.get(it, "source_json")
+    var r FpSourceView = FpSourceView {
+        found: fb,
+        note_id: json.as_string(json.get(it, "note_id")),
+        book_id: json.as_string(json.get(it, "book_id")),
+        source_status: json.as_string(json.get(it, "source_status")),
+        title: json.as_string(json.get(it, "title")),
+        author: json.as_string(json.get(it, "author")),
+        quote: json.as_string(json.get(it, "quote")),
+        locator: json.encode(v_loc),
+        source_json: json.encode(v_raw),
+    }
+    return r
+}
+
+pub fn fp_source_view_note(note_id int) FpSourceView {
+    var js str = repository.fp_source_view_of_note(note_id)
+    return parse_source_view(js)
+}
+
+pub fn fp_source_view(note_id str) FpSourceView {
+    var js str = repository.fp_source_of_view(note_id)
+    return parse_source_view(js)
 }

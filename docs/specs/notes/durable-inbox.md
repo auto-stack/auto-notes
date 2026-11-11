@@ -164,6 +164,28 @@
   成功判定 `< 0`；字符串与引号字符比较用 `"\""` 转义形式（单引号字面量在
   比较上下文被发射为 char——实证）。
 
+## FeaturePack 附加列共存边界（NOTES-006 r2，SD-02）
+
+- `notes` 附加列（附加式 ALTER，不动 schema_v 与 legacy 升级状态机）：
+  `book_id TEXT NOT NULL DEFAULT ''`（''=既有无来源便签）、
+  `source_json TEXT NOT NULL DEFAULT ''`（不可变来源快照原文；冻结闭集
+  schema 与读投影见 featurepack-service-and-editor.md）。
+- `fp_drafts(draft_key PK, text, state, op, base_rev, input_ver)`：宿主草稿
+  持久暂存表（本地 scratch 面，非 notes 行；NOTES-006 T-07）。
+- 旧投影共存：13 列标准文档投影不变——fp 字段只在 fp 读取信封附加（get/
+  list 的 `book_id/source/source_status`），主应用面无感。requests 原语义
+  不受扰：fp 去重键 `fp:<principal>:<operation_id>` 复用 requests 行
+  （kind=fp_capture/fp_update），v2c| 迁移门与规范化意图同律（intent 全
+  匹配重放 / 差异 request_conflict）。
+- 迁移回滚/半途故障：附加列缺席（ALTER 未跑/回滚）由 ensure_schema 幂等
+  重加自愈（列在时 ALTER 失败无害）；重加不重建既有行数据——半途故障后
+  旧 fp 行以 `source_status=incomplete` 明确呈现（可读、回访入口不可用），
+  普通便签照常读写。恢复/普通便签编辑不得意外抹掉来源：主路径 UPDATE
+  只触 revision/body，不写 book_id/source_json。
+- 回执权限：fp 回执查询按 policy principal 裁决（cred→principal 绑定，
+  requests 行按 `fp:<principal>:<operation_id>` 寻址）；主应用自有路径不经
+  fp policy 门（数据归属全量）。
+
 ## 回归资产（r9）
 
 - 电池 S0–S22（S20 元数据/删除/恢复失败传播+控制；S21 fresh finalize 回滚+
