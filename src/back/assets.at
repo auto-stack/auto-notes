@@ -978,7 +978,7 @@ pub fn clip_import(operation_id str, note_id str, entries_json str, producer str
         var e_mime str = json.as_string(json.get(e, "mime"))
         var path_src str = json.as_string(json.get(e, "path"))
         var text_src str = json.as_string(json.get(e, "text"))
-        var tmp str = incoming_base + "/" + rid_of(operation_id) + "-e" + json.encode(i)
+        var tmp str = incoming_base + "/" + asset_file_key(rid_of(operation_id)) + "-e" + json.encode(i)
         var kind str = "file"
         if ekind == "text" {
             if e_name == "" {
@@ -1138,12 +1138,13 @@ pub fn clip_import(operation_id str, note_id str, entries_json str, producer str
 // 清理本操作前 upto 条条目暂存 + 单文件主名（仅本操作命名空间）。
 fn cleanup_incoming_parts(rid str, upto int) {
     var incoming_base str = assets_root() + "/incoming"
+    var fkey str = asset_file_key(rid)
     var i int = 0
     while i < upto {
-        fs.delete(incoming_base + "/" + rid + "-e" + json.encode(i))
+        fs.delete(incoming_base + "/" + fkey + "-e" + json.encode(i))
         i = i + 1
     }
-    fs.delete(incoming_base + "/" + rid)
+    fs.delete(incoming_base + "/" + fkey)
 }
 
 fn rid_of(operation_id str) str {

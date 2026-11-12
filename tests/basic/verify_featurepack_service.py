@@ -101,6 +101,9 @@ def spawn_service(data_dir, policy_path, legacy_file, log_path):
     env = dict(os.environ)
     env["NOTES_DATA_DIR"] = str(data_dir)
     env["NOTES_TEST_MODE"] = "1"
+    env["AUTO_ALLOW_PARTIAL_DB"] = "1"  # NOTES-002 T-01 实测：asset_upload 端点为
+    # PLAN-730 UploadRequest 形（db.rs pub async fn 不被装配器 db-fn 提取识别），
+    # 再生成期装配检查需本 env；写入仍全走 db.rs→assets 单写者核心，无分叉。
     env["NOTES_FP_POLICY"] = str(policy_path)
     env["NOTES_LEGACY_FILE"] = str(legacy_file)
     exe = os.environ.get("AUTO_EXE", "auto")

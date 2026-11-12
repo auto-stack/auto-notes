@@ -147,6 +147,9 @@ def port_free(port):
 def spawn(env_extra, log_path, vm=False):
     env = dict(os.environ)
     env["NOTES_TEST_MODE"] = "1"
+    env["AUTO_ALLOW_PARTIAL_DB"] = "1"  # NOTES-002 T-01 实测：asset_upload 端点为
+    # PLAN-730 UploadRequest 形（db.rs pub async fn 不被装配器 db-fn 提取识别），
+    # 再生成期装配检查需本 env；写入仍全走 db.rs→assets 单写者核心，无分叉。
     env.update(env_extra)
     exe = os.environ.get("AUTO_EXE", "auto")
     cmd = [exe, "run", "-r", "vm"] if vm else [exe, "run"]
