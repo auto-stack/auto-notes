@@ -15,8 +15,11 @@ use api: MigrationReport
 use api: CorruptItem
 use api: FpDraftRow
 use api: FpSourceView
+use api: AssetView
 use auto.env
+use auto.http
 
+use assets
 use repository
 use p2probe
 
@@ -657,4 +660,37 @@ pub fn fp_source_view_note(note_id int) FpSourceView {
 pub fn fp_source_view(note_id str) FpSourceView {
     var js str = repository.fp_source_of_view(note_id)
     return parse_source_view(js)
+}
+
+// ═══════════════════════════════════════════════════════════
+// 附件服务层（NOTES-002 T-01）：api.at → db.at → assets.at 同既有
+// 委托纪律；逻辑在 assets.at（受管原件/暂存/事务闭合/恢复）。
+// ═══════════════════════════════════════════════════════════
+
+pub fn asset_import(operation_id str, note_id str, path str, name str, kind str, mime str, source str) str {
+    return assets.import_attach(operation_id, note_id, path, name, kind, mime, source)
+}
+
+pub fn asset_clip_import(operation_id str, note_id str, entries_json str, producer str) str {
+    return assets.clip_import(operation_id, note_id, entries_json, producer)
+}
+
+pub fn asset_list(note_id int) []AssetView {
+    return assets.asset_list(note_id)
+}
+
+pub fn asset_get(asset_id str) ?AssetView {
+    return assets.asset_get(asset_id)
+}
+
+pub fn asset_raw(aid str) FileResponse {
+    return assets.asset_raw(aid)
+}
+
+pub fn asset_download(aid str) FileResponse {
+    return assets.asset_download(aid)
+}
+
+pub fn asset_receipt(operation_id str) str {
+    return assets.asset_receipt(operation_id)
 }

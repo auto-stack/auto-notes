@@ -45,7 +45,7 @@
 //      rid；revision 冲突时按服务器内容裁决旧提交是否落地，落地则采用其
 //      revision 重试新意图，保留新草稿（不再沿用陈旧 revision 卡死）。
 
-use back.api: list_notes, create_note, update_note_r, get_note_r, delete_note, toggle_pin_result, update_tags_result, search_notes, next_request_id, fp_draft_put, fp_draft_get, fp_draft_delete, fp_draft_put_note, fp_draft_get_note, fp_draft_delete_note, fp_source_of_note
+use back.api: list_notes, create_note, update_note_r, get_note_r, delete_note, toggle_pin_result, update_tags_result, search_notes, next_request_id, fp_draft_put, fp_draft_get, fp_draft_delete, fp_draft_put_note, fp_draft_get_note, fp_draft_delete_note, fp_source_of_note, asset_list
 use components.fp_host: fp_state_next, fp_draft_key, fp_open_source_payload
 
 store NotesStore {
@@ -206,6 +206,15 @@ store NotesStore {
         var dark_mode bool = true
         var accent_color str = "indigo"
         var show_settings bool = false
+
+        // 快速卡片（NOTES-002 T-02）：与主编辑器共享同一草稿/七态/意图面
+        // （FpEdit* 消息直发），卡片自有状态只覆盖视觉参数与附件投影。
+        // card_open=false 时附件列表不承载语义（打开时重载）。
+        var card_open bool = false
+        var card_wide bool = false
+        var card_sort_title bool = false
+        var card_assets []Asset = []
+        var card_recent []int = []
     }
 
     msg {
@@ -218,7 +227,8 @@ store NotesStore {
         StashDraft, RecoverDraft, RecoverDraft2, DiscardRecovery, DiscardRecovery2, DiscardDraft,
         BindIntent,
         FpOpenSource,
-        ToggleDarkMode, SetMode(str), SetAccent(str), ToggleSettings
+        ToggleDarkMode, SetMode(str), SetAccent(str), ToggleSettings,
+        CardOpened, CardClosed, CardAssetsReload, CardWidthToggled, CardSortToggled
     }
 
     on {
@@ -2374,6 +2384,60 @@ store NotesStore {
                 .fp_open_json = fp_open_source_payload(.fp_open_note, .fp_src_raw)
                 .fp_open_active = true
             }
+        }
+
+        // ── 快速卡片（NOTES-002 T-02）────────────────────────────
+        // 打开/刷新：按 draft_id 拉附件投影（异步入口内联 API——文件头纪律）。
+        // 关闭不清草稿不 flush：同一条 note 的脏稿与七态保留（重开即恢复），
+        // 导航保存沿既有 SelectNote flush 面负责。
+        .CardOpened -> {
+            .card_open = true
+            .CardAssetsReload
+        }
+        .CardClosed -> {
+            .card_open = false
+        }
+        .CardAssetsReload -> {
+            if .draft_id != 0 {
+                .card_assets = asset_list(.draft_id)
+            }
+            // 最近项索引表（工作集顺序；title 排序时按标题字典序重排索引）
+            var idx []int = []
+            var n int = .notes.len()
+            if n > 6 {
+                n = 6
+            }
+            var i int = 0
+            while i < n {
+                idx.push(i)
+                i = i + 1
+            }
+            if .card_sort_title {
+                var j int = 1
+                while j < idx.len() {
+                    var k int = j
+                    while k > 0 {
+                        var a int = idx[k - 1]
+                        var b int = idx[k]
+                        if .notes[b].title < .notes[a].title {
+                            idx[k - 1] = b
+                            idx[k] = a
+                            k = k - 1
+                        } else {
+                            k = 0
+                        }
+                    }
+                    j = j + 1
+                }
+            }
+            .card_recent = idx
+        }
+        .CardWidthToggled -> {
+            .card_wide = !.card_wide
+        }
+        .CardSortToggled -> {
+            .card_sort_title = !.card_sort_title
+            .CardAssetsReload
         }
     }
 }

@@ -1,0 +1,1206 @@
+// src/back/assets.at — 附件受管原件与关联提交（NOTES-002 T-01，D-02）。
+//
+// 职责：
+//   * 原件内容寻址持久层：objects/<sha256>（多名同 hash 共享原件；显示名
+//     在 note_assets 行，内容去重不合并用户新建意图）。
+//   * 操作专属暂存：incoming/<rid>（受管 root 内、行从不引用、按操作命名
+//     的恢复材料命名空间；PLAN-730 commit=hard_link create-only 原子发布）。
+//   * 事务闭合：BEGIN IMMEDIATE → 意图重放（requests 复用，kind=asset_attach，
+//     intent=as1| 规范化全量语义）→ 写 note_assets + requests(doc_json=资产
+//     信封) → 逐语句查返回值 → COMMIT。committed ⇔ 原件在 objects 完整 +
+//     DB 关联提交同时成立（调用序：incoming 发布 → hash → objects 发布 → DB）。
+//   * 中断恢复（A-03 四窗口）：W1 接收半途=PLAN-730 lease 看门狗自清；
+//     W2/W3 incoming/objects 孤儿由同 operation_id 重试调和（commit
+//     create-only：既有 incoming 为权威恢复材料，重传副本被拒收）；
+//     W4 DB 提交后回包丢失=同 rid 意图重放原收据。rejected/校验失败只清
+//     本操作 incoming 命名空间，绝不动 objects（可能已被其他笔记引用）。
+//   * 故障注入（NOTES_TEST_MODE=1 门内经 v1_test_fault 设 NOTES_FAULT）：
+//     after_incoming（暂存获取后）/ after_object（objects 发布后、DB 前）/
+//     after_entity（事务 COMMIT 前 ROLLBACK）/ after_manifest（COMMIT 后
+//     报错）——与 repository.at 既有词汇同形。
+//
+// 隔离纪律：repository.at / db.at 零改动。sql_str/rid 校验/parse_int/char_w
+// 为本模块自持副本（规范语义以 repository.at 为准源）；schema 为附加式
+// note_assets 表（不动 notes/requests/schema_v 与 legacy 升级状态机）。
+// 语法注（T-01 实测）：fs/hash 走裸内建限定路径（同 repository 律——
+// use auto.fs|auto.hash 会生成错误的 crate:: 导入）；fs.copy 名被生成器
+// 发射为模块值冲突——单文件复制用 fs.copy_recursive（repository.fs_copy
+// 同款）；str 参数不可重赋值（&str 借用）——展示名等派生值用本地变量；
+// 与 json.parse("null") 的比较须双临时值内联（变量比较发 &Value≠Value）。
+// 上限（T-00 冻结）：图片 20MiB、视频 200MiB、文件 64MiB（NOTES_ASSET_MAX_*
+// 可配置；服务硬上限 env AUTO_HTTP_UPLOAD_* 取 min，缺省 64MiB 如实生效）。
+//
+// 已知工具链边界（T-01 实测）：db.rs 的 pub async fn 不被 api 装配器的
+// db-fn 提取正则识别——UploadRequest 端点构建需 AUTO_ALLOW_PARTIAL_DB=1
+// （生成 handler 仍委托 crate::db::asset_upload → assets，全部写入走
+// db.rs→assets 单写者核心，无 State<Db> 分叉；缺口 owner=工具链）。
+
+use auto.env
+use auto.sqlite
+use auto.json
+use auto.http
+
+use repository
+use api: AssetView
+
+// ═══════════════════════════════════════════════════════════
+// 本地助手（repository.at 同语义自持副本——避免动共享文件）
+// ═══════════════════════════════════════════════════════════
+
+fn sql_str(s str) str {
+    return "'" + s.replace("'", "''") + "'"
+}
+
+fn parse_int(s str) int {
+    var r int = 0
+    var i int = 0
+    var n int = s.len()
+    while i < n {
+        var c int = s.char_at(i)
+        if c < 48 {
+            return r
+        }
+        if c > 57 {
+            return r
+        }
+        r = r * 10 + (c - 48)
+        i = i + 1
+    }
+    return r
+}
+
+/// UTF-8 码点 → 字节宽（char_at 字符索引 / sub 字节切片各归其位——同 repository.char_w）。
+fn char_w(c int) int {
+    var w int = 1
+    if c >= 128 {
+        w = 2
+    }
+    if c >= 2048 {
+        w = 3
+    }
+    if c >= 65536 {
+        w = 4
+    }
+    return w
+}
+
+/// request_id 校验：非空、≤100、仅 [A-Za-z0-9._:-]（durable-inbox §标识）。
+fn valid_rid(rid str) bool {
+    var n int = rid.len()
+    if n < 1 {
+        return false
+    }
+    if n > 100 {
+        return false
+    }
+    var i int = 0
+    while i < n {
+        var c int = rid.char_at(i)
+        var ok bool = false
+        if c >= 48 {
+            if c <= 57 {
+                ok = true
+            }
+        }
+        if c >= 65 {
+            if c <= 90 {
+                ok = true
+            }
+        }
+        if c >= 97 {
+            if c <= 122 {
+                ok = true
+            }
+        }
+        if c == 46 {
+            ok = true
+        }
+        if c == 95 {
+            ok = true
+        }
+        if c == 45 {
+            ok = true
+        }
+        if c == 58 {
+            ok = true
+        }
+        if ok == false {
+            return false
+        }
+        i = i + 1
+    }
+    return true
+}
+
+/// 显示名：1..=200 长度、不含路径分隔符/控制字符（Unicode 原名保留）。
+/// 实测裁定（T-01）：len()=字节、char_at=字符索引在非 ASCII 名上索引错位
+/// （越位读 0 → 误拒）——检测一律走 replace 差分，不做逐字符扫描。
+fn valid_name(name str) bool {
+    var n int = name.len()
+    if n < 1 {
+        return false
+    }
+    if n > 600 {
+        return false
+    }
+    if name.replace("/", "") != name {
+        return false
+    }
+    if name.replace("\\", "") != name {
+        return false
+    }
+    if name.replace("
+", "") != name {
+        return false
+    }
+    if name.replace("
+", "") != name {
+        return false
+    }
+    if name.replace("	", "") != name {
+        return false
+    }
+    return true
+}
+
+fn env_max(key str, dflt int) int {
+    var v str = env.get(key)
+    if v == "" {
+        return dflt
+    }
+    var p int = parse_int(v)
+    if p < 1 {
+        return dflt
+    }
+    return p
+}
+
+fn max_image_bytes() int {
+    return env_max("NOTES_ASSET_MAX_IMAGE_BYTES", 20971520)
+}
+
+fn max_video_bytes() int {
+    return env_max("NOTES_ASSET_MAX_VIDEO_BYTES", 209715200)
+}
+
+fn max_file_bytes() int {
+    return env_max("NOTES_ASSET_MAX_FILE_BYTES", 67108864)
+}
+
+/// 扩展名/类型判定（T-01 实测终版）：len()=字节、sub()=字符索引——
+/// 任意索引数学在非 ASCII 名上 panic/错位（两轮实测在案）。终版不含任何
+/// 索引运算：含 ".ext" 子串判定（contains-via-replace 差分）。
+/// 禁止面取安全方向（含 .exe 于任意位置即拒，如 "a.exe.bak" 同拒——
+/// 过拒记录于 Spec delta）；kind 推导为提示面（声明 kind 恒优先）。
+fn contains_str(s str, needle str) bool {
+    return s.replace(needle, "") != s
+}
+
+/// kind 推导：声明优先；MIME 前缀次之；扩展名含差分再次；未知 → file。
+fn kind_of(declared str, name str) str {
+    if declared == "image" {
+        return "image"
+    }
+    if declared == "video" {
+        return "video"
+    }
+    if declared == "file" {
+        return "file"
+    }
+    if contains_str(name, ".png") {
+        return "image"
+    }
+    if contains_str(name, ".jpg") {
+        return "image"
+    }
+    if contains_str(name, ".jpeg") {
+        return "image"
+    }
+    if contains_str(name, ".gif") {
+        return "image"
+    }
+    if contains_str(name, ".webp") {
+        return "image"
+    }
+    if contains_str(name, ".bmp") {
+        return "image"
+    }
+    if contains_str(name, ".svg") {
+        return "image"
+    }
+    if contains_str(name, ".mp4") {
+        return "video"
+    }
+    if contains_str(name, ".mkv") {
+        return "video"
+    }
+    if contains_str(name, ".webm") {
+        return "video"
+    }
+    if contains_str(name, ".mov") {
+        return "video"
+    }
+    if contains_str(name, ".avi") {
+        return "video"
+    }
+    if contains_str(name, ".m4v") {
+        return "video"
+    }
+    return "file"
+}
+
+/// 禁止类型（可执行/脚本扩展名显式拒绝——D-02；含差分安全方向）。
+fn forbidden_ext(name str) bool {
+    if contains_str(name, ".exe") {
+        return true
+    }
+    if contains_str(name, ".bat") {
+        return true
+    }
+    if contains_str(name, ".cmd") {
+        return true
+    }
+    if contains_str(name, ".com") {
+        return true
+    }
+    if contains_str(name, ".scr") {
+        return true
+    }
+    if contains_str(name, ".msi") {
+        return true
+    }
+    if contains_str(name, ".ps1") {
+        return true
+    }
+    return false
+}
+
+fn cap_for(kind str) int {
+    if kind == "image" {
+        return max_image_bytes()
+    }
+    if kind == "video" {
+        return max_video_bytes()
+    }
+    return max_file_bytes()
+}
+
+fn err_envelope(code str, detail str) str {
+    var s str = "{\"ok\":false,\"err_code\":\"" + code + "\""
+    if detail != "" {
+        s = s + ",\"err_detail\":" + json.encode(detail)
+    }
+    s = s + "}"
+    return s
+}
+
+/// 入口校验：rid/name/禁止类型/上限。actual_bytes ≤ 0 = 上限暂缓（字节
+/// 数已知处复核）。返回 "" 或 err_detail。
+fn validate_attach(operation_id str, name str, kind str, actual_bytes int) str {
+    if operation_id != "" {
+        if valid_rid(operation_id) == false {
+            return "operation_id must match [A-Za-z0-9._:-] (1..=100)"
+        }
+    }
+    if valid_name(name) == false {
+        return "name must be 1..=200 chars without path separators or control chars"
+    }
+    if forbidden_ext(name) {
+        return "forbidden_type: executable/script extensions are rejected"
+    }
+    if actual_bytes > 0 {
+        var cap int = cap_for(kind)
+        if actual_bytes > cap {
+            return "too_large: " + kind + " limit is " + json.encode(cap)
+        }
+    }
+    return ""
+}
+
+fn fault_stage() str {
+    return env.get("NOTES_FAULT")
+}
+
+// ═══════════════════════════════════════════════════════════
+// 目录与 schema
+// ═══════════════════════════════════════════════════════════
+
+pub fn assets_root() str {
+    var r str = repository.data_dir() + "/assets"
+    fs.mkdir_all(r)
+    return r
+}
+
+fn objects_dir() str {
+    var d str = assets_root() + "/objects"
+    fs.mkdir_all(d)
+    return d
+}
+
+/// PLAN-730 upload staging_root：与 root 同卷、互不嵌套（data/ 下兄弟目录）。
+pub fn upload_staging_root() str {
+    var d str = repository.data_dir() + "/assets-staging"
+    fs.mkdir_all(d)
+    return d
+}
+
+pub fn incoming_abs(rid str) str {
+    var d str = assets_root() + "/incoming"
+    fs.mkdir_all(d)
+    return d + "/" + asset_file_key(rid)
+}
+
+/// operation_id → 去重键（requests PK；"ui-asset:" 命名空间隔离于主路径 rid）。
+pub fn asset_rid(operation_id str) str {
+    return "ui-asset:" + operation_id
+}
+
+/// 去重键 → 暂存文件名（':' 非法路径字符——729 validate_relative_path 拒绝；
+/// 文件命名空间只需操作内唯一，':'→'-' 折叠在 v0 可接受并记录）。
+pub fn asset_file_key(rid str) str {
+    return rid.replace(":", "-")
+}
+
+fn ensure_schema(db SqliteDb) {
+    db.exec("CREATE TABLE IF NOT EXISTS note_assets(asset_id TEXT PRIMARY KEY, note_id TEXT NOT NULL, name TEXT NOT NULL, bytes INTEGER NOT NULL DEFAULT 0, sha256 TEXT NOT NULL DEFAULT '', mime TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '', bin_json TEXT NOT NULL DEFAULT '', seq INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT '')")
+    db.exec("CREATE INDEX IF NOT EXISTS idx_note_assets_note ON note_assets(note_id)")
+}
+
+/// 打开门：数据目录/库文件在位（repository.data_dir() 已兜底 mkdir）。
+fn open_ok() str {
+    if fs.exists(repository.db_path()) == false {
+        return "storage_unwritable"
+    }
+    return ""
+}
+
+/// note_id 请求参数（十进制整数字面量）→ notes.note_id（"n-<k>"）。
+fn note_param_to_nid(raw str) str {
+    if raw == "" {
+        return ""
+    }
+    var idv int = parse_int(raw)
+    if idv < 1 {
+        return ""
+    }
+    var s str = json.encode(idv)
+    if s != raw {
+        return ""
+    }
+    return "n-" + s
+}
+
+// ═══════════════════════════════════════════════════════════
+// 对象发布（incoming → objects/<sha256>，create-only 共享）
+// ═══════════════════════════════════════════════════════════
+
+/// 前置：incoming 在位。返回 "" 或 err_detail（失败保持 incoming——恢复
+/// 材料）。成功后 objects/<sha256> 完整在位（并发同内容写入竞争无害：
+/// 字节全等末写者胜）。发布后以 size+hash 双核（不冒认完整——A-03）。
+pub fn publish_object(incoming str) str {
+    if fs.exists(incoming) == false {
+        return "incoming material missing (unexpected recovery state)"
+    }
+    var size int = fs.file_size(incoming)
+    if size < 0 {
+        return "incoming material unreadable"
+    }
+    var sha str = hash.file_sha256(incoming)
+    var obj str = objects_dir() + "/" + sha
+    if fs.exists(obj) == false {
+        var cp bool = fs.copy_recursive(incoming, obj)
+        if cp == false {
+            return "object publish failed"
+        }
+    }
+    var osize int = fs.file_size(obj)
+    if osize != size {
+        return "object size mismatch after publish"
+    }
+    if hash.file_sha256(obj) != sha {
+        return "object hash mismatch after publish"
+    }
+    return ""
+}
+
+// ═══════════════════════════════════════════════════════════
+// 事务闭合：意图重放 → 行 + requests 写入 → COMMIT
+// ═══════════════════════════════════════════════════════════
+
+fn next_asset_id_on(db SqliteDb) str {
+    var rows List<List<str>> = db.query("SELECT v FROM meta WHERE k='asset_seq'")
+    var cur int = 0
+    if rows.len() > 0 {
+        cur = parse_int(rows[0][0])
+    }
+    var nv int = cur + 1
+    db.exec("INSERT INTO meta(k,v) VALUES('asset_seq'," + json.encode(nv) + ") ON CONFLICT(k) DO UPDATE SET v=" + json.encode(nv))
+    return "a-" + json.encode(nv)
+}
+
+/// 成功/重放信封（assets_json 为完整资产信封数组文本）。
+fn attach_ok_envelope(rid str, nid_str str, assets_json str, replayed bool) str {
+    var rp str = "false"
+    if replayed {
+        rp = "true"
+    }
+    var rc str = "{\"schema_version\":1,\"request_id\":" + json.encode(rid)
+    rc = rc + ",\"note_id\":" + json.encode(nid_str) + ",\"revision\":0,\"status\":\"committed\"}"
+    return "{\"ok\":true,\"err_code\":\"\",\"assets\":" + assets_json + ",\"receipt\":" + rc + ",\"replayed\":" + rp + "}"
+}
+
+/// 单条资产信封。
+fn asset_envelope(aid str, nid_str str, name str, size int, sha str, mime str, source str, bin_json str, seq int) str {
+    var s str = "{\"asset_id\":" + json.encode(aid)
+    s = s + ",\"note_id\":" + json.encode(nid_str)
+    s = s + ",\"name\":" + json.encode(name)
+    s = s + ",\"bytes\":" + json.encode(size)
+    s = s + ",\"sha256\":" + json.encode(sha)
+    s = s + ",\"mime\":" + json.encode(mime)
+    s = s + ",\"source\":" + json.encode(source)
+    if bin_json != "" {
+        s = s + ",\"bin_json\":" + bin_json
+    }
+    s = s + ",\"seq\":" + json.encode(seq) + "}"
+    return s
+}
+
+/// 意图规范化（as1| 前缀族；字段独立 json.encode 无边界歧义——同律）。
+fn attach_manifest(nid_str str, kind str, source str, canonical_extra str) str {
+    return "as1|attach|" + json.encode(nid_str) + "|" + json.encode(kind) + "|" + json.encode(source) + "|" + json.encode(canonical_extra)
+}
+
+/// DB 事务提交。assets_json = 资产信封数组（[...]，意图语义全量：
+/// name/bytes/sha256/mime/source/bin_json）。返回：
+/// 成功 {"ok":true,...,"assets":[...],"receipt":{...}}（重放带 replayed:true）；
+/// 失败 {"ok":false,"err_code":...}。前置：objects/<sha256> 已全部发布在位。
+fn attach_commit_tx(rid str, nid_str str, manifest_json str, assets_json str) str {
+    var db SqliteDb = sqlite.open(repository.db_path())
+    ensure_schema(db)
+    var begin int = db.exec("BEGIN IMMEDIATE")
+    if begin < 0 {
+        return err_envelope("second_writer", "")
+    }
+    var rows List<List<str>> = db.query("SELECT intent, doc_json FROM requests WHERE request_id=" + sql_str(rid))
+    if rows.len() > 0 {
+        var row = rows[0]
+        var s_intent str = row[0]
+        var s_doc str = row[1]
+        if s_intent == "" {
+            db.exec("ROLLBACK")
+            return err_envelope("request_conflict", "legacy request replay not confirmable: original intent was not persisted")
+        }
+        if s_intent != manifest_json {
+            db.exec("ROLLBACK")
+            return err_envelope("request_conflict", "same operation_id used for a different attach manifest")
+        }
+        db.exec("COMMIT")
+        return attach_ok_envelope(rid, nid_str, s_doc, true)
+    }
+    var erows List<List<str>> = db.query("SELECT note_id FROM notes WHERE note_id=" + sql_str(nid_str) + " AND state='active'")
+    if erows.len() < 1 {
+        db.exec("ROLLBACK")
+        return err_envelope("not_found", "target note missing or not active")
+    }
+    var arr = json.parse(assets_json)
+    if arr == json.parse("null") {
+        db.exec("ROLLBACK")
+        return err_envelope("invalid_request", "assets envelope unparseable")
+    }
+    var n int = json.len(arr)
+    if n < 1 {
+        db.exec("ROLLBACK")
+        return err_envelope("invalid_request", "attach has no assets")
+    }
+    var out str = "["
+    var i int = 0
+    while i < n {
+        var e = json.get_at(arr, i)
+        var e_name str = json.as_string(json.get(e, "name"))
+        var e_size int = json.as_int(json.get(e, "bytes"))
+        var e_sha str = json.as_string(json.get(e, "sha256"))
+        var e_mime str = json.as_string(json.get(e, "mime"))
+        var e_source str = json.as_string(json.get(e, "source"))
+        var e_bin str = ""
+        if json.encode(json.get(e, "bin_json")) != "null" {
+            e_bin = json.encode(json.get(e, "bin_json"))
+        }
+        if e_sha.len() != 64 {
+            db.exec("ROLLBACK")
+            return err_envelope("invalid_request", "entry sha256 must be 64 hex chars")
+        }
+        if e_size < 0 {
+            db.exec("ROLLBACK")
+            return err_envelope("invalid_request", "entry bytes must be >= 0")
+        }
+        var srows List<List<str>> = db.query("SELECT COALESCE(MAX(seq),0) FROM note_assets WHERE note_id=" + sql_str(nid_str))
+        var base_seq int = 0
+        if srows.len() > 0 {
+            base_seq = parse_int(srows[0][0])
+        }
+        var seq int = base_seq + 1
+        var aid str = next_asset_id_on(db)
+        var ins int = db.exec("INSERT INTO note_assets(asset_id, note_id, name, bytes, sha256, mime, source, bin_json, seq, created_at) VALUES(" + sql_str(aid) + ", " + sql_str(nid_str) + ", " + sql_str(e_name) + ", " + json.encode(e_size) + ", " + sql_str(e_sha) + ", " + sql_str(e_mime) + ", " + sql_str(e_source) + ", " + sql_str(e_bin) + ", " + json.encode(seq) + ", '')")
+        if ins < 0 {
+            db.exec("ROLLBACK")
+            return err_envelope("storage_unwritable", "asset insert rejected")
+        }
+        if i > 0 {
+            out = out + ","
+        }
+        out = out + asset_envelope(aid, nid_str, e_name, e_size, e_sha, e_mime, e_source, e_bin, seq)
+        i = i + 1
+    }
+    out = out + "]"
+    var ir int = db.exec("INSERT OR IGNORE INTO requests(request_id, note_id, kind, rev, doc_json, intent) VALUES(" + sql_str(rid) + ", " + sql_str(nid_str) + ", 'asset_attach', 0, " + sql_str(out) + ", " + sql_str(manifest_json) + ")")
+    if ir < 0 {
+        db.exec("ROLLBACK")
+        return err_envelope("storage_unwritable", "request row rejected")
+    }
+    var fault str = fault_stage()
+    if fault == "after_entity" {
+        db.exec("ROLLBACK")
+        return err_envelope("fault_injected", "after_entity")
+    }
+    var commit int = db.exec("COMMIT")
+    if commit < 0 {
+        return err_envelope("storage_unwritable", "commit failed")
+    }
+    if fault == "after_manifest" {
+        return err_envelope("fault_injected", "after_manifest")
+    }
+    return attach_ok_envelope(rid, nid_str, out, false)
+}
+
+// ═══════════════════════════════════════════════════════════
+// 入口 1：multipart 上传（PLAN-730 ABI；api.at → db.at → 本层）
+// ═══════════════════════════════════════════════════════════
+
+/// metadata fields（[{"name","value"}...]）按名取值（重复取首个）。
+pub fn field_of(meta str, want str) str {
+    var m = json.parse(meta)
+    if m == json.parse("null") {
+        return ""
+    }
+    if json.encode(json.get(m, "fields")) == "null" {
+        return ""
+    }
+    var fields_node = json.get(m, "fields")
+    var n int = json.len(fields_node)
+    var i int = 0
+    while i < n {
+        var f = json.get_at(fields_node, i)
+        if json.as_string(json.get(f, "name")) == want {
+            return json.as_string(json.get(f, "value"))
+        }
+        i = i + 1
+    }
+    return ""
+}
+
+pub fn meta_str_field(meta str, key str) str {
+    var m = json.parse(meta)
+    if m == json.parse("null") {
+        return ""
+    }
+    if json.encode(json.get(m, key)) == "null" {
+        return ""
+    }
+    return json.as_string(json.get(m, key))
+}
+
+/// 上传 attach：receive → 字段校验 → commit 到 incoming/<rid>（create-only；
+/// 既有目标=本操作恢复材料，重传副本被拒收——W2/W3 调和）→ hash →
+/// objects 发布 → DB 事务 → 回 commit 收据（201）。校验失败清本操作
+/// incoming；DB/对象失败保留 incoming 并回 upload_error（receipt/list 查询
+/// 与重试收敛——W4 重放）。
+pub fn upload_attach(req UploadRequest) ~UploadReceipt {
+    var opts str = "{\"mode\":\"multipart\",\"file_field\":\"file\",\"text_fields\":[\"operation_id\",\"note_id\",\"name\",\"mime\",\"kind\",\"source\"],\"max_text_field_bytes\":1024}"
+    var session UploadSession = http.upload_receive(req, assets_root(), upload_staging_root(), opts)
+    var meta str = http.upload_metadata(session)
+    var m = json.parse(meta)
+    var state str = json.as_string(json.get(m, "state"))
+    if state == "failed" {
+        return http.upload_reject(session, 0, "")
+    }
+    var operation_id str = field_of(meta, "operation_id")
+    var note_id_raw str = field_of(meta, "note_id")
+    var name str = field_of(meta, "name")
+    if name == "" {
+        name = meta_str_field(meta, "filename")
+    }
+    var mime str = field_of(meta, "mime")
+    if mime == "" {
+        mime = meta_str_field(meta, "content_type")
+    }
+    var kind_declared str = field_of(meta, "kind")
+    var source str = field_of(meta, "source")
+    if source == "" {
+        source = "upload"
+    }
+    if valid_rid(operation_id) == false {
+        return http.upload_error(400, "operation_id must match [A-Za-z0-9._:-] (1..=100)")
+    }
+    var nid_str str = note_param_to_nid(note_id_raw)
+    if nid_str == "" {
+        return http.upload_error(400, "note_id must be a positive integer id")
+    }
+    var rid str = asset_rid(operation_id)
+    var incoming str = incoming_abs(rid)
+    // 先核显示名（业务前，避免为坏请求做接收后的发布/清理来回）
+    var kind str = kind_of(kind_declared, name)
+    var verr str = validate_attach(operation_id, name, kind, 0)
+    if verr != "" {
+        return http.upload_error(400, verr)
+    }
+    // 提交到操作命名空间（create-only；既有=恢复材料，重传副本拒收）
+    var target str = "incoming/" + rid
+    var receipt UploadReceipt = http.upload_commit(session, target)
+    var size int = fs.file_size(incoming)
+    if size < 0 {
+        return http.upload_error(500, "incoming material missing after commit")
+    }
+    var verr2 str = validate_attach(operation_id, name, kind, size)
+    if verr2 != "" {
+        fs.delete(incoming)
+        return http.upload_error(400, verr2)
+    }
+    if fault_stage() == "after_incoming" {
+        return http.upload_error(500, "fault_injected: after_incoming (recovery material kept)")
+    }
+    var perr str = publish_object(incoming)
+    if perr != "" {
+        return http.upload_error(500, perr)
+    }
+    if fault_stage() == "after_object" {
+        return http.upload_error(500, "fault_injected: after_object (incoming+objects kept, no db row)")
+    }
+    var sha str = hash.file_sha256(incoming)
+    var manifest str = attach_manifest(nid_str, kind, source, "{\"u\":1,\"name\":" + json.encode(name) + ",\"bytes\":" + json.encode(size) + ",\"sha256\":" + json.encode(sha) + ",\"mime\":" + json.encode(mime) + "}")
+    var assets_json str = "[" + asset_envelope("", nid_str, name, size, sha, mime, source, "", 0) + "]"
+    var res str = attach_commit_tx(rid, nid_str, manifest, assets_json)
+    var okv = json.parse(res)
+    var okb bool = json.get(okv, "ok") == true
+    if okb == false {
+        var code str = json.as_string(json.get(okv, "err_code"))
+        var detail str = json.as_string(json.get(okv, "err_detail"))
+        var st int = 500
+        if code == "request_conflict" {
+            st = 409
+        }
+        if code == "not_found" {
+            st = 404
+        }
+        if code == "invalid_request" {
+            st = 400
+        }
+        return http.upload_error(st, code + ": " + detail)
+    }
+    fs.delete(incoming)
+    return receipt
+}
+
+// ═══════════════════════════════════════════════════════════
+// 入口 2：路径导入（VM 通道：对话框/剪贴板文件路径 → HTTP 参数）
+// ═══════════════════════════════════════════════════════════
+
+pub fn import_attach(operation_id str, note_id str, path str, name str, kind_declared str, mime str, source str) str {
+    // str 参数为借用不可重赋值——派生值落本地变量
+    var disp_name str = name
+    var mime_face str = mime
+    var source_face str = source
+    if valid_rid(operation_id) == false {
+        return err_envelope("invalid_request", "operation_id must match [A-Za-z0-9._:-] (1..=100)")
+    }
+    var nid_str str = note_param_to_nid(note_id)
+    if nid_str == "" {
+        return err_envelope("invalid_request", "note_id must be a positive integer id")
+    }
+    if disp_name == "" {
+        // T-01 实测：路径末段推导需索引数学（len 字节 / char_at 字符错位，
+        // panic 在案）——v0 契约改为 name 必填（VM 通道恒有对话框文件名）
+        return err_envelope("invalid_request", "name required (1..=200 chars)")
+    }
+    if source_face == "" {
+        source_face = "file"
+    }
+    var kind str = kind_of(kind_declared, disp_name)
+    var verr str = validate_attach(operation_id, disp_name, kind, 0)
+    if verr != "" {
+        return err_envelope("invalid_request", verr)
+    }
+    if fs.exists(path) == false {
+        return err_envelope("invalid_request", "missing_file: source path does not exist")
+    }
+    if fs.is_dir(path) {
+        return err_envelope("invalid_request", "missing_file: source path is a directory")
+    }
+    var cap int = cap_for(kind)
+    var src_size int = fs.file_size(path)
+    if src_size > cap {
+        return err_envelope("invalid_request", "too_large: " + kind + " limit is " + json.encode(cap))
+    }
+    var rid str = asset_rid(operation_id)
+    var incoming str = incoming_abs(rid)
+    fs.delete(incoming_abs(rid))
+    var cp bool = fs.copy_recursive(path, incoming)
+    if cp == false {
+        return err_envelope("storage_unwritable", "staging copy failed")
+    }
+    if fault_stage() == "after_incoming" {
+        return err_envelope("fault_injected", "after_incoming (recovery material kept)")
+    }
+    var size int = fs.file_size(incoming)
+    var verr2 str = validate_attach(operation_id, disp_name, kind, size)
+    if verr2 != "" {
+        fs.delete(incoming)
+        return err_envelope("invalid_request", verr2)
+    }
+    var perr str = publish_object(incoming)
+    if perr != "" {
+        return err_envelope("storage_unwritable", perr)
+    }
+    if fault_stage() == "after_object" {
+        return err_envelope("fault_injected", "after_object (incoming+objects kept, no db row)")
+    }
+    var sha str = hash.file_sha256(incoming)
+    if mime_face == "" {
+        mime_face = "application/octet-stream"
+    }
+    var manifest str = attach_manifest(nid_str, kind, source_face, "{\"i\":1,\"name\":" + json.encode(disp_name) + ",\"bytes\":" + json.encode(size) + ",\"sha256\":" + json.encode(sha) + ",\"mime\":" + json.encode(mime_face) + "}")
+    var assets_json str = "[" + asset_envelope("", nid_str, disp_name, size, sha, mime_face, source_face, "", 0) + "]"
+    var res str = attach_commit_tx(rid, nid_str, manifest, assets_json)
+    var okv = json.parse(res)
+    var okb bool = json.get(okv, "ok") == true
+    if okb {
+        fs.delete(incoming)
+    }
+    return res
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// 读取面：列表 / 单条 / 原件 raw / 下载 / 回执
+// ═══════════════════════════════════════════════════════════
+
+pub fn asset_list(note_id int) List<AssetView> {
+    var nid_str str = "n-" + json.encode(note_id)
+    var out List<AssetView> = List<AssetView>.new([])
+    var oerr str = open_ok()
+    if oerr != "" {
+        return out
+    }
+    var db SqliteDb = sqlite.open(repository.db_path())
+    ensure_schema(db)
+    var rows List<List<str>> = db.query("SELECT asset_id, note_id, name, bytes, sha256, mime, source, seq FROM note_assets WHERE note_id=" + sql_str(nid_str) + " ORDER BY seq ASC")
+    var n int = rows.len()
+    var i int = 0
+    while i < n {
+        var row = rows[i]
+        var v AssetView = AssetView {
+            asset_id: row[0]
+            note_id: row[1]
+            name: row[2]
+            bytes: parse_int(row[3])
+            sha256: row[4]
+            mime: row[5]
+            source: row[6]
+            seq: parse_int(row[7])
+            raw_url: "/api/assets/v1/" + row[0] + "/raw"
+            download_url: "/api/assets/v1/" + row[0] + "/download"
+        }
+        out.push(v)
+        i = i + 1
+    }
+    return out
+}
+
+pub fn asset_get(asset_id str) ?AssetView {
+    var oerr str = open_ok()
+    if oerr != "" {
+        return None
+    }
+    var db SqliteDb = sqlite.open(repository.db_path())
+    ensure_schema(db)
+    var rows List<List<str>> = db.query("SELECT asset_id, note_id, name, bytes, sha256, mime, source, seq FROM note_assets WHERE asset_id=" + sql_str(asset_id))
+    if rows.len() < 1 {
+        return None
+    }
+    var row = rows[0]
+    var v AssetView = AssetView {
+        asset_id: row[0]
+        note_id: row[1]
+        name: row[2]
+        bytes: parse_int(row[3])
+        sha256: row[4]
+        mime: row[5]
+        source: row[6]
+        seq: parse_int(row[7])
+        raw_url: "/api/assets/v1/" + row[0] + "/raw"
+        download_url: "/api/assets/v1/" + row[0] + "/download"
+    }
+    return Some(v)
+}
+
+/// 回执查询（D-02：提交成功回包丢失按原 operation 查询/重试）。
+pub fn asset_receipt(operation_id str) str {
+    if valid_rid(operation_id) == false {
+        return err_envelope("invalid_request", "operation_id must match [A-Za-z0-9._:-] (1..=100)")
+    }
+    var rid str = asset_rid(operation_id)
+    var oerr str = open_ok()
+    if oerr != "" {
+        return err_envelope(oerr, "")
+    }
+    var db SqliteDb = sqlite.open(repository.db_path())
+    ensure_schema(db)
+    var rows List<List<str>> = db.query("SELECT note_id, doc_json FROM requests WHERE request_id=" + sql_str(rid) + " AND kind='asset_attach'")
+    if rows.len() < 1 {
+        return "{\"ok\":true,\"status\":\"not_observed\",\"operation_id\":" + json.encode(operation_id) + "}"
+    }
+    var row = rows[0]
+    var s str = "{\"ok\":true,\"status\":\"committed\",\"operation_id\":" + json.encode(operation_id)
+    s = s + ",\"note_id\":" + json.encode(row[0]) + ",\"assets\":" + row[1] + "}"
+    return s
+}
+
+/// 行文件定位：sha256/mime/name（未知 asset → 空串三元组语义）。
+fn asset_row_file(asset_id str) List<str> {
+    var out List<str> = List<str>.new([])
+    var db SqliteDb = sqlite.open(repository.db_path())
+    ensure_schema(db)
+    var rows List<List<str>> = db.query("SELECT sha256, mime, name FROM note_assets WHERE asset_id=" + sql_str(asset_id))
+    if rows.len() < 1 {
+        out.push("")
+        out.push("")
+        out.push("")
+        return out
+    }
+    var row = rows[0]
+    out.push(row[0])
+    out.push(row[1])
+    out.push(row[2])
+    return out
+}
+
+/// 原件投影（预览：inline + 单区间 Range；双轨 file_response 同律）。
+/// 未知 asset → 描述符指向不存在路径（serve 时 404，不冒认）。
+pub fn asset_raw(asset_id str) FileResponse {
+    var triple List<str> = asset_row_file(asset_id)
+    var sha str = triple[0]
+    var mime str = triple[1]
+    var opts str = "{}"
+    var rel str = "objects/__no_such_asset__"
+    if sha != "" {
+        rel = "objects/" + sha
+        if mime != "" {
+            opts = "{\"content_type\":" + json.encode(mime) + ",\"disposition\":\"inline\"}"
+        } else {
+            opts = "{\"disposition\":\"inline\"}"
+        }
+    }
+    return http.file_response(assets_root(), rel, opts)
+}
+
+/// 原件下载（导出：attachment + 原名 RFC5987）。
+pub fn asset_download(asset_id str) FileResponse {
+    var triple List<str> = asset_row_file(asset_id)
+    var sha str = triple[0]
+    var mime str = triple[1]
+    var name str = triple[2]
+    var opts str = "{}"
+    var rel str = "objects/__no_such_asset__"
+    if sha != "" {
+        rel = "objects/" + sha
+        opts = "{\"disposition\":\"attachment\""
+        if name != "" {
+            opts = opts + ",\"download_name\":" + json.encode(name)
+        }
+        if mime != "" {
+            opts = opts + ",\"content_type\":" + json.encode(mime)
+        }
+        opts = opts + "}"
+    }
+    return http.file_response(assets_root(), rel, opts)
+}
+
+// =============================================================
+// 入口 3：clipboard-bin 已选条目 fixture 导入（D-03/T-03；版本化 v1）
+// =============================================================
+
+// entries_json: {"v":1,"producer":str,"entries":[
+//   {"kind":"text"|"url","text":str,"name"?:str,"mime"?:str,"selected_at"?:str,"origin"?:str} |
+//   {"kind":"file"|"image","path":str,"name":str,"mime"?:str,...} ...]}
+// 每条目独立获取原件（text/url → UTF-8 字节写暂存；file/image → 路径复制）；
+// 全部条目 hash 进意图 → objects 逐条发布 → 单事务插入全部行 + 一条
+// requests 意图（原顺序 = seq；bin_json = producer/kind/entry 序号/选择
+// 时间/原来源）。同 operation_id 重放返回原集合（不重复）；同文新操作
+// 另建集合（内容去重不合并意图——D-02）。
+pub fn clip_import(operation_id str, note_id str, entries_json str, producer str) str {
+    if valid_rid(operation_id) == false {
+        return err_envelope("invalid_request", "operation_id must match [A-Za-z0-9._:-] (1..=100)")
+    }
+    var nid_str str = note_param_to_nid(note_id)
+    if nid_str == "" {
+        return err_envelope("invalid_request", "note_id must be a positive integer id")
+    }
+    if json.parse(entries_json) == json.parse("null") {
+        return err_envelope("invalid_request", "entries_json unparseable")
+    }
+    var root = json.parse(entries_json)
+    if json.as_int(json.get(root, "v")) != 1 {
+        return err_envelope("invalid_request", "unsupported clipboard-bin fixture version")
+    }
+    var prod str = producer
+    if prod == "" {
+        prod = json.as_string(json.get(root, "producer"))
+    }
+    if json.encode(json.get(root, "entries")) == "null" {
+        return err_envelope("invalid_request", "entries required")
+    }
+    var entries = json.get(root, "entries")
+    var n int = json.len(entries)
+    if n < 1 {
+        return err_envelope("invalid_request", "entries must not be empty")
+    }
+    if n > 64 {
+        return err_envelope("invalid_request", "too many entries in one import (max 64)")
+    }
+    var incoming_base str = assets_root() + "/incoming"
+    fs.mkdir_all(incoming_base)
+    // 第一轮：逐条目获取暂存材料 + 校验（业务前；失败清本操作全部暂存）
+    var parts str = ""
+    var i int = 0
+    while i < n {
+        var e = json.get_at(entries, i)
+        var ekind str = json.as_string(json.get(e, "kind"))
+        var e_name str = json.as_string(json.get(e, "name"))
+        var e_mime str = json.as_string(json.get(e, "mime"))
+        var path_src str = json.as_string(json.get(e, "path"))
+        var text_src str = json.as_string(json.get(e, "text"))
+        var tmp str = incoming_base + "/" + rid_of(operation_id) + "-e" + json.encode(i)
+        var kind str = "file"
+        if ekind == "text" {
+            if e_name == "" {
+                e_name = "clip-" + json.encode(i) + ".txt"
+            }
+            if e_mime == "" {
+                e_mime = "text/plain"
+            }
+            if text_src.len() < 1 {
+                cleanup_incoming_parts(rid_of(operation_id), i + 1)
+                return err_envelope("invalid_request", "text entry requires non-empty text")
+            }
+            if text_src.len() > 65536 {
+                cleanup_incoming_parts(rid_of(operation_id), i + 1)
+                return err_envelope("invalid_request", "text entry out of 1..=65536")
+            }
+            fs.delete("" + tmp)
+            var w int = fs.write_text(tmp, text_src)
+            if w < 0 {
+                cleanup_incoming_parts(rid_of(operation_id), i + 1)
+                return err_envelope("storage_unwritable", "text staging write failed")
+            }
+        } else {
+            if ekind == "url" {
+                if e_name == "" {
+                    e_name = "clip-" + json.encode(i) + ".url"
+                }
+                if e_mime == "" {
+                    e_mime = "text/plain"
+                }
+                if text_src.len() < 1 {
+                    cleanup_incoming_parts(rid_of(operation_id), i + 1)
+                    return err_envelope("invalid_request", "url entry requires non-empty text")
+                }
+                if text_src.len() > 2048 {
+                    cleanup_incoming_parts(rid_of(operation_id), i + 1)
+                    return err_envelope("invalid_request", "url text out of 1..=2048")
+                }
+                fs.delete("" + tmp)
+                var wu int = fs.write_text(tmp, text_src)
+                if wu < 0 {
+                    cleanup_incoming_parts(rid_of(operation_id), i + 1)
+                    return err_envelope("storage_unwritable", "url staging write failed")
+                }
+            } else {
+                if e_name == "" {
+                    cleanup_incoming_parts(rid_of(operation_id), i + 1)
+                    return err_envelope("invalid_request", "file entry requires name")
+                }
+                if e_mime == "" {
+                    e_mime = "application/octet-stream"
+                }
+                if fs.exists(path_src) == false {
+                    cleanup_incoming_parts(rid_of(operation_id), i + 1)
+                    return err_envelope("invalid_request", "missing_file: entry path does not exist")
+                }
+                if fs.is_dir(path_src) {
+                    cleanup_incoming_parts(rid_of(operation_id), i + 1)
+                    return err_envelope("invalid_request", "missing_file: entry path is a directory")
+                }
+                var cap int = cap_for(kind_of(ekind, e_name))
+                if fs.file_size(path_src) > cap {
+                    cleanup_incoming_parts(rid_of(operation_id), i + 1)
+                    return err_envelope("invalid_request", "too_large: entry exceeds limit")
+                }
+                fs.delete("" + tmp)
+                var cp bool = fs.copy_recursive(path_src, tmp)
+                if cp == false {
+                    cleanup_incoming_parts(rid_of(operation_id), i + 1)
+                    return err_envelope("storage_unwritable", "entry staging copy failed")
+                }
+                kind = kind_of(ekind, e_name)
+            }
+        }
+        var size int = fs.file_size(tmp)
+        var verr str = validate_attach("", e_name, kind, size)
+        if verr != "" {
+            cleanup_incoming_parts(rid_of(operation_id), i + 1)
+            return err_envelope("invalid_request", verr)
+        }
+        if i > 0 {
+            parts = parts + ","
+        }
+        var binj str = "{\"producer\":" + json.encode(prod)
+        binj = binj + ",\"kind\":" + json.encode(ekind)
+        binj = binj + ",\"entry\":" + json.encode(i)
+        var sel str = json.as_string(json.get(e, "selected_at"))
+        var org str = json.as_string(json.get(e, "origin"))
+        if sel != "" {
+            binj = binj + ",\"selected_at\":" + json.encode(sel)
+        }
+        if org != "" {
+            binj = binj + ",\"origin\":" + json.encode(org)
+        }
+        binj = binj + "}"
+        parts = parts + "{\"tmp\":" + json.encode(tmp)
+        parts = parts + ",\"name\":" + json.encode(e_name)
+        parts = parts + ",\"bytes\":" + json.encode(size)
+        parts = parts + ",\"mime\":" + json.encode(e_mime)
+        parts = parts + ",\"bin_json\":" + json.encode(binj) + "}"
+        i = i + 1
+    }
+    if fault_stage() == "after_incoming" {
+        cleanup_incoming_parts(rid_of(operation_id), n)
+        return err_envelope("fault_injected", "after_incoming (parts cleaned — fault before publish)")
+    }
+    // 第二轮：逐条目 hash（意图全量语义）→ objects 发布 → 组资产信封
+    var parts_node = json.parse("[" + parts + "]")
+    var manifest_src str = "{\"c\":1,\"producer\":" + json.encode(prod) + ",\"entries\":["
+    var out str = "["
+    i = 0
+    while i < n {
+        var p2 = json.get_at(parts_node, i)
+        var tmp str = json.as_string(json.get(p2, "tmp"))
+        var e_sha str = hash.file_sha256(tmp)
+        var e_size int = json.as_int(json.get(p2, "bytes"))
+        var e_name str = json.as_string(json.get(p2, "name"))
+        if i > 0 {
+            manifest_src = manifest_src + ","
+            out = out + ","
+        }
+        manifest_src = manifest_src + "{\"name\":" + json.encode(e_name) + ",\"bytes\":" + json.encode(e_size) + ",\"sha256\":" + json.encode(e_sha) + "}"
+        var perr str = publish_object(tmp)
+        if perr != "" {
+            cleanup_incoming_parts(rid_of(operation_id), n)
+            return err_envelope("storage_unwritable", perr)
+        }
+        out = out + "{\"name\":" + json.encode(e_name)
+        out = out + ",\"bytes\":" + json.encode(e_size)
+        out = out + ",\"sha256\":" + json.encode(e_sha)
+        out = out + ",\"mime\":" + json.encode(json.as_string(json.get(p2, "mime")))
+        out = out + ",\"source\":\"clipboard-bin\""
+        out = out + ",\"bin_json\":" + json.as_string(json.get(p2, "bin_json")) + "}"
+        i = i + 1
+    }
+    manifest_src = manifest_src + "]}"
+    out = out + "]"
+    if fault_stage() == "after_object" {
+        cleanup_incoming_parts(rid_of(operation_id), n)
+        return err_envelope("fault_injected", "after_object (parts cleaned, objects kept as shared content)")
+    }
+    var manifest str = attach_manifest(nid_str, "file", "clipboard-bin", manifest_src)
+    var res str = attach_commit_tx(rid_of(operation_id), nid_str, manifest, out)
+    var okv = json.parse(res)
+    var okb bool = json.get(okv, "ok") == true
+    if okb == false {
+        var code str = json.as_string(json.get(okv, "err_code"))
+        if code == "invalid_request" {
+            cleanup_incoming_parts(rid_of(operation_id), n)
+        }
+        return res
+    }
+    cleanup_incoming_parts(rid_of(operation_id), n)
+    return res
+}
+
+// 清理本操作前 upto 条条目暂存 + 单文件主名（仅本操作命名空间）。
+fn cleanup_incoming_parts(rid str, upto int) {
+    var incoming_base str = assets_root() + "/incoming"
+    var i int = 0
+    while i < upto {
+        fs.delete(incoming_base + "/" + rid + "-e" + json.encode(i))
+        i = i + 1
+    }
+    fs.delete(incoming_base + "/" + rid)
+}
+
+fn rid_of(operation_id str) str {
+    return asset_rid(operation_id)
+}
+
+// =============================================================
+// 上传编排的同步后段（api.at 端点体持有 stdlib await 点——companion
+// async 无 .await 生成为 T-01 实测缺口；本层只出同步阶段）。
+// =============================================================
+
+/// 上传请求字段校验（业务前）：rid/nid/名/kind。返回 "" 或 err_detail。
+pub fn validate_upload_request(operation_id str, note_id_raw str, name str, kind_declared str) str {
+    if valid_rid(operation_id) == false {
+        return "operation_id must match [A-Za-z0-9._:-] (1..=100)"
+    }
+    if note_param_to_nid(note_id_raw) == "" {
+        return "note_id must be a positive integer id"
+    }
+    var kind str = kind_of(kind_declared, name)
+    return validate_attach(operation_id, name, kind, 0)
+}
+
+/// 上传 finalize（incoming 已发布后）：大小上限复核 → 故障点 → objects
+/// 发布 → DB 事务 → incoming 清理。返回信封（ok/err_code/err_detail）。
+pub fn finalize_upload(operation_id str, note_id_raw str, name str, mime str, kind_declared str, source str) str {
+    var nid_str str = note_param_to_nid(note_id_raw)
+    var rid str = asset_rid(operation_id)
+    var incoming str = incoming_abs(rid)
+    var kind str = kind_of(kind_declared, name)
+    var size int = fs.file_size(incoming)
+    if size < 0 {
+        return err_envelope("storage_unwritable", "incoming material missing after commit")
+    }
+    var verr str = validate_attach(operation_id, name, kind, size)
+    if verr != "" {
+        fs.delete(incoming)
+        return err_envelope("invalid_request", verr)
+    }
+    if fault_stage() == "after_incoming" {
+        return err_envelope("fault_injected", "after_incoming (recovery material kept)")
+    }
+    var perr str = publish_object(incoming)
+    if perr != "" {
+        return err_envelope("storage_unwritable", perr)
+    }
+    if fault_stage() == "after_object" {
+        return err_envelope("fault_injected", "after_object (incoming+objects kept, no db row)")
+    }
+    var sha str = hash.file_sha256(incoming)
+    var manifest str = attach_manifest(nid_str, kind, source, "{\"u\":1,\"name\":" + json.encode(name) + ",\"bytes\":" + json.encode(size) + ",\"sha256\":" + json.encode(sha) + ",\"mime\":" + json.encode(mime) + "}")
+    var assets_json str = "[" + asset_envelope("", nid_str, name, size, sha, mime, source, "", 0) + "]"
+    var res str = attach_commit_tx(rid, nid_str, manifest, assets_json)
+    var okv = json.parse(res)
+    var okb bool = json.get(okv, "ok") == true
+    if okb {
+        fs.delete(incoming)
+    }
+    return res
+}

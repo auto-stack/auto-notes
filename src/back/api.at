@@ -116,6 +116,151 @@ pub type FpSourceView = {
 
 use db
 use p2probe
+use assets
+use auto.time
+use repository
+
+/// 附件投影（NOTES-002 T-01）：note_assets 行的类型化读取面。
+pub type AssetView = {
+    asset_id: str
+    note_id: str
+    name: str
+    bytes: int
+    sha256: str
+    mime: str
+    source: str
+    seq: int
+    raw_url: str
+    download_url: str
+}
+
+// ═══════════════════════════════════════════════════════════
+// 附件端点（NOTES-002 T-01；受管原件/暂存/事务闭合/恢复见 assets.at）。
+// 上传端点为 PLAN-730 ABI：UploadRequest bypass to_bytes，回执即 HTTP
+// status+JSON；其余参数走 multipart text_fields（assets.at 自解析）。
+// 构建需 AUTO_ALLOW_PARTIAL_DB=1（db.rs pub async fn 不被装配器 db-fn
+// 提取识别——实测工具链缺口，写入仍全走 db.rs→assets 单写者核心）。
+// ═══════════════════════════════════════════════════════════
+
+/// multipart 上传 attach（PLAN-730；上下文在 text_fields）。
+#[api(method = "POST", path = "/api/assets/v1/upload")]
+pub fn asset_upload(req UploadRequest) ~UploadReceipt {
+    // 编排（T-01 实测：stdlib async 调用点须在端点体内——a2r 只对 stdlib
+    // async 发射 .await，companion async 不生成 await；故 receive/commit
+    // 在此，校验/发布/事务在 assets 同步阶段）。库/磁盘失败保留 incoming
+    // 恢复材料并回 upload_error（receipt/list 查询与重试收敛）。
+    var opts str = "{\"mode\":\"multipart\",\"file_field\":\"file\",\"text_fields\":[\"operation_id\",\"note_id\",\"name\",\"mime\",\"kind\",\"source\"],\"max_text_field_bytes\":1024}"
+    var session UploadSession = http.upload_receive(req, assets.assets_root(), assets.upload_staging_root(), opts)
+    var meta str = http.upload_metadata(session)
+    var m = json.parse(meta)
+    var state str = json.as_string(json.get(m, "state"))
+    if env.get("NOTES_TEST_MODE") == "1" {
+        fs.write_text(repository.data_dir() + "/upload-meta.txt", meta)
+    }
+    if state == "failed" {
+        return http.upload_reject(session, 0, "")
+    }
+    var operation_id str = assets.field_of(meta, "operation_id")
+    var note_id_raw str = assets.field_of(meta, "note_id")
+    var name str = assets.field_of(meta, "name")
+    if name == "" {
+        name = assets.meta_str_field(meta, "filename")
+    }
+    var mime str = assets.field_of(meta, "mime")
+    if mime == "" {
+        mime = assets.meta_str_field(meta, "content_type")
+    }
+    var kind_declared str = assets.field_of(meta, "kind")
+    var source str = assets.field_of(meta, "source")
+    if source == "" {
+        source = "upload"
+    }
+    var verr str = assets.validate_upload_request(operation_id, note_id_raw, name, kind_declared)
+    if verr != "" {
+        return http.upload_error(400, verr)
+    }
+    var rid str = assets.asset_rid(operation_id)
+    // 目标父目录先在位（730 commit 不自动建父目录——safe_target_in_root）
+    var incoming str = assets.incoming_abs(rid)
+    // 写者收尾竞态缓解（T-01 实测：极小载荷上新实例 commit 偶发 io_error、
+    // staging 残留 .part——有界等待让 writer Finish 先行；单次，无重试循环。
+    // 实测：裸 void 调用发射缺分号——赋值式自旋替代 sleep_ms）
+    var settle_deadline int = time.now_ms() + 100
+    var spin int = 0
+    while time.now_ms() < settle_deadline {
+        spin = spin + 1
+    }
+    var receipt UploadReceipt = http.upload_commit(session, "incoming/" + assets.asset_file_key(rid))
+    // commit 未落文件 = 发布失败（opaque 收据原样回传：status/kind 即真相——
+    // 403 路径拒/409 冲突/500 io；不冒认成功）
+    if fs.exists(assets.incoming_abs(rid)) == false {
+        return receipt
+    }
+    var res str = assets.finalize_upload(operation_id, note_id_raw, name, mime, kind_declared, source)
+    var okv = json.parse(res)
+    var okb bool = json.get(okv, "ok") == true
+    if okb {
+        return receipt
+    }
+    var code str = json.as_string(json.get(okv, "err_code"))
+    var detail str = json.as_string(json.get(okv, "err_detail"))
+    var st int = 500
+    if code == "request_conflict" {
+        st = 409
+    }
+    if code == "not_found" {
+        st = 404
+    }
+    if code == "invalid_request" {
+        st = 400
+    }
+    if code == "fault_injected" {
+        st = 500
+    }
+    return http.upload_error(st, code + ": " + detail)
+}
+
+/// 路径导入 attach（VM 通道：对话框/剪贴板文件路径经 HTTP 参数入后端）。
+#[api(method = "POST", path = "/api/assets/v1/import")]
+pub fn asset_import(operation_id str, note_id str, path str, name str, kind str, mime str, source str) str {
+    return db.asset_import(operation_id, note_id, path, name, kind, mime, source)
+}
+
+/// clipboard-bin 已选条目 fixture 导入（D-03；版本化 v1，原顺序/选择/来源可核）。
+#[api(method = "POST", path = "/api/assets/v1/clip_import")]
+pub fn asset_clip_import(operation_id str, note_id str, entries_json str, producer str) str {
+    return db.asset_clip_import(operation_id, note_id, entries_json, producer)
+}
+
+/// 附件列表（seq 升序）。
+#[api(method = "POST", path = "/api/assets/v1/list")]
+pub fn asset_list(note_id int) []AssetView {
+    return db.asset_list(note_id)
+}
+
+/// 单条附件投影。
+#[api(method = "POST", path = "/api/assets/v1/get")]
+pub fn asset_get(asset_id str) ?AssetView {
+    return db.asset_get(asset_id)
+}
+
+/// 原件投影（预览：inline + 单区间 Range；双轨同律）。
+#[api(method = "GET", path = "/api/assets/v1/:aid/raw")]
+pub fn asset_raw(aid str) FileResponse {
+    return db.asset_raw(aid)
+}
+
+/// 原件下载（导出：attachment + 原名）。
+#[api(method = "GET", path = "/api/assets/v1/:aid/download")]
+pub fn asset_download(aid str) FileResponse {
+    return db.asset_download(aid)
+}
+
+/// 附件回执查询：committed（原资产集）| not_observed。
+#[api(method = "POST", path = "/api/assets/v1/receipt")]
+pub fn asset_receipt(operation_id str) str {
+    return db.asset_receipt(operation_id)
+}
 
 // ═══════════════════════════════════════════════════════════
 // NOTES-001 v1 端点（T-01/T-02 采证面；测试端点在 T-04 收尾时评估保留）

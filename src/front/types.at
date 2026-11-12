@@ -14,3 +14,17 @@ type Folder {
     name str
     icon str
 }
+
+/// 附件投影（NOTES-002 T-02 快速卡片附件条；镜像 back api.AssetView）。
+type Asset {
+    asset_id str
+    note_id str
+    name str
+    bytes int
+    sha256 str
+    mime str
+    source str
+    seq int
+    raw_url str
+    download_url str
+}

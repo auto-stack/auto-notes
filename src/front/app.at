@@ -22,6 +22,62 @@ use themes.themes: Auto
 style icon_btn = "h-8 w-8 border-0 flex items-center justify-center rounded-md bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
 style primary_btn = "h-9 w-auto border-0 flex items-center gap-1.5 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow-sm hover:bg-primary/90 transition-colors"
 
+// ── 快速卡片行视图（NOTES-002 T-02；view fn 调用点内联——同 NoteRow 律）。
+// 附件行：URL 文本投影 + 图片块形真实预览（下载链接缺口 owner=工具链——
+// link 仅 router `to:` 形）。
+view fn CardAssetRow(a: Asset) {
+    col {
+        style: "items-stretch gap-1 w-full"
+        row {
+            style: "items-center gap-2 px-2 py-1 rounded-md bg-accent/30 w-auto"
+            icon (name: "file", size: 12, style: "text-muted-foreground")
+            text a.name { style: "text-xs text-foreground" }
+            text a.download_url { style: "text-xs text-muted-foreground" }
+        }
+        if a.mime == "image/png" {
+            image {
+                src: a.raw_url
+                alt: a.name
+                fit: "contain"
+                style: "w-full h-32 rounded-md border border-border object-contain"
+            }
+        }
+        if a.mime == "image/jpeg" {
+            image {
+                src: a.raw_url
+                alt: a.name
+                fit: "contain"
+                style: "w-full h-32 rounded-md border border-border object-contain"
+            }
+        }
+        if a.mime == "image/gif" {
+            image {
+                src: a.raw_url
+                alt: a.name
+                fit: "contain"
+                style: "w-full h-32 rounded-md border border-border object-contain"
+            }
+        }
+        if a.mime == "image/webp" {
+            image {
+                src: a.raw_url
+                alt: a.name
+                fit: "contain"
+                style: "w-full h-32 rounded-md border border-border object-contain"
+            }
+        }
+    }
+}
+
+// 最近项行（k = 工作集下标，title 调用点传值——view fn 不反引 .store）。
+view fn CardRecentRow(k: int, title: str) {
+    button {
+        onclick: .CardRecent(k)
+        style: "h-7 w-auto border-0 flex items-center gap-1.5 px-2 rounded-md bg-transparent text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        text title { style: "text-xs" }
+    }
+}
+
 widget App {
     // NOTES-006 T-03：FeaturePack 可嵌入编辑组件（主应用第一消费者）——
     // 目录包形态（reader components 先例）：包内 widget 名并入组件注册表。
@@ -30,7 +86,9 @@ widget App {
     msg { Init, NewNote, ToggleDarkMode, SetMode(str), SetAccent(str), ToggleSettings,
           FpEditDraft(str), FpEditSubmit(str), FpEditRebase,
           FpCreateDraft(str), FpCreateSubmit(str), FpCreateRebase,
-          FpOpenSource }
+          FpOpenSource,
+          CardOpened, CardClosed, CardAssetsReload, CardWidthToggled, CardSortToggled,
+          CardRecent(int) }
 
     model {
         var dark_mode bool = true
@@ -71,6 +129,12 @@ widget App {
                         } else {
                             icon (name: "moon", size: 16)
                         }
+                    }
+                    button {
+                        onclick: .CardOpened
+                        style: "h-8 w-auto border-0 flex items-center gap-1.5 px-2.5 rounded-md bg-transparent text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                        icon (name: "zap", size: 14)
+                        text "Quick card" { style: "text-xs" }
                     }
                     button {
                         onclick: .NewNote
@@ -144,6 +208,90 @@ widget App {
                                   on_draft_edit: .FpCreateDraft,
                                   on_submit_text: .FpCreateSubmit,
                                   on_rebase: .FpCreateRebase) {}
+                }
+                // ── 快速卡片（NOTES-002 T-02）：内联于 App（T-02 实测：组件
+                // 目录单文件生成路径不传播 store deps——R002 store 未定义，
+                // 最小复现 StoreTest 在案；缺口 owner=auto-ui-compiler）。
+                // 同草稿/同七态透传：FpNoteEditor 直接绑 App.FpEdit*——卡片
+                // 与管理页打开同一条 note_id/revision，打开期间并存（双 edit
+                // 实例同源 prop）。关闭不清草稿（重开即恢复）。
+                if .store.card_open {
+                    col {
+                        style: if .store.card_wide { "shrink-0 w-full max-w-2xl gap-2 px-3 py-3 rounded-lg border border-border bg-card shadow-sm items-stretch" } else { "shrink-0 w-full max-w-md gap-2 px-3 py-3 rounded-lg border border-border bg-card shadow-sm items-stretch" }
+
+                        row {
+                            style: "items-center gap-2 w-auto"
+                            icon (name: "zap", size: 14, style: "text-primary")
+                            text "Quick card" { style: "text-xs font-semibold text-primary" }
+                            button {
+                                onclick: .CardWidthToggled
+                                style: "h-6 w-auto border-0 flex items-center gap-1 px-2 rounded-full bg-primary/10 text-xs text-primary font-medium hover:bg-primary/20 transition-colors"
+                                if .store.card_wide {
+                                    text "Narrow" { style: "text-xs" }
+                                } else {
+                                    text "Wide" { style: "text-xs" }
+                                }
+                            }
+                            button {
+                                onclick: .CardSortToggled
+                                style: "h-6 w-auto border-0 flex items-center gap-1 px-2 rounded-full bg-primary/10 text-xs text-primary font-medium hover:bg-primary/20 transition-colors"
+                                if .store.card_sort_title {
+                                    text "Recent" { style: "text-xs" }
+                                } else {
+                                    text "Title" { style: "text-xs" }
+                                }
+                            }
+                            button {
+                                onclick: .CardAssetsReload
+                                style: "h-6 w-auto border-0 flex items-center gap-1 px-2 rounded-full bg-transparent text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                                text "Refresh" { style: "text-xs" }
+                            }
+                            button {
+                                onclick: .CardClosed
+                                style: "h-6 w-6 border-0 flex items-center justify-center rounded-full bg-transparent text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                                text "×" { style: "text-xs" }
+                            }
+                        }
+
+                        FpNoteEditor (mode: "edit", note_label: .store.draft_title,
+                                      draft_text: .store.draft_body,
+                                      save_state: .store.fp_edit_state,
+                                      conflict_revision: .store.fp_edit_conflict_rev,
+                                      server_body: .store.fp_edit_server_body,
+                                      on_draft_edit: .FpEditDraft,
+                                      on_submit_text: .FpEditSubmit,
+                                      on_rebase: .FpEditRebase) {}
+
+                        col {
+                            style: "items-stretch gap-1"
+                            row {
+                                style: "items-center gap-1 w-auto"
+                                icon (name: "paperclip", size: 12, style: "text-muted-foreground")
+                                text "Attachments" { style: "text-xs text-muted-foreground" }
+                            }
+                            if .store.card_assets.len() == 0 {
+                                text "No attachments" { style: "text-xs text-muted-foreground/70" }
+                            }
+                            for a in .store.card_assets {
+                                CardAssetRow(a: a)
+                            }
+                        }
+
+                        col {
+                            style: "items-stretch gap-1"
+                            row {
+                                style: "items-center gap-1 w-auto"
+                                icon (name: "clock", size: 12, style: "text-muted-foreground")
+                                text "Recent" { style: "text-xs text-muted-foreground" }
+                            }
+                            if .store.card_recent.len() == 0 {
+                                text "No recent notes" { style: "text-xs text-muted-foreground/70" }
+                            }
+                            for k in .store.card_recent {
+                                CardRecentRow(k: k, title: .store.notes[k].title)
+                            }
+                        }
+                    }
                 }
                 // ── 来源卡（NOTES-006 r2 来源回访面；T-06 统一出口）────────
                 // 配置与默认值：来源回访仅在 source_status=ok 时可用（冻结
@@ -220,5 +368,12 @@ widget App {
         .FpCreateSubmit(text) -> { store.FpCreateSubmit(text) }
         .FpCreateRebase -> { store.FpCreateRebase() }
         .FpOpenSource -> { store.FpOpenSource() }
+        // ── 快速卡片（NOTES-002 T-02） ──────────────────────────────────
+        .CardOpened -> { store.CardOpened() }
+        .CardClosed -> { store.CardClosed() }
+        .CardAssetsReload -> { store.CardAssetsReload() }
+        .CardWidthToggled -> { store.CardWidthToggled() }
+        .CardSortToggled -> { store.CardSortToggled() }
+        .CardRecent(k) -> { store.SelectNote(k) }
     }
 }
