@@ -158,3 +158,21 @@
 
 path-only 依赖以本表 SHA 固定来源；组件内容变更 = 版本变更
 （package.at 0.1.0 起，破坏性变更须升 interface/pac 版本）。
+
+## 多入口适配消费面（NOTES-003，SD-02：多入口配置、来源事件/打开与 adapter 能力投影）
+
+- 006 冻结组件契约不变（FpNoteEditor props/回调/零网络依赖冻结表照旧）；小组件
+  视图（notes_widget.at）以 props 驱动复用 FpNoteEditor（edit 实例）与 002 附件
+  投影——**组件零改动、零 store 引用**（组件目录单文件生成不传播 store deps，
+  R002 在案）；小组件/快速卡片/管理页按同一 note_id/revision 打开（宿主传同一
+  draft props 三处同源），关闭不清草稿不 flush（重开即恢复）。
+- 多入口来源事件：Launcher 文件交接（entry/v1/launcher/scan）、Scape/Lens/
+  Reader 来源 capture（entry/v1/source/capture）均经 repository.fp_capture
+  提交——**同一冻结来源 schema 与幂等键**（`fp:<principal>:<operation_id>`），
+  与 006 既有 capture 端点语义一致，无新增重复基础协议。来源回访统一出口
+  （fp_host.fp_open_source_payload / fp_source_of_view）原样适用：入口来源
+  经冻结校验 → source_status=ok；残缺/未知版本 → incomplete（明确不可回访）。
+- adapter 能力投影：入口只消费服务真实支持集（来源 7 键闭集、受管原件、
+  授权书 scope），无法协商的能力以 permission_denied/invalid_request 明确
+  不可用，不伪造完整来源或回访能力。
+

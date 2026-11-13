@@ -1,0 +1,8 @@
+{
+  "book_id": "book:reader013",
+  "source_hash": "9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c",
+  "title": "013 版本化阅读书",
+  "author": "Reader",
+  "quote": "013 引文原文",
+  "locator": { "kind": "cfi", "v": 1, "value": "epubcfi(/6/2[cover]!/4/2)" }
+}

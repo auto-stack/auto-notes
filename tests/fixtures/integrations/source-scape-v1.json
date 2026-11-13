@@ -1,0 +1,8 @@
+{
+  "book_id": "book:web",
+  "source_hash": "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5",
+  "title": "Scape 样例网页",
+  "author": "example.com",
+  "quote": "网页选区原文：中文片段",
+  "locator": { "kind": "url", "v": 1, "value": "https://example.com/page/scape" }
+}

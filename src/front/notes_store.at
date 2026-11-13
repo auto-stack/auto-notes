@@ -211,6 +211,9 @@ store NotesStore {
         // （FpEdit* 消息直发），卡片自有状态只覆盖视觉参数与附件投影。
         // card_open=false 时附件列表不承载语义（打开时重载）。
         var card_open bool = false
+        // NOTES-003 T-01：小组件视图开合（复用 card_assets 附件投影；
+        // 关闭不清草稿不 flush——同 CardClosed 律）。
+        var widget_open bool = false
         var card_wide bool = false
         var card_sort_title bool = false
         var card_assets []Asset = []
@@ -228,7 +231,8 @@ store NotesStore {
         BindIntent,
         FpOpenSource,
         ToggleDarkMode, SetMode(str), SetAccent(str), ToggleSettings,
-        CardOpened, CardClosed, CardAssetsReload, CardWidthToggled, CardSortToggled
+        CardOpened, CardClosed, CardAssetsReload, CardWidthToggled, CardSortToggled,
+        WidgetOpened, WidgetClosed
     }
 
     on {
@@ -2396,6 +2400,15 @@ store NotesStore {
         }
         .CardClosed -> {
             .card_open = false
+        }
+        // ── 小组件（NOTES-003 T-01）：开合复用 card_assets 投影与
+        // FpEdit* 链（同一 note_id/revision 三处同源）；关闭不清草稿。
+        .WidgetOpened -> {
+            .widget_open = true
+            .CardAssetsReload()
+        }
+        .WidgetClosed -> {
+            .widget_open = false
         }
         .CardAssetsReload -> {
             if .draft_id != 0 {

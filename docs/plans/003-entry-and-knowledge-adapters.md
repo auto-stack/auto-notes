@@ -1,13 +1,13 @@
 ---
 plan_id: NOTES-003
 title: "Launcher、小组件与知识交接适配"
-status: drafting
+status: execution_done
 feature_name: "Launcher、小组件与知识交接适配"
 author: [Codex]
 created_at: 2026-10-04T00:00:00Z
 updated_at: 2026-11-11
 plan_revision: 3
-current_step: 0
+current_step: 5
 total_steps: 8
 created: 2026-10-04
 base_branch: main
@@ -22,7 +22,7 @@ touched_goals: []
 
 ## 0. 变更摘要
 
-r3按用户2026-11-11指示修订。使用 [006共享服务](006-featurepack-service-and-editor.md) 和 [002附件/卡片](002-quick-card-assets.md)，实现Notes侧多入口适配、知识交接和手写原件模型。当前drafting、0/8。
+r3按用户2026-11-11指示修订。使用 [006共享服务](006-featurepack-service-and-editor.md) 和 [002附件/卡片](002-quick-card-assets.md)，实现Notes侧多入口适配、知识交接和手写原件模型。T-00..T-05 已执行（2026-11-13，execution_done 5/8），T-06/07 待复审/交付。
 
 ## 1. 目标
 
@@ -58,9 +58,35 @@ r2中apps/015-notes与v0.6-dev工作位为历史，当前独立clone/main执行�
 
 ## 5. 详细设计
 
-### D-01 adapter与系统、领域边界
+### D-01 adapter与系统、领域边界（T-00 冻结，见下）
 
 候选新增路径 src/integrations/{launcher,jade,scape,lens,ink}.at、src/back/entry_adapters.at、src/front/components/notes_widget.at，T-00核布局后记录最终路径/导出。已有app/notes_store、api/db/repository为实际消费面。
+
+#### T-00 冻结（2026-11-13 盘点，逐项引证代码行号）
+
+最终路径：**src/integrations/ 不建**（002 T-00 先例，计划原文"候选"折入本仓模块）；Notes 侧入口统一
+**src/back/entry_adapters.at**（新，纯同步服务面，assets.at 同律自持助手），api.at 加端点、db.at 同律委托；
+小组件 **src/front/components/notes_widget.at**（新，props 驱动零 store 引用——组件目录单文件生成不传播
+store deps，R002 在案）；app.at 顶栏按钮开合（复用 .store 既有 FpEdit* 链）；测试
+**tests/basic/verify_entry_knowledge_adapters.py** + **tests/fixtures/integrations/**。
+
+| producer | 消费面（版本锚） | capture 实际方法 | open 实际方法 | export 实际方法 | 回执 | 来源/附件引用 | 不可用结果 |
+|---|---|---|---|---|---|---|---|
+| Launcher（caller harness） | NOTES_HANDOFF_DIR 文件交接，envelope v1 | repository.fp_capture（api.at:470 委托链 fp_capture→db:534→repository:2193；policy 门 cred+scope，repository:1969/2024） | —（open 走既有 note_id/revision） | — | 回执文件 outgoing/<op>.json（status=committed\|rejected） | source_json 冻结 7 键闭集（repository:2062 fp_source_validate） | 半写/错版本/未知 producer→确定 rejected；update 未知 note_id→not_found；过期修订→revision_conflict |
+| Jade | NOTES_EXPORT_DIR 快照包（export_id 映射） | — | repository.repo_get（db.at:420 get_note_r 同源） | 快照导出：note.json/note.md/note.txt/source.json/attachments/*+manifest.json；原件经 assets 受管接口 raw（assets.at:888 asset_raw）+ hash 核（hash.file_sha256） | 返回包 ID + note_id/revision 映射；重复同包保持同映射 | 附件 manifest（asset_id/name/sha256/bytes/mime/seq） | 缺原件/写失败→可重试 err（不留半包）；导出中更新→快照语义 |
+| Scape | source capture 端点 | repository.fp_capture（book_id=web:…） | — | — | fp 原收据 | locator={kind:"url",value}, source_hash=选区 hash | 缺字段/未知版本→fp 冻结校验业务前拒绝 |
+| Lens | source capture + 002 附件 | repository.fp_capture + assets.import_attach（截图原件） | — | — | fp 原收据 + asset receipt | locator={kind:"region",value:<坐标/坐标系/尺寸 JSON>}, 原件 hash | 同上 |
+| Reader（013 fixture） | source capture 端点（canonical locator/source_hash 原样保留） | repository.fp_capture | — | — | fp 原收据 | 013 canonical locator/source_hash（锚字段原样） | 同上；真实链验收归 READER-013 |
+| Ink | ink save/get 端点 | assets.import_attach×2（图像+模型 JSON 文本资产，name=ink-<op>.json、source=ink） | assets.asset_list + fs.read_text(objects/<sha>) | — | asset 收据 | 模型 schema_version/canvas/coords/strokes?/pressure_missing 版本化 | 设备缺席→能力报告明确未验证项 |
+
+- 端点面（api.at 新块，全部 POST body 信封，沿 006 T-02 裁定统一形态）：`/api/entry/v1/launcher/scan`
+  （cred）、`/api/entry/v1/jade/export`（note_id、export_id）、`/api/entry/v1/source/capture`
+  （cred、producer、source_json、text、attachment_path?）、`/api/entry/v1/ink/save`（note_id、
+  operation_id、image_path、image_name、model_json）、`/api/entry/v1/ink/get`（note_id）。
+- 构建纪律：UploadRequest 端点装配检查需 AUTO_ALLOW_PARTIAL_DB=1（沿用 002 实测缺口 owner=工具链）；
+  新增端点全部普通 body 形态，无 UploadRequest 新增依赖。
+- 前端缺口在案：组件目录单文件生成不传播 store deps（R002）——notes_widget 零 store 引用（纯 props
+  驱动，沿 FpNoteEditor 零网络纪律）；VM edit 实例物理输入=006 裁定②边界外（BOUNDARY 引用不计退出码）。
 
 T-00产出接口映射表，列producer/version、capture/open/export的实际服务方法、允许类型、operation映射、回执、来源和附件引用、不可用结果。capture经006/002实际API提交，open使用已有note_id/revision，export从已提交修订生成一致快照。adapter能力响应投影系统与服务真实支持集，记录包/接口版本及三仓SHA，无法协商的能力明确不可用。
 
@@ -124,16 +150,16 @@ InkAsset保存原始手写图像（走002附件）及版本化坐标/画布/可�
 
 ## 8. 执行步骤
 
-全部未执行。原T-00～04功能归属保留，新增验证/复审/交付阶段。T-00接口核查可先做，后续写入依赖006/002实际交付；实现/内检/复审同clone顺序执行。
+T-00..T-05 已执行（2026-11-13，见 §9 work 回执）；T-06 review / T-07 merge 待续。
 
 | ID | owner_stage | 依赖 | 真实改面与动作 | 关闭产出/验证 | AC |
 |---|---|---|---|---|---|
-| T-00 | work | 无；接口核查可先做 | 核api/db/repository、006组件、002附件、系统能力，冻结D-01方法映射、收发/导出/Ink资源边界及新路径 | 完整样例/字段/错误/调用图，外仓存在性与缺口明确；不重复实现基础服务 | AC-01～06 |
-| T-01 | work | T-00、006/002交付 | 建launcher adapter与notes_widget（拟），复用共享卡片；caller harness实际文件交接→服务提交→回执 | I-01/02有效/失败对照和同ID导航 | AC-01/02/06 |
-| T-02 | work | T-01 | 建jade adapter（拟），一致修订导出包/原件manifest/收据映射，receiver stub | I-03并发更新/缺文件/重复投递均符合D-03 | AC-03/06 |
-| T-03 | work | T-02 | 建scape/lens adapters（拟），接网页/区域/Reader既定来源fixture，调用006/002保存 | I-04逐字来源/locator比对；报告Reader实际集成引用与fixture界限 | AC-04/06 |
-| T-04 | work | T-03 | 建ink模型adapter（拟），保存图像/坐标/stroke，输出真实设备和运行时能力报告 | I-05图像/模型可逆，未具备设备与功能范围明确 | AC-05 |
-| T-05 | work | T-04 | 建verify_entry_knowledge_adapters.py，双端跑I-01～06和006/002受影响回归，写SD-01～03 | 必需case无skip，三层证据及固定版本清单可查 | AC-01～06 |
+| T-00 | work | 无；接口核查可先做 | [x] 核api/db/repository、006组件、002附件、系统能力，冻结D-01方法映射、收发/导出/Ink资源边界及新路径。[✅ 已完成] 盘点闭合：006 fp 面（capture/get/list/update/receipt/draft/source，api.at:461-547）+ 002 附件面（upload/import/clip_import/list/get/raw/download/receipt，assets.at 全文件）+ repository 单写者核心（fp_capture:2193/fp_update:2352/fp_get:2267/回执:2427/来源校验:2062）+ 前端既有 FpEdit* 链（app.at:81-379）+ 构建纪律（AGENTS.md debug 快环；AUTO_ALLOW_PARTIAL_DB=1）；冻结结论=D-01 映射表（producer×方法×回执×不可用结果）+ 最终路径（entry_adapters.at / notes_widget.at / verify_entry_knowledge_adapters.py + fixtures/integrations）+ 端点面（launcher/scan、jade/export、source/capture、ink/save、ink/get）+ 边界（widget 零 store 引用；VM edit 物理输入=裁定②） | 完整样例/字段/错误/调用图，外仓存在性与缺口明确；不重复实现基础服务 | AC-01～06 |
+| T-01 | work | T-00、006/002交付 | [x] 建launcher adapter与notes_widget，复用共享卡片；caller harness实际文件交接→服务提交→回执。[✅ 已完成] entry_adapters.at（envelope v1 校验+scan 提交/回执/删源，重启重放幂等）+ /api/entry/v1/launcher/scan；notes_widget.at（props 驱动，内部消息透传载荷）+ app.at 开合 + store WidgetOpened/Closed。S-01 I-01 全负例+重启重放、V-01..11 I-02 全过 | I-01/02有效/失败对照和同ID导航 | AC-01/02/06 |
+| T-02 | work | T-01 | [x] 建jade adapter，一致修订导出包/原件manifest/收据映射，receiver stub。[✅ 已完成] jade_export_package（note.json/note.md/note.txt/source.json/attachments/*+manifest 最后写；同 export_id 同映射；asset_missing/request_conflict 确定结果）+ /api/entry/v1/jade/export；S-02 逐项核（Unicode/Markdown/多附件 hash/manifest/固定 SHA/可重试收敛） | I-03并发更新/缺文件/重复投递均符合D-03 | AC-03/06 |
+| T-03 | work | T-02 | [x] 建scape/lens adapters，接网页/区域/Reader既定来源fixture，调用006/002保存。[✅ 已完成] source_capture（producer 注册表 scape|lens|reader；fp_capture 冻结校验 + lens 截图 002 附件）+ /api/entry/v1/source/capture；fixtures/integrations 四样例；S-03 逐字/locator/原件 hash 比对+重复幂等+拒绝面 | I-04逐字来源/locator比对；报告Reader实际集成引用与fixture界限 | AC-04/06 |
+| T-04 | work | T-03 | [x] 建ink模型adapter，保存图像/坐标/stroke，输出真实设备和运行时能力报告。[✅ 已完成] ink_save/ink_get（图像+模型 JSON 文本资产 ink-<op>.json，round-trip 逐字，pressure_missing 保留）+ /api/entry/v1/ink/save|get；S-04 round-trip+能力报告（Windows 平台、硬件 absent/unverified 如实输出） | I-05图像/模型可逆，未具备设备与功能范围明确 | AC-05 |
+| T-05 | work | T-04 | [x] 建verify_entry_knowledge_adapters.py，双端跑I-01～06和006/002受影响回归，写SD-01～03。[✅ 已完成] 电池 service 50/0/0、vue 63/0/0（必需 case 无 skip）；受影响回归 002 svc 49/0/0 · 002 vue 70/0/0 · 002 vm 61/0/1B · 006 svc 67/0/0 · 006 editor vue 29/0/0 · 006 editor vm 18/0/0；SD-01=entry-and-knowledge-adapters.md（新）、SD-02=featurepack 多入口消费节、SD-03=quick-card 导出消费节 | 必需case无skip，三层证据及固定版本清单可查 | AC-01～06 |
 | T-06 | review | T-05 | 同clone独立上下文核高风险交接/快照/来源/实例与完整work AC | 绑定精确commit/revision，明确pass或修复项 | AC-07 |
 | T-07 | merge | T-06 pass | main精确交付、规范与导航核对、归档及自有清理 | 交付SHA/接收仓适配合同和真实联动未结项 | AC-08 |
 
@@ -146,6 +172,8 @@ InkAsset保存原始手写图像（走002附件）及版本化坐标/画布/可�
 [产品设计](../design/01-product-design.md) · [006](006-featurepack-service-and-editor.md) · [002](002-quick-card-assets.md) · [Reader013](../../../auto-reader/docs/plans/013-notes-featurepack-host.md)
 
 2026-11-11 文档核查通过。两份计划均为r3/drafting、0/8，0～10节完整，任务与AC各8项且ID唯一，相对链接全部可解析，006→002→003依赖方向正确，diff --check通过。该记录仅为计划自检，产品测试与独立终审尚未执行。
+
+2026-11-13 · stage: work | plan_id: NOTES-003 | plan_revision: 3 | outcome: pass（execution_done；T-00..T-05 闭合） | worktree: D:/autostack/auto-notes（独立 clone，main——本仓惯例=实施树即 main，无 dev worktree） | branch: main | base_commit: cb8c8f8（002 归档态） | code_commit: 本回执提交（T-00..T-05 实现+电池+SD 稿） | dependency_revisions: auto CLI 0.1.0（auto-man debug）+ 006 归档态（featurepack-service-and-editor.md）+ 002 归档态（quick-card-assets.md）· 后端 debug 构建于 rust-workspace（AUTO_ALLOW_PARTIAL_DB=1 装配） | task_ids: T-00、T-01、T-02、T-03、T-04、T-05 | evidence: ①本仓电池 verify_entry_knowledge_adapters.py——service **50 PASS/0 FAIL**（S-01..05：Launcher 文件交接全负例+重启重放库行独立核验 / Jade 快照 Unicode+Markdown+多附件 hash+固定 SHA+可重试收敛 / scape·lens·reader 来源逐字保真+重复幂等+拒绝面 / Ink round-trip 逐字+pressure 保留 / 收窄拒绝+006-002 兼容）、vue **63 PASS/0 FAIL**（S 段 + V-01..11：小组件/卡片/管理页同 note、中文真实键入提交、外部更新冲突→Rebase 保输入、关闭回主应用、关闭保脏稿、零页面错误）②受影响回归——002 svc **49/0/0** · 002 vue **70/0/0** · 002 vm **61/0/1B**（M-B-01 引用裁定②）· 006 svc **67/0/0** · 006 editor vue **29/0/0** · 006 editor vm **18/0/0**（首轮 5 项与 vm 6 项失败均为并发进程干扰瞬态，重跑全绿）③SD-01..03 沉淀：docs/specs/notes/entry-and-knowledge-adapters.md（新增）+ featurepack-service-and-editor.md / quick-card-assets.md 共存节 ④原始材料 D:/autostack/plan-artifacts/plan-003/（smoke-probe 开发期探针 + 电池运行日志，merge 收口折叠） | blockers: 无（生成器跨模块 &str 转换缺口已包装规避并记录 owner=工具链） | next_responsible_role: review（T-06 独立上下文复审）
 
 ## 10. 待澄清事项
 

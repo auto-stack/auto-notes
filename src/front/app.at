@@ -88,7 +88,8 @@ widget App {
           FpCreateDraft(str), FpCreateSubmit(str), FpCreateRebase,
           FpOpenSource,
           CardOpened, CardClosed, CardAssetsReload, CardWidthToggled, CardSortToggled,
-          CardRecent(int) }
+          CardRecent(int),
+          WidgetOpened, WidgetClosed }
 
     model {
         var dark_mode bool = true
@@ -135,6 +136,12 @@ widget App {
                         style: "h-8 w-auto border-0 flex items-center gap-1.5 px-2.5 rounded-md bg-transparent text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                         icon (name: "zap", size: 14)
                         text "Quick card" { style: "text-xs" }
+                    }
+                    button {
+                        onclick: .WidgetOpened
+                        style: "h-8 w-auto border-0 flex items-center gap-1.5 px-2.5 rounded-md bg-transparent text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                        icon (name: "widgets", size: 14)
+                        text "Notes widget" { style: "text-xs" }
                     }
                     button {
                         onclick: .NewNote
@@ -293,6 +300,21 @@ widget App {
                         }
                     }
                 }
+                // ── 小组件（NOTES-003 T-01）：props 驱动组件（notes_widget.at）
+                // 零 store 引用；宿主传同一 draft props（与主编辑器/快速卡片
+                // 三处同源——同 note_id/revision）。关闭不清草稿（重开即恢复）。
+                if .store.widget_open {
+                    NotesWidget (note_label: .store.draft_title,
+                                 draft_text: .store.draft_body,
+                                 save_state: .store.fp_edit_state,
+                                 conflict_revision: .store.fp_edit_conflict_rev,
+                                 server_body: .store.fp_edit_server_body,
+                                 assets: .store.card_assets,
+                                 on_draft_edit: .FpEditDraft,
+                                 on_submit_text: .FpEditSubmit,
+                                 on_rebase: .FpEditRebase,
+                                 on_close: .WidgetClosed) {}
+                }
                 // ── 来源卡（NOTES-006 r2 来源回访面；T-06 统一出口）────────
                 // 配置与默认值：来源回访仅在 source_status=ok 时可用（冻结
                 // 校验过的来源）；incomplete 显示「来源不完整」且回访入口
@@ -375,5 +397,8 @@ widget App {
         .CardWidthToggled -> { store.CardWidthToggled() }
         .CardSortToggled -> { store.CardSortToggled() }
         .CardRecent(k) -> { store.SelectNote(k) }
+        // ── 小组件（NOTES-003 T-01） ────────────────────────────────────
+        .WidgetOpened -> { store.WidgetOpened() }
+        .WidgetClosed -> { store.WidgetClosed() }
     }
 }

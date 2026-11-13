@@ -1,0 +1,694 @@
+// src/back/entry_adapters.at — Notes 侧多入口适配（NOTES-003 T-01..T-04）。
+//
+// 职责（D-01 T-00 冻结映射）：
+//   * Launcher 文件交接（T-01/D-02）：caller harness 写版本化 envelope 至
+//     NOTES_HANDOFF_DIR/incoming/<op>.json；`launcher_scan` 逐文件读/验 → 经
+//     repository.fp_capture/fp_update 提交（006 共享服务）→ 回执文件写
+//     outgoing/<op>.json（status=committed|rejected）→ 删 incoming。半写/
+//     错版本/未知 producer/未知 note_id/过期修订均有确定 rejected 回执；
+//     重启同包重放经 fp 幂等（replayed:true，同 note 不重复）。
+//   * Jade 导出快照（T-02/D-03）：已提交修订 → note.json/note.md/note.txt/
+//     source.json/attachments/* + manifest.json（NOTES_EXPORT_DIR/<export_id>/）；
+//     原件经 assets 受管接口（objects/<sha256>）读取并 hash 核验；缺原件/
+//     写失败保留可重试状态（manifest 最后写=完整性标记）；同 export_id 重投
+//     同 note/revision 保持同映射（不重写）。
+//   * 来源 capture（T-03/D-04）：producer ∈ scape|lens|reader → source_json
+//     经 repository.fp_capture 冻结校验入库（Reader 用 013 canonical
+//     locator/source_hash 原样保留）；lens 截图原件经 assets.import_attach。
+//   * Ink（T-04/D-04）：图像+版本化模型 JSON 文本资产（name=ink-<op>.json、
+//     source=ink）经 assets.import_attach 入 002；ink_get 读回 round-trip
+//     （pressure_missing 原样保留）。设备/运行时能力报告由测试探针输出。
+//
+// 隔离纪律：repository.at / db.at / assets.at 零改动；助手为自持副本
+// （assets.at 同律）；schema 零新增——全部复用 006/002 既有表与意图。
+// 语法注（沿用 assets.at T-01 实测）：fs/hash 走裸内建限定路径；str 参数
+// 不可重赋值（派生值落本地变量）；非 ASCII 字符串一律避免索引数学
+// （检测走 replace 差分）。生成器注（T-00 实测）：跨模块用户函数调用对
+// 本地变量/调用表达式不做 &str 转换——跨模块调用一律收进同模块包装函数
+// （参数直传 &str 天然合法），主逻辑只调同模块函数（本地变量 .as_str()
+// 转换可靠）。
+
+use auto.env
+use auto.json
+
+use repository
+use assets
+use api: AssetView
+
+// ═══════════════════════════════════════════════════════════
+// 跨模块包装（唯一跨模块调用面——参数直传，回避生成器转换缺口）
+// ═══════════════════════════════════════════════════════════
+
+fn repo_nid_of(id int) str {
+    return repository.nid_of(id)
+}
+
+fn repo_get_doc(nid str) str {
+    return repository.repo_get(nid)
+}
+
+fn repo_fp_capture(cred str, op str, src str, text str) str {
+    return repository.fp_capture(cred, op, src, text)
+}
+
+fn repo_fp_update(cred str, nid str, rev int, text str, op str) str {
+    return repository.fp_update(cred, nid, rev, text, op)
+}
+
+fn repo_fp_source_of_view(nid str) str {
+    return repository.fp_source_of_view(nid)
+}
+
+fn assets_list_for(nid int) List<AssetView> {
+    return assets.asset_list(nid)
+}
+
+fn assets_import_for(op str, nid str, path str, name str, kind str, mime str, src str) str {
+    return assets.import_attach(op, nid, path, name, kind, mime, src)
+}
+
+// ═══════════════════════════════════════════════════════════
+// 本地助手（repository/assets.at 同语义自持副本——避免动共享文件）
+// ═══════════════════════════════════════════════════════════
+
+fn parse_int(s str) int {
+    var r int = 0
+    var i int = 0
+    var n int = s.len()
+    while i < n {
+        var c int = s.char_at(i)
+        if c < 48 {
+            return r
+        }
+        if c > 57 {
+            return r
+        }
+        r = r * 10 + (c - 48)
+        i = i + 1
+    }
+    return r
+}
+
+/// operation_id/export_id 校验：非空、≤100、仅 [A-Za-z0-9._:-]（同律）。
+fn valid_rid(rid str) bool {
+    var n int = rid.len()
+    if n < 1 {
+        return false
+    }
+    if n > 100 {
+        return false
+    }
+    var i int = 0
+    while i < n {
+        var c int = rid.char_at(i)
+        var ok bool = false
+        if c >= 48 {
+            if c <= 57 {
+                ok = true
+            }
+        }
+        if c >= 65 {
+            if c <= 90 {
+                ok = true
+            }
+        }
+        if c >= 97 {
+            if c <= 122 {
+                ok = true
+            }
+        }
+        if c == 46 {
+            ok = true
+        }
+        if c == 95 {
+            ok = true
+        }
+        if c == 45 {
+            ok = true
+        }
+        if c == 58 {
+            ok = true
+        }
+        if ok == false {
+            return false
+        }
+        i = i + 1
+    }
+    return true
+}
+
+/// 十进制整数字面量 → "n-<k>"（同 assets.note_param_to_nid）。
+fn note_param_to_nid(raw str) str {
+    if raw == "" {
+        return ""
+    }
+    var idv int = parse_int(raw)
+    if idv < 1 {
+        return ""
+    }
+    var s str = json.encode(idv)
+    if s != raw {
+        return ""
+    }
+    return "n-" + s
+}
+
+fn env_or(key str, dflt str) str {
+    var v str = env.get(key)
+    if v == "" {
+        return dflt
+    }
+    return v
+}
+
+fn err_envelope(code str, detail str) str {
+    var s str = "{\"ok\":false,\"err_code\":\"" + code + "\""
+    if detail != "" {
+        s = s + ",\"err_detail\":" + json.encode(detail)
+    }
+    s = s + "}"
+    return s
+}
+
+/// 拉链名称净化（Windows 非法路径字符 → '-'；replace 差分，无索引数学）。
+fn export_file_name(name str) str {
+    var s str = name
+    s = s.replace(":", "-")
+    s = s.replace("?", "-")
+    s = s.replace("*", "-")
+    s = s.replace("\"", "-")
+    s = s.replace("<", "-")
+    s = s.replace(">", "-")
+    s = s.replace("|", "-")
+    return s
+}
+
+/// 扩展名 → MIME（contains 差分；未知 → octet-stream）。
+fn mime_of(name str) str {
+    if name.replace(".png", "") != name {
+        return "image/png"
+    }
+    if name.replace(".jpg", "") != name {
+        return "image/jpeg"
+    }
+    if name.replace(".jpeg", "") != name {
+        return "image/jpeg"
+    }
+    if name.replace(".gif", "") != name {
+        return "image/gif"
+    }
+    if name.replace(".webp", "") != name {
+        return "image/webp"
+    }
+    return "application/octet-stream"
+}
+
+// ═══════════════════════════════════════════════════════════
+// Launcher 文件交接（T-01/D-02）
+// ═══════════════════════════════════════════════════════════
+
+fn handoff_root() str {
+    var r str = env_or("NOTES_HANDOFF_DIR", "")
+    if r == "" {
+        r = repository.data_dir() + "/handoff"
+    }
+    fs.mkdir_all(r)
+    return r
+}
+
+fn handoff_incoming() str {
+    var d str = handoff_root() + "/incoming"
+    fs.mkdir_all(d)
+    return d
+}
+
+fn handoff_outgoing() str {
+    var d str = handoff_root() + "/outgoing"
+    fs.mkdir_all(d)
+    return d
+}
+
+fn export_root() str {
+    var r str = env_or("NOTES_EXPORT_DIR", "")
+    if r == "" {
+        r = repository.data_dir() + "/exports"
+    }
+    fs.mkdir_all(r)
+    return r
+}
+
+/// 回执 JSON（outgoing/<op>.json 形态）。
+fn launcher_receipt_json(op str, status str, note_id str, revision int, err_code str, err_detail str, replayed bool, receipt_json str) str {
+    var s str = "{\"schema_version\":1,\"operation_id\":" + json.encode(op)
+    s = s + ",\"status\":\"" + status + "\""
+    if note_id != "" {
+        s = s + ",\"note_id\":" + json.encode(note_id)
+    }
+    if revision > 0 {
+        s = s + ",\"revision\":" + json.encode(revision)
+    }
+    if err_code != "" {
+        s = s + ",\"err_code\":" + json.encode(err_code)
+    }
+    if err_detail != "" {
+        s = s + ",\"err_detail\":" + json.encode(err_detail)
+    }
+    if replayed {
+        s = s + ",\"replayed\":true"
+    }
+    if receipt_json != "" {
+        s = s + ",\"receipt\":" + receipt_json
+    }
+    s = s + "}"
+    return s
+}
+
+/// envelope v1 校验（半写/错版本/未知 producer/名不匹配/缺字段均返回
+/// err_detail；source 冻结 schema 由 repository.fp_capture 权威校验）。
+fn envelope_check(raw str, want_stem str) str {
+    if raw == "" {
+        return "empty envelope file (half-written)"
+    }
+    var env = json.parse(raw)
+    if env == json.parse("null") {
+        return "unparseable envelope JSON (half-written)"
+    }
+    var sv int = json.as_int(json.get(env, "schema_version"))
+    if sv != 1 {
+        return "unsupported envelope schema_version (expected 1)"
+    }
+    var prod str = json.as_string(json.get(env, "producer"))
+    if prod != "launcher" {
+        return "permission_denied: unknown producer (authorized: launcher)"
+    }
+    var pv str = json.as_string(json.get(env, "producer_version"))
+    if pv == "" {
+        return "producer_version required"
+    }
+    var op str = json.as_string(json.get(env, "operation_id"))
+    if op == "" {
+        return "operation_id required"
+    }
+    if valid_rid(op) == false {
+        return "operation_id must match [A-Za-z0-9._:-] (1..=100)"
+    }
+    if op + ".json" != want_stem + ".json" {
+        return "file name does not match envelope operation_id"
+    }
+    var intent str = json.as_string(json.get(env, "intent"))
+    if intent != "capture" {
+        if intent != "update" {
+            return "intent must be capture|update"
+        }
+    }
+    var text str = json.as_string(json.get(env, "text"))
+    if text.len() < 1 {
+        return "text required (1..=16384)"
+    }
+    if text.len() > 16384 {
+        return "text length out of 1..=16384"
+    }
+    if intent == "capture" {
+        if json.encode(json.get(env, "source")) == "null" {
+            return "source required for capture"
+        }
+    }
+    if intent == "update" {
+        var nid_raw str = json.as_string(json.get(env, "note_id"))
+        if nid_raw == "" {
+            return "note_id required for update"
+        }
+        if note_param_to_nid(nid_raw) == "" {
+            return "note_id must be a positive integer id"
+        }
+        if json.encode(json.get(env, "expected_revision")) == "null" {
+            return "expected_revision required for update"
+        }
+        if json.as_int(json.get(env, "expected_revision")) < 1 {
+            return "expected_revision must be >= 1"
+        }
+    }
+    return ""
+}
+
+/// 单包提交（参数直传包装后的跨模块调用；返回回执 JSON 串）。capture →
+/// fp_capture（冻结来源校验/幂等）；update → fp_update（条件修订）。
+fn launcher_submit(cred str, op str, intent str, text str, src str, nid str, rev int) str {
+    var res str = ""
+    if intent == "capture" {
+        res = repo_fp_capture(cred, op, src, text)
+    } else {
+        res = repo_fp_update(cred, nid, rev, text, op)
+    }
+    var okv = json.parse(res)
+    var okb bool = json.get(okv, "ok") == true
+    if okb {
+        var rc = json.get(okv, "receipt")
+        var r_note str = json.as_string(json.get(rc, "note_id"))
+        var r_rev int = json.as_int(json.get(rc, "revision"))
+        var rp bool = json.get(okv, "replayed") == true
+        var rc_json str = json.encode(rc)
+        return launcher_receipt_json(op, "committed", r_note, r_rev, "", "", rp, rc_json)
+    }
+    var code str = json.as_string(json.get(okv, "err_code"))
+    var detail str = json.as_string(json.get(okv, "err_detail"))
+    return launcher_receipt_json(op, "rejected", "", 0, code, detail, false, "")
+}
+
+/// 扫描 incoming/：逐文件读/验/提交/写回执/删源。HTTP 触发（如 cron tick）——
+/// 文件交接本身为真实进程/文件介质（caller harness 写、adapter 读、回执落盘）。
+pub fn launcher_scan(cred str) str {
+    var inc str = handoff_incoming()
+    var names List<str> = fs.dir_names(inc)
+    var processed int = 0
+    var committed int = 0
+    var rejected int = 0
+    var n int = names.len()
+    var i int = 0
+    while i < n {
+        var name str = names[i]
+        if name.replace(".json", "") != name {
+            var stem str = name.replace(".json", "")
+            var raw str = fs.read_text(inc + "/" + name)
+            var verr str = envelope_check(raw, stem)
+            if verr != "" {
+                var rec str = launcher_receipt_json(stem, "rejected", "", 0, "invalid_request", verr, false, "")
+                fs.write_text(handoff_outgoing() + "/" + stem + ".json", rec)
+                fs.delete(inc + "/" + name)
+                rejected = rejected + 1
+                processed = processed + 1
+            } else {
+                var env = json.parse(raw)
+                var intent str = json.as_string(json.get(env, "intent"))
+                var text str = json.as_string(json.get(env, "text"))
+                var src str = ""
+                var nid str = ""
+                var rev int = 0
+                if intent == "capture" {
+                    src = json.encode(json.get(env, "source"))
+                } else {
+                    var nid_raw str = json.as_string(json.get(env, "note_id"))
+                    nid = note_param_to_nid(nid_raw)
+                    rev = json.as_int(json.get(env, "expected_revision"))
+                }
+                var rec2 str = launcher_submit(cred, stem, intent, text, src, nid, rev)
+                fs.write_text(handoff_outgoing() + "/" + stem + ".json", rec2)
+                if json.as_string(json.get(json.parse(rec2), "status")) == "committed" {
+                    committed = committed + 1
+                } else {
+                    rejected = rejected + 1
+                }
+                fs.delete(inc + "/" + name)
+                processed = processed + 1
+            }
+        }
+        i = i + 1
+    }
+    var out str = "{\"ok\":true,\"processed\":" + json.encode(processed)
+    out = out + ",\"committed\":" + json.encode(committed) + ",\"rejected\":" + json.encode(rejected) + "}"
+    return out
+}
+
+// ═══════════════════════════════════════════════════════════
+// Jade 导出快照（T-02/D-03）
+// ═══════════════════════════════════════════════════════════
+
+fn export_ok_envelope(export_id str, note_id int, revision int, pkg str, replayed bool) str {
+    var rp str = "false"
+    if replayed {
+        rp = "true"
+    }
+    var s str = "{\"ok\":true,\"err_code\":\"\",\"export_id\":" + json.encode(export_id)
+    s = s + ",\"note_id\":" + json.encode(note_id) + ",\"revision\":" + json.encode(revision)
+    s = s + ",\"package_dir\":" + json.encode(pkg) + ",\"manifest\":\"manifest.json\""
+    s = s + ",\"replayed\":" + rp + "}"
+    return s
+}
+
+/// 附件条 manifest 项（file = 净化文件名，供接收端定位原件）。
+fn manifest_att_json(a AssetView, fname str) str {
+    var s str = "{\"asset_id\":" + json.encode(a.asset_id)
+    s = s + ",\"name\":" + json.encode(a.name)
+    s = s + ",\"file\":" + json.encode(fname)
+    s = s + ",\"sha256\":" + json.encode(a.sha256)
+    s = s + ",\"bytes\":" + json.encode(a.bytes)
+    s = s + ",\"mime\":" + json.encode(a.mime)
+    s = s + ",\"seq\":" + json.encode(a.seq) + "}"
+    return s
+}
+
+/// 快照导出：固定 note_id/revision/export_id → 同映射；缺原件/写失败 →
+/// 可重试 err（无 manifest = 未完成，重试收敛）；manifest 最后写。
+pub fn jade_export_package(note_id int, export_id str) str {
+    if valid_rid(export_id) == false {
+        return err_envelope("invalid_request", "export_id must match [A-Za-z0-9._:-] (1..=100)")
+    }
+    if note_id < 1 {
+        return err_envelope("invalid_request", "note_id must be a positive integer id")
+    }
+    var nid str = repo_nid_of(note_id)
+    var docjs str = repo_get_doc(nid)
+    if docjs == "" {
+        return err_envelope("not_found", "note not found")
+    }
+    var doc = json.parse(docjs)
+    var revision int = json.as_int(json.get(doc, "revision"))
+    var title str = json.as_string(json.get(doc, "title"))
+    var body str = json.as_string(json.get(doc, "body"))
+    var pkg str = export_root() + "/" + export_id
+    fs.mkdir_all(pkg + "/attachments")
+    var man_path str = pkg + "/manifest.json"
+    if fs.exists(man_path) {
+        var man = json.parse(fs.read_text(man_path))
+        if json.as_int(json.get(man, "note_id")) == note_id {
+            if json.as_int(json.get(man, "revision")) == revision {
+                return export_ok_envelope(export_id, note_id, revision, pkg, true)
+            }
+        }
+        return err_envelope("request_conflict", "export_id already used for a different note/revision")
+    }
+    // 附件原件（002 受管接口读取 + hash 核验；缺原件/失配 = 可重试 err）
+    var att_list List<AssetView> = assets_list_for(note_id)
+    var att_json str = "["
+    var att_count int = 0
+    var k int = 0
+    var an int = att_list.len()
+    while k < an {
+        var a AssetView = att_list[k]
+        var obj str = assets.assets_root() + "/objects/" + a.sha256
+        if fs.exists(obj) == false {
+            return err_envelope("asset_missing", "original missing for " + a.asset_id)
+        }
+        var fname str = json.encode(a.seq) + "-" + export_file_name(a.name)
+        var dst str = pkg + "/attachments/" + fname
+        if fs.exists(dst) == false {
+            var cp bool = fs.copy_recursive(obj, dst)
+            if cp == false {
+                return err_envelope("storage_unwritable", "attachment copy failed for " + a.asset_id)
+            }
+        }
+        var h str = hash.file_sha256(dst)
+        if h != a.sha256 {
+            return err_envelope("asset_missing", "attachment hash mismatch for " + a.asset_id)
+        }
+        if att_count > 0 {
+            att_json = att_json + ","
+        }
+        att_json = att_json + manifest_att_json(a, fname)
+        att_count = att_count + 1
+        k = k + 1
+    }
+    att_json = att_json + "]"
+    // 快照文件（note.json 原样已提交文档；正文更新期间输出读取时点快照）
+    var wn int = fs.write_text(pkg + "/note.json", docjs)
+    if wn < 0 {
+        return err_envelope("storage_unwritable", "note.json write failed")
+    }
+    var wm int = fs.write_text(pkg + "/note.md", "# " + title + "\n\n" + body)
+    if wm < 0 {
+        return err_envelope("storage_unwritable", "note.md write failed")
+    }
+    var wt int = fs.write_text(pkg + "/note.txt", body)
+    if wt < 0 {
+        return err_envelope("storage_unwritable", "note.txt write failed")
+    }
+    var src_view str = repo_fp_source_of_view(nid)
+    var sv = json.parse(src_view)
+    var src_raw str = json.as_string(json.get(sv, "source_json"))
+    var src_text str = "null"
+    if src_raw != "" {
+        src_text = src_raw
+    }
+    var ws int = fs.write_text(pkg + "/source.json", src_text)
+    if ws < 0 {
+        return err_envelope("storage_unwritable", "source.json write failed")
+    }
+    // manifest 最后写（完整性标记）
+    var man_json str = "{\"schema_version\":1,\"export_id\":" + json.encode(export_id)
+    man_json = man_json + ",\"note_id\":" + json.encode(note_id) + ",\"revision\":" + json.encode(revision)
+    man_json = man_json + ",\"producer\":\"jade\",\"source\":" + src_text + ",\"attachments\":" + att_json + "}"
+    var wman int = fs.write_text(man_path, man_json)
+    if wman < 0 {
+        return err_envelope("storage_unwritable", "manifest write failed (retry same export_id)")
+    }
+    return export_ok_envelope(export_id, note_id, revision, pkg, false)
+}
+
+// ═══════════════════════════════════════════════════════════
+// 来源 capture（T-03/D-04：scape 网页 / lens 截图区域 / reader 013 fixture）
+// ═══════════════════════════════════════════════════════════
+
+/// producer 注册表：scape|lens|reader（未知 producer 确定拒绝）。
+/// source_json 冻结 schema 校验由 repository.fp_capture 权威执行（业务前
+/// 拒绝、零写入）；lens 截图原件经 assets.import_attach 入 002。
+pub fn source_capture(cred str, producer str, operation_id str, source_json str, text str, attachment_path str, attachment_name str) str {
+    if producer != "scape" {
+        if producer != "lens" {
+            if producer != "reader" {
+                return err_envelope("permission_denied", "unknown producer (authorized: scape|lens|reader)")
+            }
+        }
+    }
+    if valid_rid(operation_id) == false {
+        return err_envelope("invalid_request", "operation_id must match [A-Za-z0-9._:-] (1..=100)")
+    }
+    var res str = repo_fp_capture(cred, operation_id, source_json, text)
+    var okv = json.parse(res)
+    var okb bool = json.get(okv, "ok") == true
+    if okb == false {
+        return res
+    }
+    var rc = json.get(okv, "receipt")
+    var r_note str = json.as_string(json.get(rc, "note_id"))
+    if producer == "lens" {
+        if attachment_path == "" {
+            return err_envelope("invalid_request", "lens capture requires attachment_path")
+        }
+        if attachment_name == "" {
+            return err_envelope("invalid_request", "lens capture requires attachment_name")
+        }
+        var nid_raw str = r_note.replace("n-", "")
+        var shot_op str = operation_id + ".shot"
+        var img_mime str = mime_of(attachment_name)
+        var ares str = assets_import_for(shot_op, nid_raw, attachment_path, attachment_name, "image", img_mime, "lens")
+        var aokv = json.parse(ares)
+        var aokb bool = json.get(aokv, "ok") == true
+        if aokb == false {
+            return ares
+        }
+        var note_json str = json.encode(json.get(okv, "note"))
+        var rc_json str = json.encode(rc)
+        var rp_json str = json.encode(json.get(okv, "replayed"))
+        var att_json str = json.encode(json.get(aokv, "assets"))
+        var s str = "{\"ok\":true,\"err_code\":\"\",\"note\":" + note_json
+        s = s + ",\"receipt\":" + rc_json + ",\"replayed\":" + rp_json
+        s = s + ",\"attachment\":" + att_json + "}"
+        return s
+    }
+    return res
+}
+
+// ═══════════════════════════════════════════════════════════
+// Ink（T-04/D-04：图像原件 + 版本化模型 JSON 文本资产）
+// ═══════════════════════════════════════════════════════════
+
+/// 保存：图像走 002 附件（source=ink）；模型 JSON 文本资产
+/// （name=ink-<op>.json, source=ink）同 note 第二附件。pressure_missing/
+/// 坐标等模型内容逐字保留（round-trip 由 ink_get 核验）。
+pub fn ink_save(note_id int, operation_id str, image_path str, image_name str, model_json str) str {
+    if valid_rid(operation_id) == false {
+        return err_envelope("invalid_request", "operation_id must match [A-Za-z0-9._:-] (1..=100)")
+    }
+    if note_id < 1 {
+        return err_envelope("invalid_request", "note_id must be a positive integer id")
+    }
+    if fs.exists(image_path) == false {
+        return err_envelope("invalid_request", "missing_file: image path does not exist")
+    }
+    if image_name == "" {
+        return err_envelope("invalid_request", "image_name required")
+    }
+    if json.parse(model_json) == json.parse("null") {
+        return err_envelope("invalid_request", "model_json unparseable")
+    }
+    if model_json.len() > 65536 {
+        return err_envelope("invalid_request", "model_json out of 1..=65536")
+    }
+    var nid_s str = json.encode(note_id)
+    var img_mime str = mime_of(image_name)
+    var ires str = assets_import_for(operation_id, nid_s, image_path, image_name, "image", img_mime, "ink")
+    var iokv = json.parse(ires)
+    var iokb bool = json.get(iokv, "ok") == true
+    if iokb == false {
+        return ires
+    }
+    // 模型文本资产：写受管暂存临时文件 → import_attach（同 002 提交协议）
+    var model_name str = "ink-" + operation_id + ".json"
+    var tmp str = assets.assets_root() + "/incoming/" + "ink-model-" + operation_id.replace(":", "-")
+    fs.delete("" + tmp)
+    var wt int = fs.write_text(tmp, model_json)
+    if wt < 0 {
+        return err_envelope("storage_unwritable", "model staging write failed")
+    }
+    var model_op str = operation_id + ".m"
+    var mres str = assets_import_for(model_op, nid_s, tmp, model_name, "file", "application/json", "ink")
+    fs.delete(tmp)
+    var mokv = json.parse(mres)
+    var mokb bool = json.get(mokv, "ok") == true
+    if mokb == false {
+        return mres
+    }
+    var nid_final str = repo_nid_of(note_id)
+    var img_json str = json.encode(json.get(iokv, "assets"))
+    var model_json2 str = json.encode(json.get(mokv, "assets"))
+    var s str = "{\"ok\":true,\"err_code\":\"\",\"note_id\":" + json.encode(nid_final)
+    s = s + ",\"image\":" + img_json + ",\"model\":" + model_json2 + "}"
+    return s
+}
+
+/// 读取：返回该 note 全部 ink 资产（模型含对象文本；round-trip 核验面）。
+pub fn ink_get(note_id int) str {
+    if note_id < 1 {
+        return err_envelope("invalid_request", "note_id must be a positive integer id")
+    }
+    var att_list List<AssetView> = assets_list_for(note_id)
+    var items str = "["
+    var count int = 0
+    var k int = 0
+    var n int = att_list.len()
+    while k < n {
+        var a AssetView = att_list[k]
+        if a.source == "ink" {
+            var is_model bool = false
+            if a.name.replace(".json", "") != a.name {
+                is_model = true
+            }
+            var obj str = assets.assets_root() + "/objects/" + a.sha256
+            var text str = ""
+            if is_model {
+                text = fs.read_text(obj)
+            }
+            if count > 0 {
+                items = items + ","
+            }
+            var it str = "{\"asset_id\":" + json.encode(a.asset_id)
+            it = it + ",\"name\":" + json.encode(a.name)
+            it = it + ",\"sha256\":" + json.encode(a.sha256)
+            it = it + ",\"mime\":" + json.encode(a.mime)
+            it = it + ",\"seq\":" + json.encode(a.seq)
+            it = it + ",\"is_model\":" + json.encode(is_model)
+            if text != "" {
+                it = it + ",\"text\":" + json.encode(text)
+            }
+            it = it + "}"
+            items = items + it
+            count = count + 1
+        }
+        k = k + 1
+    }
+    items = items + "]"
+    var nid str = repo_nid_of(note_id)
+    var out str = "{\"ok\":true,\"err_code\":\"\",\"note_id\":" + json.encode(nid)
+    out = out + ",\"ink_assets\":" + items + "}"
+    return out
+}

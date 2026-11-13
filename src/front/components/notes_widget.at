@@ -1,0 +1,114 @@
+// components/notes_widget.at — Notes 侧小组件视图（NOTES-003 T-01/D-02）。
+//
+// 复用 006 冻结 FpNoteEditor（edit 实例，同 draft props 往返）+ 002 附件条
+// 投影（seq 升序；图片四 mime 分支真实预览，同 app.at CardAssetRow 律）。
+// 纯 props 驱动、零 store 引用（组件目录单文件生成不传播 store deps——
+// R002 在案）；I/O 由宿主（app.at 绑 .store 既有 FpEdit* 链）执行，组件
+// 零网络依赖（沿 FpNoteEditor 纪律）。
+// 小组件/快速卡片/管理页按同一 note_id/revision 打开：宿主传同一 draft
+// props 三处同源；关闭不清草稿不 flush（脏稿与七态保留，重开即恢复）。
+//
+// 导入形态（T-00 裁定）：同目录包 use fp_editor: FpNoteEditor（treeview
+// use tree_util 先例）；宿主消费 `use { package: official from
+// "./components" }` 后 `NotesWidget(...)`。
+
+use fp_editor: FpNoteEditor
+
+widget NotesWidget (note_label: str, draft_text: str, save_state: str, conflict_revision: int, server_body: str, assets: List, on_draft_edit: msg, on_submit_text: msg, on_rebase: msg, on_close: msg) {
+    // 内部消息与 msg 型 prop 派生监听名同形（FpNoteEditor 同款结构——
+    // T-03 裁定③：内部名=派生监听名，载荷经内部消息发射保真）。
+    msg { DraftEdit(str), SubmitText(str), Rebase, Close }
+
+    view {
+        col {
+            style: "shrink-0 w-full max-w-md gap-2 px-3 py-3 rounded-lg border border-border bg-card shadow-sm items-stretch"
+
+            // ── 头：标题 + 关闭（关闭不清草稿，重开即恢复） ──────────
+            row {
+                style: "items-center gap-2 w-auto"
+                icon (name: "widgets", size: 14, style: "text-primary")
+                text "Notes widget" { style: "text-xs font-semibold text-primary" }
+                text .note_label { style: "text-xs text-muted-foreground" }
+                button {
+                    onclick: .Close
+                    style: "h-6 w-6 border-0 flex items-center justify-center rounded-full bg-transparent text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                    text "×" { style: "text-xs" }
+                }
+            }
+
+            // ── 正文编辑（006 冻结组件复用；草稿 prop 往返；内部消息
+            // 透传载荷——键入/提交/rebasing 沿宿主 FpEdit* 链） ──────────
+            FpNoteEditor (mode: "edit",
+                          note_label: .note_label,
+                          draft_text: .draft_text,
+                          save_state: .save_state,
+                          conflict_revision: .conflict_revision,
+                          server_body: .server_body,
+                          on_draft_edit: .DraftEdit,
+                          on_submit_text: .SubmitText,
+                          on_rebase: .Rebase) {}
+
+            // ── 附件条（002 投影；seq 升序） ─────────────────────────
+            col {
+                style: "items-stretch gap-1"
+                row {
+                    style: "items-center gap-1 w-auto"
+                    icon (name: "paperclip", size: 12, style: "text-muted-foreground")
+                    text "Attachments" { style: "text-xs text-muted-foreground" }
+                }
+                if .assets.len() == 0 {
+                    text "No attachments" { style: "text-xs text-muted-foreground/70" }
+                }
+                for a in .assets {
+                    col {
+                        style: "items-stretch gap-1 w-full"
+                        row {
+                            style: "items-center gap-2 px-2 py-1 rounded-md bg-accent/30 w-auto"
+                            icon (name: "file", size: 12, style: "text-muted-foreground")
+                            text a.name { style: "text-xs text-foreground" }
+                            text a.download_url { style: "text-xs text-muted-foreground" }
+                        }
+                        if a.mime == "image/png" {
+                            image {
+                                src: a.raw_url
+                                alt: a.name
+                                fit: "contain"
+                                style: "w-full h-32 rounded-md border border-border object-contain"
+                            }
+                        }
+                        if a.mime == "image/jpeg" {
+                            image {
+                                src: a.raw_url
+                                alt: a.name
+                                fit: "contain"
+                                style: "w-full h-32 rounded-md border border-border object-contain"
+                            }
+                        }
+                        if a.mime == "image/gif" {
+                            image {
+                                src: a.raw_url
+                                alt: a.name
+                                fit: "contain"
+                                style: "w-full h-32 rounded-md border border-border object-contain"
+                            }
+                        }
+                        if a.mime == "image/webp" {
+                            image {
+                                src: a.raw_url
+                                alt: a.name
+                                fit: "contain"
+                                style: "w-full h-32 rounded-md border border-border object-contain"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    on {
+        .DraftEdit(v) -> { }
+        .SubmitText(t) -> { }
+        .Close -> { }
+    }
+}

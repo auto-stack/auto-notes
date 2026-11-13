@@ -339,8 +339,8 @@ def run_service_section():
         st, body = http("POST", "/api/assets/v1/import", {"operation_id": "qc-r4", "note_id": "99999",
                                                           "path": str(src), "name": "x.bin", "kind": "", "mime": "", "source": ""})
         check(body.get("err_code") == "not_found", "S-06 reject unknown note", body)
-        st, body = http("POST", "/api/assets/v1/raw", {"asset_id": "a-99999"})
-        check(st in (200, 404), "S-06 unknown asset raw served-or-404 (no fabricate)", st)
+        st, raw_unk, _ = http("GET", "/api/assets/v1/a-99999/raw", raw=True)
+        check(st == 404, "S-06 unknown asset raw serve-time 404 (no fabricate)", st)
     finally:
         kill(proc)
 

@@ -93,10 +93,15 @@ await cardTa.fill('正文一');
 await page.keyboard.type('卡片增补α');
 await cardBox.getByText('Submit').click();
 await cardBox.getByText('Submit').click().catch(() => {});
-await page.waitForTimeout(1200);
-const saved2 = await j(await fetch(BACK + `/api/notes/${note.id}/result`));
+// 轮询至落定后断言：重复点击必须恰推进 1 个修订（saving 在途忽略 + 意图重放）
+let saved2 = null;
+for (let i = 0; i < 15; i++) {
+  await page.waitForTimeout(700);
+  saved2 = await j(await fetch(BACK + `/api/notes/${note.id}/result`));
+  if (saved2.ok === true && (saved2.doc?.body || '').includes('卡片增补α')) break;
+}
 const rev2 = saved2.doc?.revision;
-check('V-03 dup-click keeps single revision advance', saved2.ok === true && (rev2 === rev1 + 1 || rev2 === rev1 + 2) && (saved2.doc?.body || '').includes('卡片增补α'),
+check('V-03 dup-click keeps single revision advance', saved2.ok === true && rev2 === rev1 + 1 && (saved2.doc?.body || '').includes('卡片增补α'),
   { rev1, rev2, err: saved2.err_code, body: (saved2.doc?.body || '').slice(0, 40) });
 
 // A-06 附件在位：图片真实解码 + 损坏解码失败态（原件管理不受扰）

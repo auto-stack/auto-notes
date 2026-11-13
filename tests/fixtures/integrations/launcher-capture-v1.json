@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "producer": "launcher",
+  "producer_version": "launcher/1",
+  "operation_id": "fixture-launcher-capture-1",
+  "intent": "capture",
+  "source": {
+    "book_id": "book:fixture",
+    "source_hash": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+    "title": "交接样例书",
+    "author": "样例作者",
+    "quote": "原句样例",
+    "locator": { "kind": "url", "v": 1, "value": "https://example.com/fixture/1" }
+  },
+  "text": "交接正文样例：中文与 Markdown **加粗** 保留。"
+}

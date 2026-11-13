@@ -545,3 +545,40 @@ pub fn fp_draft_delete_note(note_id int, instance str) str {
 pub fn fp_source_of_note(note_id int) FpSourceView {
     return db.fp_source_view_note(note_id)
 }
+
+// ═══════════════════════════════════════════════════════════
+// 多入口适配端点（NOTES-003 T-01..T-04；编排在 entry_adapters.at）。
+// 全部 POST body 信封（沿 006 T-02 裁定统一形态）；返回仓储风格信封 JSON 串。
+// ═══════════════════════════════════════════════════════════
+
+/// Launcher 文件交接扫描：读 NOTES_HANDOFF_DIR/incoming/ 逐文件验/提交/
+/// 写回执（outgoing/）并删源；返回 processed/committed/rejected 计数。
+#[api(method = "POST", path = "/api/entry/v1/launcher/scan")]
+pub fn entry_launcher_scan(cred str) str {
+    return db.entry_launcher_scan(cred)
+}
+
+/// Jade 快照导出：固定 note_id/revision/export_id → 包目录 + manifest。
+#[api(method = "POST", path = "/api/entry/v1/jade/export")]
+pub fn entry_jade_export(note_id int, export_id str) str {
+    return db.entry_jade_export(note_id, export_id)
+}
+
+/// 来源 capture（scape|lens|reader）：冻结来源校验入库；lens 截图原件
+/// 经 002 附件。attachment_path/attachment_name 仅 lens 使用。
+#[api(method = "POST", path = "/api/entry/v1/source/capture")]
+pub fn entry_source_capture(cred str, producer str, operation_id str, source_json str, text str, attachment_path str, attachment_name str) str {
+    return db.entry_source_capture(cred, producer, operation_id, source_json, text, attachment_path, attachment_name)
+}
+
+/// Ink 保存：图像 + 版本化模型 JSON 文本资产（002 附件双条）。
+#[api(method = "POST", path = "/api/entry/v1/ink/save")]
+pub fn entry_ink_save(note_id int, operation_id str, image_path str, image_name str, model_json str) str {
+    return db.entry_ink_save(note_id, operation_id, image_path, image_name, model_json)
+}
+
+/// Ink 读取：返回该 note 全部 ink 资产（模型含对象文本，round-trip 核验面）。
+#[api(method = "POST", path = "/api/entry/v1/ink/get")]
+pub fn entry_ink_get(note_id int) str {
+    return db.entry_ink_get(note_id)
+}

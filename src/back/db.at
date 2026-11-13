@@ -20,6 +20,7 @@ use auto.env
 use auto.http
 
 use assets
+use entry_adapters
 use repository
 use p2probe
 
@@ -693,4 +694,29 @@ pub fn asset_download(aid str) FileResponse {
 
 pub fn asset_receipt(operation_id str) str {
     return assets.asset_receipt(operation_id)
+}
+
+// ═══════════════════════════════════════════════════════════
+// 多入口适配委托（NOTES-003 T-01..T-04）：api.at → db.at → entry_adapters.at
+// 同既有委托纪律；编排/校验/事务在 entry_adapters.at（assets.at 同律）。
+// ═══════════════════════════════════════════════════════════
+
+pub fn entry_launcher_scan(cred str) str {
+    return entry_adapters.launcher_scan(cred)
+}
+
+pub fn entry_jade_export(note_id int, export_id str) str {
+    return entry_adapters.jade_export_package(note_id, export_id)
+}
+
+pub fn entry_source_capture(cred str, producer str, operation_id str, source_json str, text str, attachment_path str, attachment_name str) str {
+    return entry_adapters.source_capture(cred, producer, operation_id, source_json, text, attachment_path, attachment_name)
+}
+
+pub fn entry_ink_save(note_id int, operation_id str, image_path str, image_name str, model_json str) str {
+    return entry_adapters.ink_save(note_id, operation_id, image_path, image_name, model_json)
+}
+
+pub fn entry_ink_get(note_id int) str {
+    return entry_adapters.ink_get(note_id)
 }

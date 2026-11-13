@@ -1,0 +1,12 @@
+{
+  "book_id": "book:lens",
+  "source_hash": "b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6",
+  "title": "Lens 截图区域",
+  "author": "Lens",
+  "quote": "区域说明文字",
+  "locator": {
+    "kind": "region",
+    "v": 1,
+    "value": "{\"x\":12,\"y\":34,\"w\":200,\"h\":120,\"coord\":\"image-px\",\"size\":{\"w\":1024,\"h\":768}}"
+  }
+}

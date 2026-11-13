@@ -65,7 +65,7 @@ objects 发布（exists-check + copy + size/hash 双核不冒认）→ `BEGIN IM
 
 | 端点 | 说明 |
 |---|---|
-| POST /api/assets/v1/upload | PLAN-730 multipart/raw（`UploadRequest` bypass to_bytes）；上下文走 multipart text_fields（operation_id/note_id/name/mime/kind/source）；回执即 HTTP status（201 committed/409 create-only/403 路径/413 超限）；DB/对象失败保留 incoming 恢复材料并回 upload_error |
+| POST /api/assets/v1/upload | PLAN-730 multipart/raw（`UploadRequest` bypass to_bytes）；上下文走 multipart text_fields（operation_id/note_id/name/mime/kind/source）；回执即 HTTP status（201 committed/409 create-only/403 路径拒/400 应用上限 `too_large`；413 仅存在于 AUTO_HTTP_UPLOAD_* wire 硬上限层）| DB/对象失败保留 incoming 恢复材料并回 upload_error |
 | POST /api/assets/v1/import | 路径导入（VM 通道：对话框/剪贴板文件路径经 HTTP 参数）；name 必填 |
 | POST /api/assets/v1/clip_import | clipboard-bin fixture（v1：text/url 字节化 + file/image 路径复制；原顺序=seq；bin_json=producer/kind/entry/selected_at/origin）；单事务全量行 + 单 requests 意图 |
 | POST /api/assets/v1/list | 按 note seq 升序；类型化 AssetView（含服务端组装 raw_url/download_url） |
@@ -119,3 +119,18 @@ objects 发布（exists-check + copy + size/hash 双核不冒认）→ `BEGIN IM
   实例物理输入=裁定②边界外，BOUNDARY 引用不计退出码）。
 - 继承回归：verify_featurepack_service.py 67/0/0、verify_featurepack_editor.py
   双轨（assets 附加面与 fp 契约共存不互扰）。
+
+## 多入口导出消费（NOTES-003，SD-03：导出快照、producer/区域/手写引用的实际消费规则）
+
+- **快照导出原件读取**：Jade 导出（entry/v1/jade/export）经 assets 受管接口
+  （`objects/<sha256>` 行定位 + `hash.file_sha256` 核验）读取附件原件，
+  **不改动受管原件**（只读消费；缺原件返回 asset_missing 可重试，重试经同
+  export_id 收敛，不产生半包——manifest 最后写=完整性标记）。
+- **producer/区域/手写引用**：Lens 截图原件经 import_attach（source="lens"，
+  同 note 附件）与 Ink 手写图像（source="ink"）均落入 002 受管附件面——
+  manifest 导出时按 seq 升序全量投影（asset_id/name/sha256/bytes/mime/seq +
+  净化文件名），原件 hash 与接收端逐项可核；区域/坐标/压力等模型元数据走
+  来源 locator 或 ink 模型文本资产（ink-<op>.json），不经附件 mime 猜测。
+- 附件上限/禁止类型/去重/事务恢复语义（见上）对入口附件同样生效；入口
+  adapter 提交的附件与卡片/管理页同属本地全权面，数据归属不变。
+
