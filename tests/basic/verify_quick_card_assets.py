@@ -156,11 +156,15 @@ def _spawn_once(data_dir, env_extra, log_path):
     env["NOTES_DATA_DIR"] = str(data_dir)
     env["NOTES_TEST_MODE"] = "1"
     env["AUTO_ALLOW_PARTIAL_DB"] = "1"
+    env["AUTO_HTTP_PORT"] = str(PORT)
     env.update(env_extra)
     log_f = open(log_path, "w", encoding="utf-8")
+    # AGENTS.md 构建纪律：debug 后端直跑（auto service 硬编码 --release）
+    backend_exe = os.environ.get(
+        "NOTES_BACK_EXE",
+        "D:/autostack/auto-lang/target/generated-consumers/f3f98a9e/debug/auto-notes-30db9907-back.exe")
     proc = subprocess.Popen(
-        ["D:/autostack/auto-man/target/debug/auto.exe", "service", "--server", "rust", "-B", str(PORT)],
-        cwd=str(ROOT), env=env, stdout=log_f, stderr=subprocess.STDOUT)
+        [backend_exe], cwd=str(ROOT), env=env, stdout=log_f, stderr=subprocess.STDOUT)
     deadline = time.time() + 900
     while time.time() < deadline:
         try:
@@ -389,6 +393,14 @@ def run_service_section():
 
 # ── 入口 ─────────────────────────────────────────────────────────────
 
+def load_section(name):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(name, HERE / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--profile", choices=["service", "vue", "vm"], required=True)
@@ -404,15 +416,13 @@ def main():
 
     if args.profile == "vue":
         try:
-            import run_vue_section
-            run_vue_section.main(ROOT, ARTIFACTS, check, boundary)
+            load_section("run_vue_section").main(ROOT, ARTIFACTS, check, boundary)
         except Exception as e:
             check(False, "V section crashed", repr(e))
 
     if args.profile == "vm":
         try:
-            import run_vm_section
-            run_vm_section.main(ROOT, ARTIFACTS, check, boundary)
+            load_section("run_vm_section").main(ROOT, ARTIFACTS, check, boundary)
         except Exception as e:
             check(False, "M section crashed", repr(e))
 

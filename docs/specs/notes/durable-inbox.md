@@ -186,6 +186,22 @@
   requests 行按 `fp:<principal>:<operation_id>` 寻址）；主应用自有路径不经
   fp policy 门（数据归属全量）。
 
+## 附件附加面共存边界（NOTES-002，SD-02）
+
+- 附加式表 `note_assets(asset_id PK, note_id, name, bytes, sha256, mime, source,
+  bin_json, seq, created_at)` + `meta.asset_seq` 独立计数器（CREATE TABLE/INDEX
+  IF NOT EXISTS，assets.at 自持 ensure——不动 schema_v、notes/requests 既有列与
+  legacy 升级状态机）。
+- requests 复用为附件意图去重键：kind=`asset_attach`、rid=`ui-asset:<operation_id>`
+  命名空间隔离于主路径；intent=`as1|` 前缀族（全量语义规范化，同律：全匹配
+  重放 `replayed:true` / 差异 `request_conflict` / intent 空行恒 conflict）。
+- 附件回执 `revision:0`（附件不推进笔记修订——expected_revision 流不受扰）；
+  doc_json 列承载资产信封数组（重放返回原集合）。
+- `note_id` 外键语义：attach 目标须存在且 state='active'（not_found 拒绝）；
+  笔记 trash/restore 模型下无附件删除端点，objects 原件只增（GC 留待需求）。
+- 存储细节/上传 ABI/恢复协议见 quick-card-assets.md（本节只记与 13 列投影和
+  requests 语义的共存边界）。
+
 ## 回归资产（r9）
 
 - 电池 S0–S22（S20 元数据/删除/恢复失败传播+控制；S21 fresh finalize 回滚+

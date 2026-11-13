@@ -125,6 +125,20 @@
   Rebase/零页面错误；VM 轨 type_text 真实输入 + 进程重启恢复（必需 case 无
   skip，缺失即非零）。
 
+## 附件能力面（NOTES-002，SD-03：可协商附件扩展）
+
+- FpNoteEditor 组件契约不变（props/回调/零网络依赖冻结表照旧）；快速卡片在
+  宿主侧组合该组件（app.at 内联，见 quick-card-assets.md 组合边界）——编辑器
+  无需感知附件。
+- 附件端点 `/api/assets/v1/*` 为本地全权面（不经 fp policy 门，数据归属同
+  /api/notes）；Reader 宿主后续可按 cred 范围协商消费（v0 仅 Notes 主应用）。
+- 上传走 PLAN-730 服务端上传 ABI（UploadRequest 端点 + AUTO_HTTP_UPLOAD_* 硬
+  上限 + 应用 NOTES_ASSET_MAX_* 取 min）；构建装配需 AUTO_ALLOW_PARTIAL_DB=1
+  （实测缺口 owner=工具链）。
+- 能力协商规则：宿主经 `/api/health` 的 interface 字段识别基础服务；附件面以
+  端点探测（/api/assets/v1/receipt 404/200）为准，不做版本字段扩展（v0 前向
+  冲突显式化同源冻结策略）。
+
 ## 三仓消费清单（AC-07）
 
 | 仓 | 消费面 | 版本锚 |

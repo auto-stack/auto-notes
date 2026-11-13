@@ -2392,7 +2392,7 @@ store NotesStore {
         // 导航保存沿既有 SelectNote flush 面负责。
         .CardOpened -> {
             .card_open = true
-            .CardAssetsReload
+            .CardAssetsReload()
         }
         .CardClosed -> {
             .card_open = false
@@ -2437,7 +2437,7 @@ store NotesStore {
         }
         .CardSortToggled -> {
             .card_sort_title = !.card_sort_title
-            .CardAssetsReload
+            .CardAssetsReload()
         }
     }
 }

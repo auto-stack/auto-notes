@@ -5,9 +5,9 @@ status: executing
 feature_name: "快速卡片、多媒体收存与剪贴板接收"
 author: [Codex]
 created_at: 2026-10-04T00:00:00Z
-updated_at: 2026-11-12
+updated_at: 2026-11-13
 plan_revision: 3
-current_step: 1
+current_step: 5
 total_steps: 8
 created: 2026-10-04
 base_branch: main
@@ -83,7 +83,27 @@ T-00冻结支持矩阵，逐项核二进制文件选择/读取/流式复制、�
 
 卡片参数覆盖宽窄、明暗、焦点、色标、最近项/排序与空态，触屏按钮尺寸和点击区域在T-00冻结并于A-06验证。缩略图/媒体元信息是可重建派生物，导出和打开使用受管原件，hash一致。视频封面/图片解码无法完成须有实测错误状态，原件导出为必需路径。
 
-### 规范增量
+#### T-01/T-05 实测：工具链/平台限制清单（12 项，owner=工具链；绕行已落地并双轨验证）
+
+| # | 层 | 限制 | 绕行/状态 |
+|---|---|---|---|
+| 1 | a2r标准库 | json.is_null 无 verified 发射（装配拒） | encode 双引号差分判 null |
+| 2 | a2r标准库 | 无 append_bytes（仅 append_text） | 单文件 copy_recursive 发布；无追加需求收敛 |
+| 3 | a2r标准库 | 剪贴板/对话框 natives 仅 VM 腿（vue=throwing stubs） | 采件=HTTP API/fixture；VM 直读留待 track 门 |
+| 4 | 发射器 | 裸表达式语句发射丢分号（time.sleep_ms 编译错） | 赋值式自旋替代 |
+| 5 | 发射器 | len()=字节 而 sub()/char_at()=字符索引——非 ASCII 名索引错位 panic | 禁索引数学：replace 差分/固定尾比较/服务端组装 |
+| 6 | 发射器 | json.get 结果与 parse("null") 比较发射 &Value≠Value | repository 双 parse 临时值惯用法 |
+| 7 | 发射器 | 跨模块 async 调用不发射 .await（stdlib 例外） | upload 编排上移端点体内（stdlib await 点） |
+| 8 | 发射器 | use auto.hash 发射 crate::hash（模块映射缺项） | 去 use 走裸内建限定路径 |
+| 9 | 装配检查 | db-fn 提取正则不认 pub async fn → UploadRequest 端点须 AUTO_ALLOW_PARTIAL_DB=1（写入仍全走 db.rs→assets，无分叉） | 构建纪律入 AGENTS.md+电池 |
+| 10 | 装配/运行 | PLAN-730 commit 不自动建父目录；commit target 拒':' | incoming 目录预创建 + file_key 折叠 |
+| 11 | vue代码生成 | 组件目录单文件生成不传播 store 依赖（R002 store 未定义，StoreTest 最小复现） | 卡片内联 app.at |
+| 12 | vue代码生成/TS | link 仅 router to: 形；TS 客户端无 multipart；视图 prop 括号形仅字面量 | 下载=URL 文本投影+raw 直取；intake=HTTP API |
+
+（叠加非工具链项：git bash heredoc 转 python 长文本两次截断——改 Write 文件法；
+`auto service`/`auto run` 硬编码 --release 3-15 分钟/轮——AGENTS.md 已立 debug 快环纪律。）
+
+## 规范增量
 
 | delta_id | add/modify/retire | docs/specs/... target | before/after rule | rationale | acceptance IDs |
 |---|---|---|---|---|---|
@@ -126,11 +146,11 @@ T-00登记支持资源和错误边界，T-01建立夹具，T-05执行全部必�
 | ID | owner_stage | 依赖 | 真实改面与动作 | 关闭产出/验证 | AC |
 |---|---|---|---|---|---|
 | T-00 | work | 无；接口核查可先做 | 核repository/api、006组件/适配、文件/剪贴板/原生输入能力，冻结D-01支持矩阵与资源预算 | [x] 盘点闭合（2026-11-12）。[✅ 已完成] 关键发现：①二进制收存双轨唯一可行 intake=PLAN-730 服务端上传 ABI（`http.upload_receive/commit`，UploadRequest #[api] 参数 bypass to_bytes；a2r-std/src/http/server_upload.rs；commit=hard_link create-only 发布→原件按 sha256 去重共享的原子原语）；②TS 生成客户端无 multipart、vue 无 file-picker 元素、dialog/clipboard natives 共享 store 不可达（vue=throwing stubs）——UI 直接采件缺口 owner=工具链，v0 UI 采件=文本/URL 输入+显式粘贴（原生双轨）；③预览/导出双轨可行：`http.file_response`（GET/HEAD+单区间 Range+disposition attachment/inline+download_name，stdlib/auto/http.at:340-360，双轨同律）+ vue `image{src}`/`video`/`link{href}` 元素与 VM image 相对 URL 经 AUTO_HTTP_BASE 展开（VM 视频无 mpv=诚实占位态）；④hash=file_sha256 双轨唯一（暂存后对原件求）；⑤上传硬上限 env AUTO_HTTP_UPLOAD_*（默认 64MiB/65MiB，应用 options 取 min——200MiB 视频需 launch env，缺省 64MiB 如实生效）；⑥布局裁定：assets.at→src/back/、quick_card.at→src/front/components/、src/integrations/ 不建（bin 映射并入 assets.at）。006 交接清单=006 已交付（archived r2，SHA 表 featurepack-service-and-editor.md:136-146），无在途依赖。全量证据 plan-artifacts/plan-002/t00-inventory.md。未证项（生成腿 UploadRequest 路由装配）列 T-01 首个写动作=有界构建先证 | AC-01～06 |
-| T-01 | work | T-00、006交付 | 新增assets.at（拟），扩展仓储及API版本，落实附件暂存/校验/关联提交与恢复；建A-01/03/04夹具 | 原件与引用/回执闭合、有效与中断反例可跑，旧文本API兼容 | AC-01/03/04/06 |
-| T-02 | work | T-01 | 新增quick_card.at（拟），组合006组件/适配，接app/notes_store/editor，实现自动保存、IME、焦点、撤销重做和视觉配置 | A-02/06真实输入与恢复可复现 | AC-02/06 |
-| T-03 | work | T-02 | 新增clipboard.at（拟），显式粘贴和bin已选条目fixture，旧request_id映射复用006 | A-05和失败保稿，纯文本fallback成立 | AC-04/05 |
-| T-04 | work | T-03 | 卡片/管理页同ID导航、缩略图/媒体元信息及原件打开导出、损坏媒体fallback | A-01/06冷重启和hash独立读回 | AC-01/06 |
-| T-05 | work | T-04 | 建verify_quick_card_assets.py，双端跑A-01～06与006受影响回归，沉淀SD-01～03 | 必需case完整通过，版本/数据/进程隔离可查 | AC-01～06 |
+| T-01 | work | T-00、006交付 | 新增assets.at（拟），扩展仓储及API版本，落实附件暂存/校验/关联提交与恢复；建A-01/03/04夹具 | [x] [✅ 已完成] assets.at（受管原件 objects/<sha256> 内容寻址共享、incoming 操作命名空间、note_assets 附加表、as1| 意图族、四故障阶段 after_incoming/object/entity/manifest、W1-W4 恢复调和）；端点面 /api/assets/v1/{upload,import,list,get,raw,download,receipt}；上传编排=PLAN-730 ABI（端点体内 stdlib await——companion async 无 .await 发射为实测缺口）。A-01/03/04 夹具=tests/fixtures/capture/{valid-1x1,corrupt}.png+脚本合成。旧文本API兼容=verify_featurepack_service.py 67/0/0（2026-11-12 实测） | AC-01/03/04/06 |
+| T-02 | work | T-01 | ~~新增quick_card.at~~ 卡片内联 app.at（T-05 实测：组件目录单文件生成不传播 store 依赖——R002 最小复现；缺口 owner=auto-ui-compiler），组合 FpNoteEditor 同草稿 prop 往返（同 note_id/revision、七态透传零复制），app/notes_store 接卡片状态与动作 | [x] [✅ 已完成] A-02/06 真实输入可复现：Vue 电池 V-01..10（中文键入/提交/重复点击单步推进/关闭保脏稿/同草稿往返/显式粘贴） | AC-02/06 |
+| T-03 | work | T-02 | ~~新增clipboard.at~~ bin fixture 映射并入 assets.at clip_import（T-00 布局裁定：src/integrations/ 不建），显式粘贴=原生 Ctrl+V，operation_id 映射复用 as1| 事务律 | [x] [✅ 已完成] A-05 全绿（S-05：混合条目原顺序=seq、bin_json provenance、同请求重试不重、同文新操作另建）；失败保稿=关闭保脏稿 V-07 + fp 草稿槽 | AC-04/05 |
+| T-04 | work | T-03 | 卡片/管理页同ID导航、缩略图/媒体元信息及原件打开导出、损坏媒体fallback | [x] [✅ 已完成] 同草稿往返 V-08（管理页=同 note_id 同 revision 文本）；预览=raw 端点 img 真实解码（V-04 naturalWidth>0）+损坏解码失败态（V-05 naturalWidth=0 原件管理不受扰）；导出=download 端点 attachment+原名（S-01 断言）；A-01 冷重启 hash 独立读回=S-01 | AC-01/06 |
+| T-05 | work | T-04 | 建verify_quick_card_assets.py，双端跑A-01～06与006受影响回归，沉淀SD-01～03 | [x] [✅ 已完成] service 49/49、vue 70/70、vm 段（M-00..07 结构/状态面 + 裁定② BOUNDARY）实测绿（2026-11-13，log 见 plan-artifacts/plan-002/qc-*.log）；006 回归 service 67/0/0；SD-01..03 已沉淀（quick-card-assets.md 新增 + 两份既有规范共存节）；开发环按 AGENTS.md 切 debug 快环 | AC-01～06 |
 | T-06 | review | T-05 | 同clone独立上下文复核高风险A-02/03/05与双端产品路径 | 明确pass或修复项，精确revision/commit | AC-07 |
 | T-07 | merge | T-06 pass | main精确交付、Spec核对和归档、自有材料清理 | 交付SHA与003接口清单，OS pin按独立装配流程 | AC-08 |
 
@@ -141,6 +161,8 @@ T-00登记支持资源和错误边界，T-01建立夹具，T-05执行全部必�
 2026-11-11 · stage: new · plan_id: NOTES-002 · plan_revision: 3 · outcome: pass（修订草案可交接，产品未验收）· next: work T-00只读核查，006真实交付后T-01。changed: T-00～04、AC-05术语、SD-01细化，新增T-05～07、AC-06～08、SD-02/03和A-01～06。current_step=0，实施、内检、独立终审与合入均未执行。
 
 [产品设计](../design/01-product-design.md) · [006](006-featurepack-service-and-editor.md) · [003](003-entry-and-knowledge-adapters.md) · [AutoOS收口](../../../auto-os/docs/plans/067-notes-featurepack-product-closure.md)
+
+2026-11-13 · stage: work | plan_id: NOTES-002 | plan_revision: r3 | outcome: pass（execution_done）| worktree: D:/autostack/auto-notes（独立 clone，main——本仓惯例=实施树即 main，无 dev worktree）| branch: main | base_commit: 13d7b57（006 归档态）| code_commit: b92548c（T-01..03 实现）→ b442bda（S 电池+clip 修复）→ ffdb750（AGENTS.md 构建纪律）→ 本回执提交 | dependency_revisions: auto 0.1.0+plan-890-verified-r7-t19-20-g347c29f-dirty · auto-os main 868c80d · auto-reader main 8f57fd9（沿 006 交付记录；PLAN-730/729/1003 能力已含）| task_ids: T-00、T-01、T-02、T-03、T-04、T-05 | evidence: ①本仓电池 verify_quick_card_assets.py——service **49 PASS/0 FAIL**、vue **70 PASS/0 FAIL**（P-V debug 快环：V-01..10 卡片中文键入/提交 saved/重复点击单步推进/附件真实解码+损坏 naturalWidth=0 失败态原件不受扰/宽窄/明暗/最近项/空态/关闭保脏稿/同草稿往返/显式 Ctrl+V 粘贴/零页面错误）、vm **61 PASS/0 FAIL/1 BOUNDARY**（M-01..07 结构渲染/按钮链路/状态面；M-B-01 卡片 edit 实例物理键入=裁定②边界外，引用 NOTES-006 §5⑦/§10，输入真实性以 Vue 轨为准）②继承回归——verify_featurepack_service.py **67/0/0**、verify_featurepack_editor.py vue **29/0/0** + vm **18/0/0**（卡片改动不扰 fp 契约）③SD-01..03 沉淀：docs/specs/notes/quick-card-assets.md（新增）+ durable-inbox.md/featurepack-service-and-editor.md 共存节 ④12 项工具链实测清单（§5 表，owner=工具链，绕行双轨验证）+ AGENTS.md debug 快环纪律 | AC 面：AC-01 ✓(S-01)/AC-02 ✓(V-02,03+vm B)/AC-03 ✓(S-07 四窗口)/AC-04 ✓(S-06+V-09)/AC-05 ✓(S-05)/AC-06 ✓(V+M)；AC-07/08=review/merge 所有 | blockers: 无（工具链 12 项缺口已记录 owner，绕行不阻塞交付面）| next_responsible_role: review（T-06 独立上下文复核）
 
 2026-11-11 文档核查通过。两份计划均为r3/drafting、0/8，0～10节完整，任务与AC各8项且ID唯一，相对链接全部可解析，006→002→003依赖方向正确，diff --check通过。该记录仅为计划自检，产品测试与独立终审尚未执行。
 
