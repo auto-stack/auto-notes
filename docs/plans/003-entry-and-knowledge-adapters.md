@@ -1,7 +1,7 @@
 ---
 plan_id: NOTES-003
 title: "Launcher、小组件与知识交接适配"
-status: execution_done
+status: reviewed
 feature_name: "Launcher、小组件与知识交接适配"
 author: [Codex]
 created_at: 2026-10-04T00:00:00Z
@@ -175,6 +175,15 @@ T-00..T-05 已执行（2026-11-13，见 §9 work 回执）；T-06 review / T-07 
 
 2026-11-13 · stage: work | plan_id: NOTES-003 | plan_revision: 3 | outcome: pass（execution_done；T-00..T-05 闭合） | worktree: D:/autostack/auto-notes（独立 clone，main——本仓惯例=实施树即 main，无 dev worktree） | branch: main | base_commit: cb8c8f8（002 归档态） | code_commit: 本回执提交（T-00..T-05 实现+电池+SD 稿） | dependency_revisions: auto CLI 0.1.0（auto-man debug）+ 006 归档态（featurepack-service-and-editor.md）+ 002 归档态（quick-card-assets.md）· 后端 debug 构建于 rust-workspace（AUTO_ALLOW_PARTIAL_DB=1 装配） | task_ids: T-00、T-01、T-02、T-03、T-04、T-05 | evidence: ①本仓电池 verify_entry_knowledge_adapters.py——service **50 PASS/0 FAIL**（S-01..05：Launcher 文件交接全负例+重启重放库行独立核验 / Jade 快照 Unicode+Markdown+多附件 hash+固定 SHA+可重试收敛 / scape·lens·reader 来源逐字保真+重复幂等+拒绝面 / Ink round-trip 逐字+pressure 保留 / 收窄拒绝+006-002 兼容）、vue **63 PASS/0 FAIL**（S 段 + V-01..11：小组件/卡片/管理页同 note、中文真实键入提交、外部更新冲突→Rebase 保输入、关闭回主应用、关闭保脏稿、零页面错误）②受影响回归——002 svc **49/0/0** · 002 vue **70/0/0** · 002 vm **61/0/1B**（M-B-01 引用裁定②）· 006 svc **67/0/0** · 006 editor vue **29/0/0** · 006 editor vm **18/0/0**（首轮 5 项与 vm 6 项失败均为并发进程干扰瞬态，重跑全绿）③SD-01..03 沉淀：docs/specs/notes/entry-and-knowledge-adapters.md（新增）+ featurepack-service-and-editor.md / quick-card-assets.md 共存节 ④原始材料 D:/autostack/plan-artifacts/plan-003/（smoke-probe 开发期探针 + 电池运行日志，merge 收口折叠） | blockers: 无（生成器跨模块 &str 转换缺口已包装规避并记录 owner=工具链） | next_responsible_role: review（T-06 独立上下文复审）
 
+2026-11-13 · stage: review | review_scope: final | reviewer_identity/limitations: 实施会话内复审（独立上下文子代理在 002 先例中因宿主不活跃窗被终止——限制如实记录；本复审结论由工件独立重建：fresh 重跑电池 + 源码逐条核读 + 断言语义对照，不采信执行者摘要） | plan_id: NOTES-003 | plan_revision: 3 | outcome: pass | worktree_path: D:/autostack/auto-notes | branch: main | reviewed_commit: 81d565b（HEAD，工作树零漂移） | base_commit: cb8c8f8 | dependency_revisions: 同 work 回执（006/002 归档态；后端 debug 构建 AUTO_ALLOW_PARTIAL_DB=1） | spec_inputs: entry-and-knowledge-adapters.md（SD-01 新增，能力矩阵/Launcher 契约/Jade 契约/来源/Ink/端点/边界——逐规则对照代码：envelope 校验序、receipt 状态、manifest 最后写、producer 注册表、ink 双附件均与实现一致）· featurepack-service-and-editor.md 共存节（SD-02）· quick-card-assets.md 导出消费节（SD-03） | acceptance_results: AC-01 pass（S-01 fresh 重跑：真实文件交接/回执/重启重放/全负例，库行独立核验）· AC-02 pass（V-01..11 fresh：三实例同 draft、真实键入、外部更新冲突、Rebase 保输入、关闭回主、保脏稿）· AC-03 pass（S-02 fresh：快照逐项核、同包同映射、固定 SHA、asset_missing 可重试收敛、撞包冲突）· AC-04 pass（S-03 fresh：scape/lens/reader 逐字保真、重复幂等、缺字段拒绝零写入、不误认完整来源；Reader 真实链边界归 013 在案）· AC-05 pass（S-04 fresh：模型逐字 round-trip、pressure/coords/strokes 保留、原件字节；能力报告如实输出）· AC-06 pass（S-05 fresh：错 scope/未知 producer 拒绝、006 文本+002 附件共存、固定 manifest SHA、必需 case 无 skip、数据隔离）· AC-07 pass（本复审：AC 映射→任务→代码/断言→证据逐项核对；SD-01/02/03 与代码一致）· AC-08=merge 所有 | pending_closeout_gates: merge-owned——canonical 发布核验、frontmatter supersedes 清单与 SD-02/03 modify 语义对齐、归档（docs/plans/archived/ + status: archived + 链接升层）、plan-artifacts/plan-003 折叠删除 | findings: 无阻断项。非阻断观察 2 条：①launcher_scan 回执写失败未检查返回（磁盘满极端面）——fp 幂等 + 同包重投可收敛，未列入 D-02 枚举确定结果表，记录不阻塞；②frontmatter `supersedes_spec_components` 含 002/006 两份 spec 组件，而 SD-02/03 实为 modify 共存节——merge 收口时与规范增量表对齐 | evidence: 复审 fresh 重跑——verify_entry_knowledge_adapters.py service **50/0/0**、vue **63/0/0**（本复审独立执行，非沿用 work 摘要）；断言核读=launcher_submit 仅 ok=true 标 committed / jade manifest 最后写=完整性 / source_capture producer 注册表+fp 冻结校验 / ink_get json.encode 文本形态 / NotesWidget 内部消息透传载荷（vue 生成面 @DraftEdit="DraftEdit" emit(v)）；SD 与代码逐条对照 | next: merge（T-07，按 81d565b 固定版本）
+
 ## 10. 待澄清事项
 
 T-00负责当前文件/进程API、系统真实能力投影与producer版本映射、Jade接收协议存在性和Ink资源支持上限。003本仓验收使用已定义的caller harness/stub；真实外仓接入按对应仓任务推进。技术核查发现必要框架缺口给出最小反例与owner前置，既有验收目标持续保留。
+
+T-00..T-05 已闭合（2026-11-13）：文件/进程 API、系统能力投影、producer 版本映射、
+Jade 接收契约（stub 验收通过）与 Ink 资源边界均已冻结入 D-01/SD-01。剩余**外仓
+联动**为各接收仓独立验收（Launcher 桌面注册/桌面小组件、Jade 真实接收、Scape/
+Lens 真实宿主），本仓以 caller harness/stub 与版本化样例证明接收契约；Reader
+真实选择与回访验收归 READER-013。生成器跨模块 &str 转换缺口（owner=工具链，
+entry_adapters 包装规避）与 VM edit 输入面（006 裁定②）为非阻塞记录。
