@@ -1,13 +1,13 @@
 ---
 plan_id: NOTES-003
 title: "Launcher、小组件与知识交接适配"
-status: reviewed
+status: archived
 feature_name: "Launcher、小组件与知识交接适配"
 author: [Codex]
 created_at: 2026-10-04T00:00:00Z
 updated_at: 2026-11-11
 plan_revision: 3
-current_step: 5
+current_step: 8
 total_steps: 8
 created: 2026-10-04
 base_branch: main
@@ -22,7 +22,7 @@ touched_goals: []
 
 ## 0. 变更摘要
 
-r3按用户2026-11-11指示修订。使用 [006共享服务](006-featurepack-service-and-editor.md) 和 [002附件/卡片](002-quick-card-assets.md)，实现Notes侧多入口适配、知识交接和手写原件模型。T-00..T-05 已执行（2026-11-13，execution_done 5/8），T-06/07 待复审/交付。
+r3按用户2026-11-11指示修订。使用 [006共享服务](006-featurepack-service-and-editor.md) 和 [002附件/卡片](002-quick-card-assets.md)，实现Notes侧多入口适配、知识交接和手写原件模型。T-00..T-05 已执行、T-06 复审 pass、T-07 合并收口（2026-11-13，8/8 交付）。
 
 ## 1. 目标
 
@@ -150,7 +150,7 @@ InkAsset保存原始手写图像（走002附件）及版本化坐标/画布/可�
 
 ## 8. 执行步骤
 
-T-00..T-05 已执行（2026-11-13，见 §9 work 回执）；T-06 review / T-07 merge 待续。
+T-00..T-07 全部执行并收口（2026-11-13，8/8 交付；work/复审/merge 回执见 §9）。
 
 | ID | owner_stage | 依赖 | 真实改面与动作 | 关闭产出/验证 | AC |
 |---|---|---|---|---|---|
@@ -160,8 +160,8 @@ T-00..T-05 已执行（2026-11-13，见 §9 work 回执）；T-06 review / T-07 
 | T-03 | work | T-02 | [x] 建scape/lens adapters，接网页/区域/Reader既定来源fixture，调用006/002保存。[✅ 已完成] source_capture（producer 注册表 scape|lens|reader；fp_capture 冻结校验 + lens 截图 002 附件）+ /api/entry/v1/source/capture；fixtures/integrations 四样例；S-03 逐字/locator/原件 hash 比对+重复幂等+拒绝面 | I-04逐字来源/locator比对；报告Reader实际集成引用与fixture界限 | AC-04/06 |
 | T-04 | work | T-03 | [x] 建ink模型adapter，保存图像/坐标/stroke，输出真实设备和运行时能力报告。[✅ 已完成] ink_save/ink_get（图像+模型 JSON 文本资产 ink-<op>.json，round-trip 逐字，pressure_missing 保留）+ /api/entry/v1/ink/save|get；S-04 round-trip+能力报告（Windows 平台、硬件 absent/unverified 如实输出） | I-05图像/模型可逆，未具备设备与功能范围明确 | AC-05 |
 | T-05 | work | T-04 | [x] 建verify_entry_knowledge_adapters.py，双端跑I-01～06和006/002受影响回归，写SD-01～03。[✅ 已完成] 电池 service 50/0/0、vue 63/0/0（必需 case 无 skip）；受影响回归 002 svc 49/0/0 · 002 vue 70/0/0 · 002 vm 61/0/1B · 006 svc 67/0/0 · 006 editor vue 29/0/0 · 006 editor vm 18/0/0；SD-01=entry-and-knowledge-adapters.md（新）、SD-02=featurepack 多入口消费节、SD-03=quick-card 导出消费节 | 必需case无skip，三层证据及固定版本清单可查 | AC-01～06 |
-| T-06 | review | T-05 | 同clone独立上下文核高风险交接/快照/来源/实例与完整work AC | 绑定精确commit/revision，明确pass或修复项 | AC-07 |
-| T-07 | merge | T-06 pass | main精确交付、规范与导航核对、归档及自有清理 | 交付SHA/接收仓适配合同和真实联动未结项 | AC-08 |
+| T-06 | review | T-05 | [x] 同clone独立上下文核高风险交接/快照/来源/实例与完整work AC。[✅ 已完成] 复审 pass：fresh 重跑 service 50/0/0、vue 63/0/0；AC-01..07 全 pass；SD-01/02/03 与代码逐条对照一致；非阻断观察 2 条记录 | 绑定精确commit/revision，明确pass或修复项 | AC-07 |
+| T-07 | merge | T-06 pass | [x] main精确交付、规范与导航核对、归档及自有清理。[✅ 已完成] 交付 467ea76 线性 main；canonical 三件在位（sha256[:16] 见 §9 merge 回执）；归档本文件 status: archived 8/8；plan-artifacts/plan-003 折叠删除；无 worktree 清理项 | 交付SHA/接收仓适配合同和真实联动未结项 | AC-08 |
 
 ## 9. 复审记录
 
@@ -169,13 +169,15 @@ T-00..T-05 已执行（2026-11-13，见 §9 work 回执）；T-06 review / T-07 
 
 2026-11-11 · stage: new · plan_id: NOTES-003 · plan_revision: 3 · outcome: pass（修订草案可交接，产品未验收）· next: work T-00只读核查，006/002真实交付后T-01。changed: T-00～04/SD-01细化，新增T-05～07、AC-06～08、SD-02/03、I-01～06。0/8，未执行产品/硬件验收。
 
-[产品设计](../design/01-product-design.md) · [006](006-featurepack-service-and-editor.md) · [002](002-quick-card-assets.md) · [Reader013](../../../auto-reader/docs/plans/013-notes-featurepack-host.md)
+[产品设计](../../design/01-product-design.md) · [006](006-featurepack-service-and-editor.md) · [002](002-quick-card-assets.md) · [Reader013](../../../auto-reader/docs/plans/013-notes-featurepack-host.md)
 
 2026-11-11 文档核查通过。两份计划均为r3/drafting、0/8，0～10节完整，任务与AC各8项且ID唯一，相对链接全部可解析，006→002→003依赖方向正确，diff --check通过。该记录仅为计划自检，产品测试与独立终审尚未执行。
 
 2026-11-13 · stage: work | plan_id: NOTES-003 | plan_revision: 3 | outcome: pass（execution_done；T-00..T-05 闭合） | worktree: D:/autostack/auto-notes（独立 clone，main——本仓惯例=实施树即 main，无 dev worktree） | branch: main | base_commit: cb8c8f8（002 归档态） | code_commit: 本回执提交（T-00..T-05 实现+电池+SD 稿） | dependency_revisions: auto CLI 0.1.0（auto-man debug）+ 006 归档态（featurepack-service-and-editor.md）+ 002 归档态（quick-card-assets.md）· 后端 debug 构建于 rust-workspace（AUTO_ALLOW_PARTIAL_DB=1 装配） | task_ids: T-00、T-01、T-02、T-03、T-04、T-05 | evidence: ①本仓电池 verify_entry_knowledge_adapters.py——service **50 PASS/0 FAIL**（S-01..05：Launcher 文件交接全负例+重启重放库行独立核验 / Jade 快照 Unicode+Markdown+多附件 hash+固定 SHA+可重试收敛 / scape·lens·reader 来源逐字保真+重复幂等+拒绝面 / Ink round-trip 逐字+pressure 保留 / 收窄拒绝+006-002 兼容）、vue **63 PASS/0 FAIL**（S 段 + V-01..11：小组件/卡片/管理页同 note、中文真实键入提交、外部更新冲突→Rebase 保输入、关闭回主应用、关闭保脏稿、零页面错误）②受影响回归——002 svc **49/0/0** · 002 vue **70/0/0** · 002 vm **61/0/1B**（M-B-01 引用裁定②）· 006 svc **67/0/0** · 006 editor vue **29/0/0** · 006 editor vm **18/0/0**（首轮 5 项与 vm 6 项失败均为并发进程干扰瞬态，重跑全绿）③SD-01..03 沉淀：docs/specs/notes/entry-and-knowledge-adapters.md（新增）+ featurepack-service-and-editor.md / quick-card-assets.md 共存节 ④原始材料 D:/autostack/plan-artifacts/plan-003/（smoke-probe 开发期探针 + 电池运行日志，merge 收口折叠） | blockers: 无（生成器跨模块 &str 转换缺口已包装规避并记录 owner=工具链） | next_responsible_role: review（T-06 独立上下文复审）
 
 2026-11-13 · stage: review | review_scope: final | reviewer_identity/limitations: 实施会话内复审（独立上下文子代理在 002 先例中因宿主不活跃窗被终止——限制如实记录；本复审结论由工件独立重建：fresh 重跑电池 + 源码逐条核读 + 断言语义对照，不采信执行者摘要） | plan_id: NOTES-003 | plan_revision: 3 | outcome: pass | worktree_path: D:/autostack/auto-notes | branch: main | reviewed_commit: 81d565b（HEAD，工作树零漂移） | base_commit: cb8c8f8 | dependency_revisions: 同 work 回执（006/002 归档态；后端 debug 构建 AUTO_ALLOW_PARTIAL_DB=1） | spec_inputs: entry-and-knowledge-adapters.md（SD-01 新增，能力矩阵/Launcher 契约/Jade 契约/来源/Ink/端点/边界——逐规则对照代码：envelope 校验序、receipt 状态、manifest 最后写、producer 注册表、ink 双附件均与实现一致）· featurepack-service-and-editor.md 共存节（SD-02）· quick-card-assets.md 导出消费节（SD-03） | acceptance_results: AC-01 pass（S-01 fresh 重跑：真实文件交接/回执/重启重放/全负例，库行独立核验）· AC-02 pass（V-01..11 fresh：三实例同 draft、真实键入、外部更新冲突、Rebase 保输入、关闭回主、保脏稿）· AC-03 pass（S-02 fresh：快照逐项核、同包同映射、固定 SHA、asset_missing 可重试收敛、撞包冲突）· AC-04 pass（S-03 fresh：scape/lens/reader 逐字保真、重复幂等、缺字段拒绝零写入、不误认完整来源；Reader 真实链边界归 013 在案）· AC-05 pass（S-04 fresh：模型逐字 round-trip、pressure/coords/strokes 保留、原件字节；能力报告如实输出）· AC-06 pass（S-05 fresh：错 scope/未知 producer 拒绝、006 文本+002 附件共存、固定 manifest SHA、必需 case 无 skip、数据隔离）· AC-07 pass（本复审：AC 映射→任务→代码/断言→证据逐项核对；SD-01/02/03 与代码一致）· AC-08=merge 所有 | pending_closeout_gates: merge-owned——canonical 发布核验、frontmatter supersedes 清单与 SD-02/03 modify 语义对齐、归档（docs/plans/archived/ + status: archived + 链接升层）、plan-artifacts/plan-003 折叠删除 | findings: 无阻断项。非阻断观察 2 条：①launcher_scan 回执写失败未检查返回（磁盘满极端面）——fp 幂等 + 同包重投可收敛，未列入 D-02 枚举确定结果表，记录不阻塞；②frontmatter `supersedes_spec_components` 含 002/006 两份 spec 组件，而 SD-02/03 实为 modify 共存节——merge 收口时与规范增量表对齐 | evidence: 复审 fresh 重跑——verify_entry_knowledge_adapters.py service **50/0/0**、vue **63/0/0**（本复审独立执行，非沿用 work 摘要）；断言核读=launcher_submit 仅 ok=true 标 committed / jade manifest 最后写=完整性 / source_capture producer 注册表+fp 冻结校验 / ink_get json.encode 文本形态 / NotesWidget 内部消息透传载荷（vue 生成面 @DraftEdit="DraftEdit" emit(v)）；SD 与代码逐条对照 | next: merge（T-07，按 81d565b 固定版本）
+
+2026-11-13 · stage: merge | plan_id: NOTES-003:r3 | outcome: pass | delivery_commit: 467ea76（main 线性史——实施线 81d565b→复审回执 467ea76 线性于 main，零 merge 提交；本仓惯例=实施树即独立 clone main，无 dev 分支/worktree 可移除） | checkpoints: prepared（reviewed@467ea76 + canonical diff 随工作提交 81d565b 在树）→ landed（main 顶=467ea76，线性史）→ canonical_verified（docs/specs/notes/entry-and-knowledge-adapters.md sha256[:16]=a6f25b89b3b29a7a（新增，SD-01）· featurepack-service-and-editor.md=df257d712bfcb69d（SD-02 共存节）· quick-card-assets.md=a778c13ff8e0c741（SD-03 导出消费节），全在 landed 树；review 观察②已核对：frontmatter supersedes 含被修改组件=002/006 归档先例同款惯例，无需改动）→ archived（本文件，status: archived，设计链接升层 ../../design，006/002 同目录链接与 Reader013 深度不变；T-00..T-07 全 [x]、计数 8/8）→ cleaned ✓（plan-artifacts/plan-003 全删（smoke-probe/电池日志/运行目录，关键证据已折入 §8/§9 回执与 SD-01），registry .retention/policy.json 记 auto-notes/PLAN-003 deleted-at-merge (no holds)；无 worktree 可移除——实施树=常驻 main clone；os-067 工作树属 auto-os PLAN-067，非本计划） | landing_checks: 部署面观察项——后端 release 二进制与生成 web bundle 随下次性能/交付门构建再生（AGENTS.md 构建纪律：release 仅限性能/交付门；本交付以 debug 快环双轨 50/0/0+63/0/0 + 受影响回归全绿为门），未预设部署；batch regression：本仓无该约定（.last-batch-regression.json 不存在，003 非 5 倍数）——不适用 | completion_kind: delivered | AC-08: 按本回执交付；接收仓可消费版本=entry-and-knowledge-adapters.md（接口/契约面）+ caller harness/stub 与版本化样例（tests/fixtures/integrations/ + verify_entry_knowledge_adapters.py）；真实外仓联动（Launcher 桌面/桌面小组件、Jade/Scape/Lens 真实宿主）为各接收仓独立验收项，本仓未联动清单=§10 在案 | next: done
 
 ## 10. 待澄清事项
 
