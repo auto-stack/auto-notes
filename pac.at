@@ -32,3 +32,12 @@ dep themes {
 desktop: "true"
 front_port: 17818
 back_port: 17819
+
+# auto-os PLAN-067 T-02 P-02（OS 侧启动装配交接，精确产品改面）：桌面
+# launch 前置 daemon ensure 声明——值 = apps.manifest 条目 id。触发
+# auto-ui session launch 的 ensure_manifest_daemon：ping :17819 → 未就绪按
+# manifest daemon.bin 路径语义 spawn 发布件 notes-service.exe
+# （AUTO_HTTP_PORT 端口 env 注入）。独立 `auto run` 不经 session launch
+# 面，不受此键影响。
+daemon: "015-notes"
+
