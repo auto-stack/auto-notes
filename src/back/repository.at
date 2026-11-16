@@ -1,4 +1,5 @@
 // repository.at — NOTES-001 Phase 2：SQLite 单写者可靠存储（r3/T-05 协议冻结实现）。
+// NOTES-007 T-02：存储并发模型修复（读快照瞬态停摆）——见下「并发模型」。
 //
 // 能力依据：tests/probe/PHASE2-CAPABILITY-REPORT.md（T-05 实测：事务 batch、
 // 跨连接 BEGIN IMMEDIATE 排他、回滚、'' 转义 + Unicode 往返全部通过）。
@@ -8,11 +9,24 @@
 // 本模块不导入 api 类型（避免 api→db→repository→api 循环导入，D-742-1）：
 // 全部 I/O 为 JSON 字符串；db.at 解析并构造 legacy Note 视图。
 //
-// 模式（T-06 门禁覆盖所有变更与读取入口；迁移同门禁）：
-//   每请求独立 sqlite.open → busy_timeout=3000 → BEGIN IMMEDIATE →
-//   以 DB 当前状态做检查（幂等/revision/存在性）→ 写入 →
-//   INSERT requests（request_id↔note_id 同事务绑定）→ COMMIT。
-//   任一步失败 → ROLLBACK + 错误 JSON；绝无部分状态。
+// 并发模型（NOTES-007；SD-01「存储并发模型」）：
+//   * 读路径（repo_get/repo_list_active/repo_search/read_receipt/repo_status/
+//     fp_get/fp_list_by_book/fp_receipt/fp_draft_get/fp_source_of_view）：
+//     **单连接、零写锁**。打开后只做只读就绪探针（见下）+ SELECT；绝不
+//     BEGIN IMMEDIATE、绝不 ALTER/meta 写。
+//   * 写路径：单连接 + BEGIN IMMEDIATE + busy_timeout=5000；BUSY/超时 →
+//     具名 second_writer 快速失败（不悬挂）。
+//   * schema/迁移就绪探针：`meta.schema_v='3'` + 三处结构哨兵（notes.book_id/
+//     notes.source_json/requests.intent）+ fp_drafts 表存在性。全部就绪即零写
+//     直连；任一项不满足才进一次性慢路径（BEGIN IMMEDIATE 内二次确认后完整
+//     DDL + 版本写 + seed）——半途迁移/列缺席仍自愈（S-02 语义保持）。
+//   * 打开失败具名化：a2r `sqlite.open` 在文件打开失败时**静默回退内存库**
+//     （a2r-std/sqlite.rs：31-43），旧代码会把幽灵空库当真实快照（幻影
+//     not_found / 冻结空列表 / 假成功写）。本模块每次打开后用
+//     `PRAGMA database_list` 的 main.file 验证文件背衬，失败一律具名
+//     storage_unavailable，绝不静默降级。
+//   * 慢操作登记：打开+就绪耗时、写事务耗时 >2000ms 打印 `storage_slow`
+//     单行日志（停摆取证与回归观测；不引入异步重排）。
 // 幂等：requests 表命中 → 返回原 note JSON（AC-02）。
 // 迁移：meta.migrated=1 + legacy_id UNIQUE ⇒ 重试幂等（AC-03）。
 // 双进程：BEGIN IMMEDIATE 由 SQLite 文件锁排他，后到 BUSY → second_writer。
@@ -20,6 +34,7 @@
 use auto.env
 use auto.sqlite
 use auto.json
+use auto.time
 
 // Invalid raw JSON and the literal `null` both cannot carry an app manifest or
 // entity. In the embedded runtime json.parse uses JsonValue null as its
@@ -166,6 +181,11 @@ pub fn ui_request_id(prefix str) str {
 /// 直接返回旧信封（ok=true 但不写入——已在冒烟中实证）。req_seq 每取一次自增。
 fn next_req_seq() int {
     var db SqliteDb = sqlite.open(db_path())
+    // 写连接背衬校验（NOTES-007）：打开回退内存库时绝不假发号（幽灵写）。
+    if conn_is_file_backed(db) == false {
+        print("storage_error op=next_req_seq phase=open err=storage_unavailable")
+        return -1
+    }
     var up int = db.exec("UPDATE meta SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT) WHERE k='req_seq'")
     if up == 0 {
         db.exec("INSERT INTO meta(k, v) VALUES('req_seq', '1')")
@@ -226,9 +246,92 @@ fn valid_request_id(rid str) bool {
     return true
 }
 
+// ═══════════════════════════════════════════════════════════
+// 就绪/打开辅助（NOTES-007 T-02 并发模型）
+// ═══════════════════════════════════════════════════════════
+
+/// 连接是否真的落在文件库上。a2r `sqlite.open` 打开失败会**静默回退内存库**
+/// （a2r-std/sqlite.rs:31-43）——幽灵空库会把读伪装成"空快照/note 不存在"，
+/// 把写伪装成成功。`PRAGMA database_list` 的 main.file 为空即内存回退，
+/// 一律视为 storage_unavailable 具名失败。
+fn conn_is_file_backed(db SqliteDb) bool {
+    var rows List<List<str>> = db.query("PRAGMA database_list")
+    var n int = rows.len()
+    for i in 0..n {
+        var row = rows[i]
+        if row[1] == "main" {
+            return row[2] != ""
+        }
+    }
+    return false
+}
+
+/// 表是否带某列（结构哨兵；缺失 = 半途迁移/被外部 DROP，需重跑 DDL 自愈）。
+fn table_has_column(db SqliteDb, table str, col str) bool {
+    var rows List<List<str>> = db.query("PRAGMA table_info(" + table + ")")
+    var n int = rows.len()
+    for i in 0..n {
+        var row = rows[i]
+        if row[1] == col {
+            return true
+        }
+    }
+    return false
+}
+
+fn table_exists(db SqliteDb, table str) bool {
+    var rows List<List<str>> = db.query("PRAGMA table_info(" + table + ")")
+    return rows.len() > 0
+}
+
+/// 结构就绪探针（全只读：1 条 meta SELECT + 4 条 schema pragma）：
+/// 版本 + 三处后加列 + fp_drafts 表。全满足 = 零写直连；否则进一次性慢路径。
+/// 增列/改表时须同步本探针（漏加只会让慢路径多跑，不会读错数据）。
+fn schema_structurally_ready(db SqliteDb) bool {
+    if meta_get_on(db, "schema_v") != "3" {
+        return false
+    }
+    if table_has_column(db, "notes", "book_id") == false {
+        return false
+    }
+    if table_has_column(db, "notes", "source_json") == false {
+        return false
+    }
+    if table_has_column(db, "requests", "intent") == false {
+        return false
+    }
+    if table_exists(db, "fp_drafts") == false {
+        return false
+    }
+    return true
+}
+
+/// 慢操作登记（>2s）：供停摆取证与回归观测。单行、具名、可 grep。
+fn slow_op(op str, phase str, t0 int) {
+    var dt int = time.now_ms() - t0
+    if dt > 2000 {
+        print("storage_slow op=" + op + " phase=" + phase + " ms=" + json.encode(dt))
+    }
+}
+
+fn storage_err_json(code str) str {
+    return "{\"__storage_error\":\"" + code + "\"}"
+}
+
+/// 读路径错误码提取（db 层用它把具名失败映射到端点信封）。
+pub fn storage_error_of(js str) str {
+    if js == "" {
+        return ""
+    }
+    var it = json.parse(js)
+    if it == json.parse("null") {
+        return ""
+    }
+    return json.as_string(json.get(it, "__storage_error"))
+}
+
+/// 完整 DDL/迁移/播种（只在结构未就绪时由 ensure_schema_once 在写事务内调用）。
 fn ensure_schema(db SqliteDb) {
-    db.exec("PRAGMA busy_timeout=3000")
-    db.exec("PRAGMA journal_mode=WAL")
     db.exec("CREATE TABLE IF NOT EXISTS notes(note_id TEXT PRIMARY KEY, legacy_id INTEGER UNIQUE, revision INTEGER NOT NULL DEFAULT 1, title TEXT NOT NULL DEFAULT '', body TEXT NOT NULL DEFAULT '', tags_json TEXT NOT NULL DEFAULT '[]', color TEXT NOT NULL DEFAULT '', pinned INTEGER NOT NULL DEFAULT 0, state TEXT NOT NULL DEFAULT 'active', folder TEXT NOT NULL DEFAULT '', seq INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')")
     // schema v2（SD-09/T-14）：requests 增加持久意图与原收据列。
     // rev/doc_json = 提交时的收据修订与文档快照（重放不得被后续变更改写）；
@@ -255,8 +358,80 @@ fn ensure_schema(db SqliteDb) {
     if sv != "3" {
         migrate_request_intents(db)
     }
-    db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('schema_v','3')")
+}
+
+/// 一次性 schema 慢路径：未就绪时才进入。BEGIN IMMEDIATE 内二次确认——并发
+/// 首请求/多进程同时初始化时只有第一个建表，其余看到就绪后直接提交返回。
+/// 返回 "" 成功；second_writer = 门禁被占；storage_unavailable = 写失败。
+fn ensure_schema_once(db SqliteDb, op str) str {
+    var t0 int = time.now_ms()
+    db.exec("PRAGMA busy_timeout=5000")
+    // WAL 切换不能出现在事务内：先在事务外做（已是 WAL 时为空操作）。
+    db.exec("PRAGMA journal_mode=WAL")
+    var begin int = db.exec("BEGIN IMMEDIATE")
+    if begin < 0 {
+        print("storage_error op=" + op + " phase=schema err=second_writer")
+        return "second_writer"
+    }
+    if schema_structurally_ready(db) {
+        db.exec("COMMIT")
+        return ""
+    }
+    ensure_schema(db)
+    // 版本标记与 DDL 同事务提交：绝不出现"建了表但没版本"的半态。
+    var vw int = db.exec("INSERT OR REPLACE INTO meta(k,v) VALUES('schema_v','3')")
+    if vw < 0 {
+        db.exec("ROLLBACK")
+        print("storage_error op=" + op + " phase=schema err=storage_unavailable")
+        return "storage_unavailable"
+    }
+    var fin int = db.exec("COMMIT")
+    if fin < 0 {
+        print("storage_error op=" + op + " phase=schema_commit err=storage_unavailable")
+        return "storage_unavailable"
+    }
+    print("storage_schema_init op=" + op + " schema_v=3")
+    slow_op(op, "schema_init", t0)
+    // 播种必须在写事务之外（seed → repo_create 走自己的 BEGIN IMMEDIATE）；
+    // NOTES_SEED 未设时为空操作。
     seed_if_requested(db)
+    return ""
+}
+
+/// 读写共用的就绪入口：文件背衬验证 → 结构探针（全只读）→ 必要时一次性慢
+/// 路径 → legacy 升级状态机（就绪后只读）。返回 "" = 可安全读写。
+fn open_ready(db SqliteDb, op str) str {
+    var t0 int = time.now_ms()
+    if conn_is_file_backed(db) == false {
+        print("storage_error op=" + op + " phase=open err=storage_unavailable")
+        return "storage_unavailable"
+    }
+    if schema_structurally_ready(db) == false {
+        var serr str = ensure_schema_once(db, op)
+        if serr != "" {
+            return serr
+        }
+    }
+    // legacy 升级状态机（SD-17/SD-18）语义原样：就绪库上只读（meta 两查 +
+    // manifest 存在性），仅升级/修复代际转换时写。
+    var uerr str = upgrade_if_legacy(db)
+    if uerr != "" {
+        print("storage_error op=" + op + " phase=legacy err=" + uerr)
+        return uerr
+    }
+    slow_op(op, "open_ready", t0)
+    return ""
+}
+
+/// 写连接背衬校验（write 路径在 BEGIN IMMEDIATE 前调用）：两次打开之间若
+/// 文件被外部锁住，第二次 sqlite.open 会回退内存库——不校验就会把写落进
+/// 幽灵库并假报成功。
+fn write_conn_ok(db SqliteDb, op str) str {
+    if conn_is_file_backed(db) == false {
+        print("storage_error op=" + op + " phase=write_open err=storage_unavailable")
+        return "storage_unavailable"
+    }
+    return ""
 }
 
 /// r4 时代 v2 行的意图迁移（SD-13）：rev>0 且 doc 快照在案的行，按提交时
@@ -385,14 +560,12 @@ fn row_to_doc_json(row List<str>) str {
 // 打开
 // ═══════════════════════════════════════════════════════════
 
+/// 写路径入口：单连接打开 + 就绪探针（全只读）+ legacy 状态机。
+/// 就绪后本函数只做只读检查；schema 慢路径仅首次/结构受损时进入。
 pub fn open_repository() str {
     var db SqliteDb = sqlite.open(db_path())
-    ensure_schema(db)
-    var uerr str = upgrade_if_legacy(db)
-    if uerr != "" {
-        return uerr
-    }
-    return ""
+    db.exec("PRAGMA busy_timeout=5000")
+    return open_ready(db, "write")
 }
 
 /// Phase 1 JSON 布局 → SQLite 安全升级（SD-07/T-12；r6/T-22/T-23 修正 F-R6-01/02/03）。
@@ -1146,8 +1319,13 @@ pub fn read_receipt(request_id str) str {
     if request_id == "" {
         return rc
     }
+    // 读路径（NOTES-007）：单连接、零写锁。
     var db SqliteDb = sqlite.open(db_path())
-    ensure_schema(db)
+    db.exec("PRAGMA busy_timeout=3000")
+    var oerr str = open_ready(db, "read_receipt")
+    if oerr != "" {
+        return "{\"schema_version\":1,\"request_id\":" + json.encode(request_id) + ",\"note_id\":\"\",\"revision\":0,\"status\":\"\",\"err_code\":\"" + oerr + "\"}"
+    }
     var esc str = json.encode(request_id)
     var sql str = "SELECT note_id FROM requests WHERE request_id=" + sql_str(request_id)
     var rows List<List<str>> = db.query(sql)
@@ -1183,8 +1361,15 @@ pub fn repo_create(title str, body str, folder str, tags_json str, request_id st
     // 不同意图，重放时明确拒绝
     var intent str = canonical_create_intent(title, body, folder, tags_json)
     var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=5000")
+    var werr str = write_conn_ok(db, "repo_create")
+    if werr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + werr + "\"}"
+    }
+    var t0 int = time.now_ms()
     var begin int = db.exec("BEGIN IMMEDIATE")
     if begin < 0 {
+        print("storage_error op=repo_create phase=begin err=second_writer")
         return "{\"ok\":false,\"err_code\":\"second_writer\"}"
     }
     // 幂等重放（事务内查询，杜绝 after_commit 重放重复）
@@ -1224,6 +1409,7 @@ pub fn repo_create(title str, body str, folder str, tags_json str, request_id st
     var doc = load_doc_json_on(db, note_id)
     var rc str = "{\"schema_version\":1,\"request_id\":" + json.encode(rid)
     rc = rc + ",\"note_id\":" + json.encode(note_id) + ",\"revision\":1,\"status\":\"committed\"}"
+    slow_op("repo_create", "write_txn", t0)
     return "{\"ok\":true,\"err_code\":\"\",\"note\":" + doc + ",\"receipt\":" + rc + "}"
 }
 
@@ -1245,8 +1431,15 @@ pub fn repo_update(note_id str, expected_revision int, title str, body str, requ
     // 内容/期望修订 = 不同意图
     var intent str = canonical_update_intent(note_id, expected_revision, title, body)
     var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=5000")
+    var werr str = write_conn_ok(db, "repo_update")
+    if werr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + werr + "\"}"
+    }
+    var t0 int = time.now_ms()
     var begin int = db.exec("BEGIN IMMEDIATE")
     if begin < 0 {
+        print("storage_error op=repo_update phase=begin err=second_writer")
         return "{\"ok\":false,\"err_code\":\"second_writer\"}"
     }
     var dup = replay_in_txn(db, rid, "update", note_id, intent)
@@ -1292,6 +1485,7 @@ pub fn repo_update(note_id str, expected_revision int, title str, body str, requ
     var doc = load_doc_json_on(db, note_id)
     var rc str = "{\"schema_version\":1,\"request_id\":" + json.encode(rid)
     rc = rc + ",\"note_id\":" + json.encode(note_id) + ",\"revision\":" + json.encode(new_rev) + ",\"status\":\"committed\"}"
+    slow_op("repo_update", "write_txn", t0)
     return "{\"ok\":true,\"err_code\":\"\",\"note\":" + doc + ",\"receipt\":" + rc + "}"
 }
 
@@ -1302,6 +1496,12 @@ fn repo_set_meta(note_id str, new_state str, pin int, tags_json str, set_tags bo
         return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
     }
     var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=5000")
+    var werr str = write_conn_ok(db, "repo_set_meta")
+    if werr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + werr + "\"}"
+    }
+    var t0 int = time.now_ms()
     var begin int = db.exec("BEGIN IMMEDIATE")
     if begin < 0 {
         return "{\"ok\":false,\"err_code\":\"second_writer\"}"
@@ -1347,6 +1547,7 @@ fn repo_set_meta(note_id str, new_state str, pin int, tags_json str, set_tags bo
         return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
     }
     var doc = load_doc_json_on(db, note_id)
+    slow_op("repo_set_meta", "write_txn", t0)
     return "{\"ok\":true,\"note\":" + doc + "}"
 }
 
@@ -1378,23 +1579,26 @@ pub fn repo_move(note_id str, folder str) str {
     return repo_set_meta(note_id, "", -1, "[]", false, folder, true)
 }
 
-/// 读取单个文档 JSON（含 trashed）；无 → ""
+/// 读取单个文档 JSON（含 trashed）；无 → ""（真不存在）；存储不可用 →
+/// `{"__storage_error":"..."}`（绝不与"不存在"混淆——幻影 not_found 禁令）。
 pub fn repo_get(note_id str) str {
-    var oerr str = open_repository()
-    if oerr != "" {
-        return ""
-    }
     var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=3000")
+    var oerr str = open_ready(db, "repo_get")
+    if oerr != "" {
+        return storage_err_json(oerr)
+    }
     return load_doc_json_on(db, note_id)
 }
 
 /// active 列表 JSON 数组，seq 降序（新在前）
 pub fn repo_list_active() str {
-    var oerr str = open_repository()
-    if oerr != "" {
-        return "[]"
-    }
     var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=3000")
+    var oerr str = open_ready(db, "repo_list_active")
+    if oerr != "" {
+        return storage_err_json(oerr)
+    }
     var sql str = "SELECT " + note_select_cols() + " FROM notes WHERE state='active' ORDER BY seq DESC"
     var rows List<List<str>> = db.query(sql)
     var out str = "["
@@ -1412,12 +1616,13 @@ pub fn repo_list_active() str {
 
 /// 搜索：title/body 子串，大小写不敏感（SQL lower + LIKE）
 pub fn repo_search(query str) str {
-    var oerr str = open_repository()
+    var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=3000")
+    var oerr str = open_ready(db, "repo_search")
     if oerr != "" {
-        return "[]"
+        return storage_err_json(oerr)
     }
     var like str = sql_str("%" + query.lower() + "%")
-    var db SqliteDb = sqlite.open(db_path())
     var sql str = "SELECT " + note_select_cols() + " FROM notes WHERE state='active' AND (lower(title) LIKE " + like + " OR lower(body) LIKE " + like + ") ORDER BY seq DESC"
     var rows List<List<str>> = db.query(sql)
     var out str = "["
@@ -1433,10 +1638,26 @@ pub fn repo_search(query str) str {
     return out
 }
 
-/// 诊断状态
+/// 诊断状态。存储不可用时 loaded=false + storage_error 具名（绝不假报
+/// loaded=true/entries=0——旧实现的幽灵空库会把停摆伪装成"库是空的"）。
+/// legacy 升级被拒（upgrade_conflict/incomplete）不算存储不可用：库体照常
+/// 报告，拒绝原因经 upgrade_error 显式可见（S-16/S-19 语义原样）。
 pub fn repo_status() str {
     var db SqliteDb = sqlite.open(db_path())
-    ensure_schema(db)
+    db.exec("PRAGMA busy_timeout=3000")
+    if conn_is_file_backed(db) == false {
+        print("storage_error op=repo_status phase=open err=storage_unavailable")
+        return "{\"loaded\":false,\"err\":\"storage_unavailable\",\"counter\":0,\"entries\":0,\"max_legacy_id\":0,\"migrated\":\"\",\"upgrade_error\":\"storage_unavailable\",\"storage_error\":\"storage_unavailable\",\"data_dir\":" + json.encode(data_dir()) + "}"
+    }
+    if schema_structurally_ready(db) == false {
+        var serr str = ensure_schema_once(db, "repo_status")
+        if serr != "" {
+            return "{\"loaded\":false,\"err\":\"" + serr + "\",\"counter\":0,\"entries\":0,\"max_legacy_id\":0,\"migrated\":\"\",\"upgrade_error\":\"" + serr + "\",\"storage_error\":\"" + serr + "\",\"data_dir\":" + json.encode(data_dir()) + "}"
+        }
+    }
+    // legacy 状态机：拒绝原因只入 upgrade_error（meta 由 upgrade_if_legacy 写），
+    // 不阻断状态报告（否则一次历史冲突会让诊断面整体失明）。
+    var uerr str = upgrade_if_legacy(db)
     var rows List<List<str>> = db.query("SELECT COUNT(*), COALESCE(MAX(CAST(legacy_id AS INTEGER)),0) FROM notes")
     var cnt int = 0
     var maxleg int = 0
@@ -1446,13 +1667,18 @@ pub fn repo_status() str {
         maxleg = parse_int(row0[1])
     }
     var migrated str = meta_get_on(db, "migrated")
+    var ue str = meta_get_on(db, "upgrade_error")
+    if ue == "" {
+        ue = uerr
+    }
     var s str = "{\"loaded\":true,\"err\":\"\","
     s = s + "\"counter\":" + json.encode(next_counter_on(db))
     s = s + ",\"entries\":" + json.encode(cnt)
     s = s + ",\"max_legacy_id\":" + json.encode(maxleg)
     s = s + ",\"migrated\":" + json.encode(migrated)
     // 升级失败显式可见（F-R5-01：不得以 loaded=true/err 空掩盖不完整升级）
-    s = s + ",\"upgrade_error\":" + json.encode(meta_get_on(db, "upgrade_error"))
+    s = s + ",\"upgrade_error\":" + json.encode(ue)
+    s = s + ",\"storage_error\":\"\""
     s = s + ",\"data_dir\":" + json.encode(data_dir())
     s = s + "}"
     return s
@@ -1466,7 +1692,11 @@ pub fn repo_status() str {
 
 pub fn migrate_legacy_at(legacy_path str) str {
     var db SqliteDb = sqlite.open(db_path())
-    ensure_schema(db)
+    db.exec("PRAGMA busy_timeout=5000")
+    var rerr str = open_ready(db, "migrate_legacy_at")
+    if rerr != "" {
+        return "{\"attempted\":true,\"migrated\":0,\"skipped_existing\":false,\"saved\":false,\"err\":\"" + rerr + "\",\"backup_file\":\"\",\"corrupted\":[]}"
+    }
     var migrated_flag str = meta_get_on(db, "migrated")
     var cnt_rows List<List<str>> = db.query("SELECT COUNT(*) FROM notes")
     var have int = 0
@@ -1932,7 +2162,11 @@ fn salvage_objects(raw str) str {
 
 pub fn test_reset() {
     var db SqliteDb = sqlite.open(db_path())
-    ensure_schema(db)
+    db.exec("PRAGMA busy_timeout=5000")
+    var rerr str = open_ready(db, "test_reset")
+    if rerr != "" {
+        print("storage_error op=test_reset err=" + rerr)
+    }
 }
 
 pub fn test_load_manifest() bool {
@@ -2228,8 +2462,15 @@ pub fn fp_capture(cred str, operation_id str, source_json str, text str) str {
     var quote str = json.as_string(json.get(src, "quote"))
     var intent str = "fp1|capture|" + json.encode(principal) + "|" + json.encode(operation_id) + "|" + json.encode(source_json) + "|" + json.encode(text)
     var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=5000")
+    var werr str = write_conn_ok(db, "fp_capture")
+    if werr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + werr + "\"}"
+    }
+    var t0 int = time.now_ms()
     var begin int = db.exec("BEGIN IMMEDIATE")
     if begin < 0 {
+        print("storage_error op=fp_capture phase=begin err=second_writer")
         return "{\"ok\":false,\"err_code\":\"second_writer\"}"
     }
     var dup = replay_in_txn(db, rid, "fp_capture", "", intent)
@@ -2260,12 +2501,15 @@ pub fn fp_capture(cred str, operation_id str, source_json str, text str) str {
     var doc = load_doc_json_on(db, note_id)
     var rc str = "{\"schema_version\":1,\"request_id\":" + json.encode(rid)
     rc = rc + ",\"note_id\":" + json.encode(note_id) + ",\"revision\":1,\"status\":\"committed\"}"
+    slow_op("fp_capture", "write_txn", t0)
     return "{\"ok\":true,\"err_code\":\"\",\"note\":" + doc + ",\"receipt\":" + rc + ",\"replayed\":false}"
 }
 
 /// 读取（含来源字段）：授权书 read + 作用域核对后返回 fp 文档投影。
 pub fn fp_get(cred str, note_id str) str {
-    var oerr str = open_repository()
+    var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=3000")
+    var oerr str = open_ready(db, "fp_get")
     if oerr != "" {
         return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
     }
@@ -2274,7 +2518,6 @@ pub fn fp_get(cred str, note_id str) str {
         return fp_deny("read not authorized for this credential")
     }
     var scopes str = fp_entry_scopes(entry)
-    var db SqliteDb = sqlite.open(db_path())
     var brows List<List<str>> = db.query("SELECT book_id FROM notes WHERE note_id=" + sql_str(note_id))
     if brows.len() < 1 {
         return fp_not_found()
@@ -2288,7 +2531,9 @@ pub fn fp_get(cred str, note_id str) str {
 
 /// 按书分页（seq 降序，cursor = 上一页末行 seq；0 = 首页；lim+1 探测 has_more）。
 pub fn fp_list_by_book(cred str, book_id str, cursor int, limit int) str {
-    var oerr str = open_repository()
+    var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=3000")
+    var oerr str = open_ready(db, "fp_list_by_book")
     if oerr != "" {
         return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
     }
@@ -2307,7 +2552,6 @@ pub fn fp_list_by_book(cred str, book_id str, cursor int, limit int) str {
     if lim > 100 {
         lim = 100
     }
-    var db SqliteDb = sqlite.open(db_path())
     var sql str = "SELECT " + note_select_cols() + ", book_id, source_json FROM notes WHERE book_id=" + sql_str(book_id) + " AND state='active'"
     if cursor > 0 {
         sql = sql + " AND seq < " + json.encode(cursor)
@@ -2363,6 +2607,11 @@ pub fn fp_update(cred str, note_id str, expected_revision int, text str, operati
     }
     var scopes str = fp_entry_scopes(entry)
     var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=5000")
+    var werr str = write_conn_ok(db, "fp_update")
+    if werr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + werr + "\"}"
+    }
     var brows List<List<str>> = db.query("SELECT book_id FROM notes WHERE note_id=" + sql_str(note_id))
     if brows.len() < 1 {
         return fp_not_found()
@@ -2380,8 +2629,10 @@ pub fn fp_update(cred str, note_id str, expected_revision int, text str, operati
         return "{\"ok\":false,\"err_code\":\"invalid_request\"}"
     }
     var intent str = "fp1|update|" + json.encode(principal) + "|" + json.encode(operation_id) + "|" + json.encode(note_id) + "|" + json.encode(expected_revision) + "|" + json.encode(text)
+    var t0 int = time.now_ms()
     var begin int = db.exec("BEGIN IMMEDIATE")
     if begin < 0 {
+        print("storage_error op=fp_update phase=begin err=second_writer")
         return "{\"ok\":false,\"err_code\":\"second_writer\"}"
     }
     var dup = replay_in_txn(db, rid, "fp_update", note_id, intent)
@@ -2419,13 +2670,16 @@ pub fn fp_update(cred str, note_id str, expected_revision int, text str, operati
     var doc = load_doc_json_on(db, note_id)
     var rc str = "{\"schema_version\":1,\"request_id\":" + json.encode(rid)
     rc = rc + ",\"note_id\":" + json.encode(note_id) + ",\"revision\":" + json.encode(new_rev) + ",\"status\":\"committed\"}"
+    slow_op("fp_update", "write_txn", t0)
     return "{\"ok\":true,\"err_code\":\"\",\"note\":" + doc + ",\"receipt\":" + rc + ",\"replayed\":false}"
 }
 
 /// 回执查询：requests 行存在且 rev 可恢复 → 存储的原收据；无行/rev 不可
 /// 恢复 → not_observed（不证明在途请求永不提交——契约 §5 同语）。
 pub fn fp_receipt(cred str, operation_id str) str {
-    var oerr str = open_repository()
+    var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=3000")
+    var oerr str = open_ready(db, "fp_receipt")
     if oerr != "" {
         return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
     }
@@ -2441,7 +2695,6 @@ pub fn fp_receipt(cred str, operation_id str) str {
     if valid_request_id(rid) == false {
         return "{\"ok\":false,\"err_code\":\"invalid_request\"}"
     }
-    var db SqliteDb = sqlite.open(db_path())
     var rows List<List<str>> = db.query("SELECT note_id, kind, rev, doc_json FROM requests WHERE request_id=" + sql_str(rid))
     if rows.len() < 1 {
         return "{\"ok\":true,\"err_code\":\"\",\"status\":\"not_observed\"}"
@@ -2495,10 +2748,17 @@ pub fn fp_draft_put(draft_key str, text str, state str, op str, base_rev int, in
         return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
     }
     var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=5000")
+    var werr str = write_conn_ok(db, "fp_draft_put")
+    if werr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + werr + "\"}"
+    }
+    var t0 int = time.now_ms()
     var r int = db.exec("INSERT INTO fp_drafts(draft_key, text, state, op, base_rev, input_ver) VALUES(" + sql_str(draft_key) + ", " + sql_str(text) + ", " + sql_str(state) + ", " + sql_str(op) + ", " + json.encode(base_rev) + ", " + json.encode(input_ver) + ") ON CONFLICT(draft_key) DO UPDATE SET text=" + sql_str(text) + ", state=" + sql_str(state) + ", op=" + sql_str(op) + ", base_rev=" + json.encode(base_rev) + ", input_ver=" + json.encode(input_ver))
     if r < 0 {
         return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
     }
+    slow_op("fp_draft_put", "write", t0)
     return "{\"ok\":true,\"err_code\":\"\"}"
 }
 
@@ -2507,11 +2767,12 @@ pub fn fp_draft_get(draft_key str) str {
     if fp_draft_key_ok(draft_key) == false {
         return "{\"ok\":false,\"err_code\":\"invalid_request\",\"err_detail\":\"draft_key required (1..256)\"}"
     }
-    var oerr str = open_repository()
+    var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=3000")
+    var oerr str = open_ready(db, "fp_draft_get")
     if oerr != "" {
         return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
     }
-    var db SqliteDb = sqlite.open(db_path())
     var rows List<List<str>> = db.query("SELECT text, state, op, base_rev, input_ver FROM fp_drafts WHERE draft_key=" + sql_str(draft_key))
     if rows.len() < 1 {
         return "{\"ok\":true,\"err_code\":\"\",\"found\":false,\"text\":\"\",\"state\":\"\",\"op\":\"\",\"base_rev\":0,\"input_ver\":0}"
@@ -2533,6 +2794,11 @@ pub fn fp_draft_delete(draft_key str) str {
         return "{\"ok\":false,\"err_code\":\"" + oerr + "\"}"
     }
     var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=5000")
+    var werr str = write_conn_ok(db, "fp_draft_delete")
+    if werr != "" {
+        return "{\"ok\":false,\"err_code\":\"" + werr + "\"}"
+    }
     var r int = db.exec("DELETE FROM fp_drafts WHERE draft_key=" + sql_str(draft_key))
     if r < 0 {
         return "{\"ok\":false,\"err_code\":\"storage_unwritable\"}"
@@ -2594,11 +2860,12 @@ pub fn fp_source_view_of_note(note_id int) str {
 /// title/author/quote/locator 从不可变快照提取（缺失留空）；source_json =
 /// 快照原文（OpenSource 载荷，不重组不规范化）。
 pub fn fp_source_of_view(note_id str) str {
-    var oerr str = open_repository()
-    if oerr != "" {
-        return "{\"found\":false,\"book_id\":\"\",\"source_status\":\"error\",\"title\":\"\",\"author\":\"\",\"quote\":\"\",\"locator\":\"\",\"source_json\":\"\"}"
-    }
     var db SqliteDb = sqlite.open(db_path())
+    db.exec("PRAGMA busy_timeout=3000")
+    var oerr str = open_ready(db, "fp_source_of_view")
+    if oerr != "" {
+        return "{\"found\":false,\"book_id\":\"\",\"source_status\":\"error\",\"title\":\"\",\"author\":\"\",\"quote\":\"\",\"locator\":\"\",\"source_json\":\"\",\"err_code\":\"" + oerr + "\"}"
+    }
     var rows List<List<str>> = db.query("SELECT book_id, source_json FROM notes WHERE note_id=" + sql_str(note_id) + " AND state='active'")
     if rows.len() < 1 {
         return "{\"found\":false,\"note_id\":" + json.encode(note_id) + ",\"book_id\":\"\",\"source_status\":\"none\",\"title\":\"\",\"author\":\"\",\"quote\":\"\",\"locator\":\"\",\"source_json\":\"\"}"

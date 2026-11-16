@@ -218,6 +218,11 @@ pub fn v1_update_note(nid str, expected_revision int, title str, body str, reque
 
 pub fn v1_get_note(nid str) RepoResult {
     var docjs str = repository.repo_get(nid)
+    // 存储不可用 ≠ 不存在（NOTES-007 幻影 not_found 禁令）：具名失败原样上报。
+    var se str = repository.storage_error_of(docjs)
+    if se != "" {
+        return repo_result_of("{\"ok\":false,\"err_code\":\"" + se + "\"}")
+    }
     if docjs == "" {
         var e RepoResult = repo_result_of("{\"ok\":false,\"err_code\":\"not_found\"}")
         return e
@@ -238,6 +243,11 @@ pub fn v1_restore_note(nid str) RepoResult {
 
 pub fn v1_list_notes() []NoteDocument {
     var js str = repository.repo_list_active()
+    // typed 数组端点无法携带错误信封：存储不可用时返回空集，但失败已由
+    // /api/v1/status.storage_error 与 storage_error 日志具名（绝不静默）。
+    if repository.storage_error_of(js) != "" {
+        return List<NoteDocument>.new([])
+    }
     var arr = json.parse(js)
     var n int = json.len(arr)
     var out List<NoteDocument> = List<NoteDocument>.new([])
@@ -347,6 +357,9 @@ fn note_of_result(js str) ?Note {
 
 pub fn all_notes() []Note {
     var js str = repository.repo_list_active()
+    if repository.storage_error_of(js) != "" {
+        return List<Note>.new([])
+    }
     var arr = json.parse(js)
     var n int = json.len(arr)
     var out List<Note> = List<Note>.new([])
@@ -361,7 +374,7 @@ pub fn all_notes() []Note {
 
 pub fn find_note(id int) ?Note {
     var js str = repository.repo_get(repository.nid_of(id))
-    if js == "" {
+    if js == "" || repository.storage_error_of(js) != "" {
         return None
     }
     // repo_get 返回裸文档 JSON（非信封）——直接映射 Note 视图
@@ -420,6 +433,10 @@ pub fn update_note_r(id int, expected_revision int, title str, body str, request
 /// 走 RepoResult 信封与既有解析路径同构）。
 pub fn get_note_r(id int) RepoResult {
     var js str = repository.repo_get(repository.nid_of(id))
+    var se str = repository.storage_error_of(js)
+    if se != "" {
+        return repo_result_of("{\"ok\":false,\"err_code\":\"" + se + "\"}")
+    }
     if js == "" {
         return repo_result_of("{\"ok\":false,\"err_code\":\"not_found\"}")
     }
@@ -437,7 +454,7 @@ pub fn delete_note(id int) bool {
 pub fn toggle_pin(id int) ?Note {
     var nid str = repository.nid_of(id)
     var cur_js str = repository.repo_get(nid)
-    if cur_js == "" {
+    if cur_js == "" || repository.storage_error_of(cur_js) != "" {
         return None
     }
     var cur = json.parse(cur_js)
@@ -463,6 +480,10 @@ pub fn update_tags(id int, tags []str) ?Note {
 pub fn toggle_pin_result(id int) RepoResult {
     var nid str = repository.nid_of(id)
     var cur_js str = repository.repo_get(nid)
+    var se str = repository.storage_error_of(cur_js)
+    if se != "" {
+        return repo_result_of("{\"ok\":false,\"err_code\":\"" + se + "\"}")
+    }
     if cur_js == "" {
         return repo_result_of("{\"ok\":false,\"err_code\":\"not_found\"}")
     }
@@ -487,6 +508,9 @@ pub fn update_tags_result(id int, tags []str) RepoResult {
 
 pub fn search_notes(query str) []Note {
     var js str = repository.repo_search(query)
+    if repository.storage_error_of(js) != "" {
+        return List<Note>.new([])
+    }
     var arr = json.parse(js)
     var n int = json.len(arr)
     var out List<Note> = List<Note>.new([])

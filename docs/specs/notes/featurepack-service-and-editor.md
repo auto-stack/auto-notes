@@ -1,9 +1,10 @@
 # featurepack-service-and-editor — 015-notes 共享笔记服务与可嵌入编辑器（current-state）
 
-> 状态：current-state（NOTES-006 r2 实施：T-02/T-03/T-06/T-07/T-08 交付面）·
-> 更新：2026-11-11 · 计划：NOTES-006（联合合同见 auto-os OS-067 / featurepack-v0 ·
-> Reader 宿主 READER-013）· SD-01（产品契约）+ SD-03（操作身份/持久草稿/公共
-> 状态/参数事件/失败恢复协议）
+> 状态：current-state（NOTES-006 r2 实施：T-02/T-03/T-06/T-07/T-08 交付面；
+> NOTES-007 增补「存储并发模型」+ 并发锤/追踪验证入口 + 发布件版本锚）·
+> 更新：2026-11-16 · 计划：NOTES-006（联合合同见 auto-os OS-067 / featurepack-v0 ·
+> Reader 宿主 READER-013）、NOTES-007（存储并发模型修复）· SD-01（产品契约）+
+> SD-03（操作身份/持久草稿/公共状态/参数事件/失败恢复协议）+ NOTES-007 SD-01/02
 
 ## 来源快照（T-06 冻结闭集，不可变）
 
@@ -115,6 +116,46 @@
 | POST /api/fp/draft/put|get|delete | 本地面（无 fp 门） | 宿主草稿持久暂存 |
 | POST /api/fp/source/of | 本地面（无 fp 门） | 来源卡投影（FpSourceView） |
 
+## 存储并发模型（NOTES-007，SD-01）
+
+服务存储层为 `repository.at`（SQLite 单写者，WAL）。并发契约（`notes.fpack/1`
+端点面/幂等语义/来源闭集不变，本节省略）：
+
+- **读路径零写锁、单连接**：`repo_get / repo_list_active / repo_search /
+  read_receipt / repo_status / fp_get / fp_list_by_book / fp_receipt /
+  fp_draft_get / fp_source_of_view` 每次请求恰好一次 `sqlite.open`，只发
+  只读语句（就绪探针 + SELECT）——**不发 `BEGIN IMMEDIATE`、不发
+  `ALTER TABLE`、不发 meta 写**。WAL 下读写并行；外部写锁（另一连接
+  `BEGIN IMMEDIATE` 持有）期间读请求实测 p99 ≪ 2s（R-02/R-03）。
+- **schema/迁移就绪探针（零写）**：`meta.schema_v='3'` + 结构哨兵
+  （`notes.book_id`、`notes.source_json`、`requests.intent` 三列存在 +
+  `fp_drafts` 表存在）。全部满足 → 直连；任一不满足（全新库、v1/v2 旧库、
+  **半途迁移/列被外部 DROP**）→ 进入**一次性慢路径**：`BEGIN IMMEDIATE`
+  内二次确认（并发首请求/多进程同时初始化只有一个建表）→ 完整 DDL →
+  `schema_v` 同事务提交 → 播种。慢路径每库生命周期至多一次（`storage_schema_init`
+  日志计数；重启不重跑）。半途故障自愈语义原样保留（S-02）。
+- **写路径**：单连接 + `BEGIN IMMEDIATE` + `busy_timeout=5000`；BUSY/超时
+  一律具名 `second_writer` 快速失败（有界 ≤5s，绝不悬挂）。写连接在
+  `BEGIN` 前做文件背衬校验（见下）。
+- **打开失败具名化（`storage_unavailable`）**：a2r `sqlite.open` 在文件打开
+  失败时静默回退内存库（`a2r-std/sqlite.rs:31-43`）。存储层每次打开后用
+  `PRAGMA database_list` 的 `main.file` 验证文件背衬，失败一律具名
+  `storage_unavailable`——**绝不把幽灵空库当真实快照**（幻影 `not_found`/
+  冻结空列表/假成功写禁令）。单文档读/写端点返回该具名码；typed 数组端点
+  （`GET /api/v1/notes`、`/api/notes/search`）受类型面限制返回空集，同一
+  失败由 `/api/v1/status.storage_error` 与 stderr 的 `storage_error` 行具名
+  （可观测性由状态面承担，不静默）。
+- **诊断面与 health 分离**：`/api/health` 不触存储（存活探针）；存储态经
+  `/api/v1/status`：健康 `loaded:true, storage_error:""`；不可用
+  `loaded:false, storage_error:<具名码>, upgrade_error:<原因>`；legacy 升级被拒
+  （`upgrade_conflict`/`upgrade_incomplete`）不算存储不可用——库体照常报告，
+  原因入 `upgrade_error`（S-16/S-19 语义）。
+- **慢操作登记**：打开+就绪、写事务耗时 >2000ms 打印单行
+  `storage_slow op=<name> phase=<phase> ms=<n>`（停摆取证与回归观测；不引入
+  异步重排，仍为同步面）。
+- **预算**：并发写负载（≥3 写者 + ≥3 读者 + draft 面，≥20 轮）下读 p99
+  ≤ 2s；零 >2s 读停摆、零幻影 `not_found`、数据零丢失（R-01 口径）。
+
 ## 验证入口
 
 - `python tests/basic/verify_featurepack_service.py`——F-01..11 + S-01（提交
@@ -124,6 +165,42 @@
   ——双实例/保存中键入/关页重启恢复/丢回包 pending 同 ID 续查/冲突保输入
   Rebase/零页面错误；VM 轨 type_text 真实输入 + 进程重启恢复（必需 case 无
   skip，缺失即非零）。
+- **并发锤（NOTES-007 R-01）**：`python tests/probe/concurrent_hammer.py
+  --mode ui --rounds 20`——UI 形状并发（≥3 写者 create/update/capture/draft put
+  + ≥3 读者 list/get/search/status/receipt/fp get/draft get + 同修订争用对），
+  断言零 >2s 读、零幻影 `not_found`、capture 幂等回执不变、错误全部具名、
+  数据零丢失。`--mode smoke`（1 轮）为日常快验入口。
+- **停摆放大器取证/回归（NOTES-007）**：`python
+  tests/probe/concurrent_hammer.py --mode lockwindow --hold 8`——外部进程以
+  Windows `FileShare=None` 独占 `inbox.db`（AV/EDR 排他扫描形状），断言窗口内
+  「要么正确数据、要么具名失败」，绝不允许静默空库/幻影 not_found；释放后数据
+  完整且窗口内成功写已落盘。
+- **存储并发模型追踪（NOTES-007 R-02）**：`python tests/probe/storage_trace.py`
+  ——生成后端读路径函数体静态断言（零 `BEGIN IMMEDIATE`/`ALTER TABLE`/meta 写、
+  恰好一次 `sqlite::open`）+ 运行时（schema 初始化日志恰好 1 行、重启 0 行、
+  外部写锁下读 ≤2s 且数据正确、健康态 `storage_error` 为空）。
+
+## 发布件版本锚（NOTES-007，SD-02）
+
+发布件 = `auto service --server rust` 生成的 Rust 服务二进制（`cargo run
+--release`，AGENTS.md：release 仅交付门）。锚身份 = **成员目录名 + sha256 +
+构建提交 + 构建命令**（成员目录名由项目路径派生，跨检出路径不同；跨检出重建
+须由发布流程重发并更新本表）。
+
+| 版本 | 成员 | sha256 | 提交 | 状态 |
+|---|---|---|---|---|
+| NOTES-006 r2 交付件 | auto-notes-57d3816f-back | `6939bafa3544…` | 80a6d98 代际 | **退役**（NOTES-007 起被下表取代；Reader 的 6939bafa pin 随之升级） |
+| NOTES-007 r1 | auto-notes-9e77e6a3-back | `7c808802c8a08cac44115a12e4be90070920f27f75af7d91fdbcf0c359419322` | `@@CODE_COMMIT@@` | current |
+
+重建命令（本仓根）：
+
+```
+auto service --server rust -B 17819            # 生成 + release 构建 + 直启（AGENTS.md 交付门）
+# 或仅取构件：cd rust-workspace && cargo build --release -p auto-notes-<id>-back
+```
+
+发布件复跑：`python tests/probe/concurrent_hammer.py --mode ui --rounds 5
+--exe <release exe>`（R-04，≥5 轮零停摆）。
 
 ## 附件能力面（NOTES-002，SD-03：可协商附件扩展）
 

@@ -47,6 +47,12 @@ fn repo_get_doc(nid str) str {
     return repository.repo_get(nid)
 }
 
+/// 跨模块 &str 转换包装（T-00 实测：跨模块用户函数调用不对本地变量做 &str
+/// 转换——参数直传合法，故收进同模块包装）。NOTES-007 读路径具名失败码。
+fn repo_storage_error_of(js str) str {
+    return repository.storage_error_of(js)
+}
+
 fn repo_fp_capture(cred str, op str, src str, text str) str {
     return repository.fp_capture(cred, op, src, text)
 }
@@ -448,6 +454,10 @@ pub fn jade_export_package(note_id int, export_id str) str {
     }
     var nid str = repo_nid_of(note_id)
     var docjs str = repo_get_doc(nid)
+    var se str = repo_storage_error_of(docjs)
+    if se != "" {
+        return err_envelope(se, "storage unavailable while reading note")
+    }
     if docjs == "" {
         return err_envelope("not_found", "note not found")
     }
