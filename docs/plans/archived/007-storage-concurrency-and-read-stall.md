@@ -1,6 +1,6 @@
 ---
 plan_id: NOTES-007
-status: reviewed
+status: archived
 feature_name: notes sqlite 存储并发模型修复——读快照瞬态停摆
 author: [Codex]
 created_at: 2026-11-16
@@ -8,6 +8,8 @@ updated_at: 2026-11-16
 plan_revision: 1
 current_step: 4
 total_steps: 5
+base_branch: main
+base_commit: ba312523d0e027de58b8a0625d69a05951a7b978
 depends_on: []
 supersedes_spec_components: [docs/specs/notes/featurepack-service-and-editor.md]
 new_spec_components: []
@@ -26,9 +28,9 @@ touched_goals: []
 零停摆 + 既有电池全绿收口，并向 READER-013 交接新发布件 pin（其 T-08
 全绿收口的第二外部阻塞随之解除）。
 
-[READER-013](../../../auto-reader/docs/plans/013-notes-featurepack-host.md) ·
-[证据包 BACK-STALL-BLOCKER.md](../../../plan-artifacts/plan-013/BACK-STALL-BLOCKER.md) ·
-[现行规格](../specs/notes/featurepack-service-and-editor.md)
+[READER-013](../../../../auto-reader/docs/plans/013-notes-featurepack-host.md) ·
+[证据包 BACK-STALL-BLOCKER.md](../../../../plan-artifacts/plan-013/BACK-STALL-BLOCKER.md) ·
+[现行规格](../../specs/notes/featurepack-service-and-editor.md)
 
 ## 1. 目标
 
@@ -642,7 +644,7 @@ F-1 复演（5.41/6.10s）输入未变（worktree 代码提交未动）；
 已在回执中标明复用而非重跑）| next: merge（T-05）
 
 2026-11-16 · stage: goal | plan_id: NOTES-007 | plan_revision: r1 | round: 8 |
-from: review | to: merge | status: reviewed | outcome: pass |
+from: review | to: merge | status: archived | outcome: pass |
 worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 0e2fd19 |
 next: merge（T-05：归档 + canonical 落地 + worktree/分支/plan-artifacts 清理 +
 READER-013 pin 交接）
@@ -659,3 +661,28 @@ READER-013 pin 交接）
   T-03 按本仓标准流程走，若流程变化以 AGENTS.md/现行脚本为准。
 - READER-013 T-08 复跑时点与双端全绿门归 reader 计划所有；本计划交付
   pin 后即解除其第二外部阻塞，无相互排期依赖。
+
+2026-11-16 · stage: merge | plan_id: NOTES-007 | plan_revision: r1 |
+completion_kind: delivered | outcome: pass |
+checkpoints: landed / canonical_verified / archived（cleaned 待收尾后补记）|
+delivery_commit: `3fff9cf06c1ec810e9d382237ce1a2a546c7492f`（rebase 后的
+dev 分支 tip，已 ff-only 落到 main）|
+landing: worktree 8 个提交 rebase 到 main（`ba31252..0e2fd19` →
+`62188ef..3fff9cf`），`git range-diff` 全等证明补丁等价（老→新：
+3e81811→3ecf80d、4dcd740→3890afe、83ae6ac→d8a1313、dbe5195→3839e93、
+6395323→8883fc0、dcc7a6f→c7c702e、8dd5e25→b64df19、0e2fd19→3fff9cf）；
+`git merge --ff-only notes-007-dev` 成功、无 merge commit。落地后
+`src`/`docs/specs`/`tests/probe` 与 reviewed 树（0e2fd19）逐 blob 相同 →
+评审证据与发布件锚（`2e5e2898…`，代码 `83ae6ac`≡`d8a1313`）继续有效；
+主检出不另做 release/生成重建（避免锚漂移；交付件即 worktree 锚定件）。|
+canonical_verified: 主检出 `docs/specs/notes/featurepack-service-and-editor.md`
+blob `6a4f9f4d13b2e4cf4dfa5ec82fecb6fd4ffbcb96`、sha256 `dcf374fe…`（与
+reviewed spec_inputs 一致）；SD-01/SD-02 delta 随落地在案。|
+archived: `docs/plans/archived/007-storage-concurrency-and-read-stall.md`
+（status: archived；README/索引无引用需改；相对链接升层后目标均存在）|
+pre-land_guard: `wt-guard.ps1` 初次 BLOCKED（728 个 pnpm junction/symlink：
+`tests/node_modules`、`gen/front/vue/node_modules`），按护栏提示仅删链接
+（`cmd /c rmdir`/`Directory.Delete(link)`，不穿透目标）后复跑 clean；
+worktree 提交前工作树干净。|
+next: cleanup（worktree 移除 + 分支删除 + plan-artifacts/plan-007 删除 +
+registry 刷新 + READER-013 pin 交接）
