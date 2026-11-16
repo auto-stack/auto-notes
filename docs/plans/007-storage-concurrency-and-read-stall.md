@@ -435,7 +435,8 @@ smoke 1.75s · `--rounds 5` 1.5s · storage_trace 6.55–6.9s——全部合格�
 
 2026-11-16 · stage: goal | plan_id: NOTES-007 | plan_revision: r1 | round: 3 |
 from: work | to: review | status: execution_done | outcome: pass |
-worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 6395323 + dcc7a6f |
+worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 6395323 + dcc7a6f +
+8dd5e25（锚定件大小 17,836,032B 补正；Spec sha256 `1d8b2cdb…`）|
 next: review（T-04 复评：F-1/F-2 闭合 + 新锚 `2e5e2898…` 上复演）
 
 ## 10. 待澄清事项
