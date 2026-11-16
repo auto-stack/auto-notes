@@ -196,22 +196,25 @@
 
 - 成员目录名由项目路径派生（跨检出不同）；
 - 生成件 `main.rs` 内嵌 assembly consumer 指纹，其输入含 notes 树之外的
-  stdlib / auto-lang / selection 来源闭包，且**构建 env 的 flag 钉法参与
-  cargo 指纹**——NOTES-007 复审 F-2 实测：同 commit 下 `auto service` 受管
-  构建与手工 `cargo build --release` 在两个 sha 间切换（`e067c3e9…` ↔
-  `02016f3a…`），同上下文重复构建为 no-op、sha 不变；
+  stdlib / auto-lang / selection 来源闭包（指纹随生成路径/时序可漂移：
+  `35f70de4…` → `757bff4b…` 历史实测）；且**构建 env 的 flag 钉法参与 cargo
+  指纹**——同 commit 且**同一生成件**（`main.rs 3f8ad97e…`）下，
+  `cargo build --release`（17:02）产 `02016f3a…`，`auto service` 受管构建
+  （17:11）产 `2e5e2898…`；同上下文重复构建为 no-op、sha 不变。**因果示例必须
+  取自同一生成件**——混用不同生成件的 sha 会把指纹漂移错记成构建路径差异；
 - 因此发布件复核以「文件 sha256 + 下表上下文」为准；跨上下文/跨检出重建须由
   发布流程重发并更新本表，不得假定可从 commit 复现。
 
 | 版本 | 成员 | sha256 | 代码提交 | 状态 |
 |---|---|---|---|---|
 | NOTES-006 r2 交付件 | auto-notes-57d3816f-back | `6939bafa3544…` | 80a6d98 代际 | **退役**（NOTES-007 起被下表取代；Reader 的 6939bafa pin 随之升级） |
-| NOTES-007 r1 | auto-notes-9e77e6a3-back | `2e5e28986706e9e3cb6954412b0e67904c09cc12b5fc8e3ba049a62892426240` | `83ae6ac`（代码；HEAD `6395323` 仅测试脚本改动） | current |
+| NOTES-007 r1 | auto-notes-9e77e6a3-back | `2e5e28986706e9e3cb6954412b0e67904c09cc12b5fc8e3ba049a62892426240` | `83ae6ac`（代码；其后仅测试脚本/文档提交） | current |
 
-**r1 锚定件构建上下文（2026-11-16 17:17–17:19）**：
+**r1 锚定件构建上下文（构建 17:11；验收 17:17–17:19，2026-11-16）**：
 
 - 发布路径：`auto service --server rust -B <port>`（生成 → release 构建 → 直启）；
-  同一上下文内 3 次服务启动中仅首次构建（9.0s），后续 restart 0.5s no-op、sha 不变。
+  同一上下文内重复构建为 no-op（start-2 实测 0.53s），三次启动前后 sha 恒为
+  `2e5e2898…`。
 - CLI：`auto 0.1.0+plan-890-verified-r7-t19-24-g54fe407-dirty`，
   sha256 `c7dbb9f4eba8de88f03b6725e9c3bcb3024456d5243521ee397d73772f65df97`。
 - auto-lang `107b23d0f`（`crates/`/`stdlib/`/`vendor/` 干净）；vendor/auto-down
