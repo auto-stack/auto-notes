@@ -134,6 +134,12 @@
   内二次确认（并发首请求/多进程同时初始化只有一个建表）→ 完整 DDL →
   `schema_v` 同事务提交 → 播种。慢路径每库生命周期至多一次（`storage_schema_init`
   日志计数；重启不重跑）。半途故障自愈语义原样保留（S-02）。
+- **legacy 升级代际归属**：`upgrade_if_legacy`（SD-17/SD-18 状态机）只由 repo
+  文档/来源访问入口驱动（`repo_get`/`repo_list_active`/`repo_search`/`fp_*` 与写
+  路径）；诊断面 `repo_status`、`read_receipt`、测试 setup（`/api/v1/test/setup`）、
+  显式迁移（`/api/v1/migrate`）只做 schema 就绪，**不得**抢先写 `meta.upgraded`
+  ——否则先到的一次状态/回执查询会让随后就位的旧树永不升级（r5 电池
+  U1..U10/S21 实测回归面）。状态面只**报告** `meta.upgrade_error`，不驱动升级。
 - **写路径**：单连接 + `BEGIN IMMEDIATE` + `busy_timeout=5000`；BUSY/超时
   一律具名 `second_writer` 快速失败（有界 ≤5s，绝不悬挂）。写连接在
   `BEGIN` 前做文件背衬校验（见下）。
@@ -190,7 +196,7 @@
 | 版本 | 成员 | sha256 | 提交 | 状态 |
 |---|---|---|---|---|
 | NOTES-006 r2 交付件 | auto-notes-57d3816f-back | `6939bafa3544…` | 80a6d98 代际 | **退役**（NOTES-007 起被下表取代；Reader 的 6939bafa pin 随之升级） |
-| NOTES-007 r1 | auto-notes-9e77e6a3-back | `7c808802c8a08cac44115a12e4be90070920f27f75af7d91fdbcf0c359419322` | `3e81811`（代码提交；本锚随其后文档提交） | current |
+| NOTES-007 r1 | auto-notes-9e77e6a3-back | `e067c3e92baa14b2459ae8adf03c409035464471873c8bc914cb29d23d0e46f1` | `83ae6ac`（代码提交；生成/构建期源码与 HEAD 一致） | current |
 
 重建命令（本仓根）：
 
