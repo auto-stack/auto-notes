@@ -1,12 +1,12 @@
 ---
 plan_id: NOTES-007
-status: execution_done
+status: reviewed
 feature_name: notes sqlite 存储并发模型修复——读快照瞬态停摆
 author: [Codex]
 created_at: 2026-11-16
 updated_at: 2026-11-16
 plan_revision: 1
-current_step: 3
+current_step: 4
 total_steps: 5
 depends_on: []
 supersedes_spec_components: [docs/specs/notes/featurepack-service-and-editor.md]
@@ -254,11 +254,10 @@ profile，release 仅 T-03 交付门一步。
 | T-04 | review | T-03 | 独立上下文复演 R-01～R-04，绑定源码与发布件版本，核 AC-01～05 | AC-06 |
 | T-05 | merge | T-04 pass | 归档回执 + READER-013 pin 交接（新 sha + 提交；其 T-08 复跑消费） | AC-07 |
 
-执行进度（2026-11-16 F-4 修复轮）：**T-01 ✓ · T-02 ✓ · T-03 ✓（F-1..F-4 闭合）**
-· T-04 待终评（owner=review）· T-05 待合并（owner=merge）。F-4 = 回执 Spec
-哈希笔误更正（`634f7de0…` → `dcf374fe…`，勘误在案）+ 回执哈希自检落地
-（44 令牌：34 回推命中 / 9 历史值 / 1 文档化勘误 / 0 不符 / 0 未登记）。本轮
-未触代码与发布件（artifact 仍 `2e5e2898…`）。
+执行进度（2026-11-16 终评 pass）：**T-01 ✓ · T-02 ✓ · T-03 ✓（F-1..F-4 全闭）·
+T-04 ✓（final review pass）** · T-05 待合并（owner=merge；归档 + canonical 落地 +
+worktree 清理 + plan-artifacts 删除 + READER-013 pin 交接）。发布件锚
+`2e5e2898…`、Spec `dcf374fe…`、worktree HEAD `0e2fd19`。
 
 ## 9. 复审记录
 
@@ -588,6 +587,56 @@ review（T-04 终评：F-4 更正与自检落地；F-1/F-2/F-3 结论复用）
 from: work | to: review | status: execution_done | outcome: pass |
 worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 0e2fd19（未变） |
 next: review（T-04 终评：F-4 闭合 + 全量哈希自检）
+
+2026-11-16 · stage: review（终评 pass）| review_scope: final | reviewer_identity:
+实现同会话复审（limitation 同前：按工件重构裁决，不采信执行者摘要）|
+plan_id: NOTES-007 | plan_revision: r1 | outcome: **pass** | worktree_path:
+D:/autostack/.wt/notes-007/auto-notes | branch: notes-007-dev |
+reviewed_commit: `0e2fd19`（worktree HEAD；Plan 文档 `f41afae`）|
+base_commit: `ba31252` | dependency_revisions: 未变（CLI
+`0.1.0+plan-890-verified-r7-t19-24-g54fe407-dirty` sha256 `c7dbb9f4…`；
+auto-lang 构建期 `107b23d0f`（其后 ace 提交不动 payload 输入）；vendor
+`c39ac7f9`）| spec_inputs: docs/specs/notes/featurepack-service-and-editor.md
+sha256 `dcf374fe063d450de583fd0a0eb6c84a2e09400bd773aaaae55039b98cf1f229`
+（SD-01 存储并发模型 + SD-02 验证入口/发布件锚；工作树 & `git show
+0e2fd19:` 双向一致）| acceptance_results: **AC-01 pass**（决策制品三因子归因 +
+可重跑负载形状；R2 结论复用于未变代码）· **AC-02 pass**（读路径 10 入口静态
+80/0 + 写锁窗口读 25.5–56.4ms + schema init 1/0 行；第 4 轮 release trace
+80/0 复跑）· **AC-03 pass**（20 轮门 5.41/6.10s、759 采样、121 notes、读 max
+140.4ms、p99 ≤128ms、26/0；R-04 5 轮 11/0 读 max 35.8ms）· **AC-04 pass
+（受限边界，见 findings/evidence）**（fp service 67/0/0 + v1 battery S0–S22
+fails=0 + scratch 52 fails=0，均绑 `2e5e2898…`；Vue suite 19/12/2 与修复前基线
+逐项同集=工具链漂移，非本改动）· **AC-05 pass**（发布件 sha/尺寸/上下文与 Spec
+锚行一致；R-04 在该件上 11/0；可复现边界成文）· **AC-06 = 本回执** |
+pending_closeout_gates（merge-owned）: ①归档（`docs/plans/archived/007-*.md` +
+`status: archived` + 相对链接升层）；②canonical Spec 落地到主检出（
+`docs/specs/notes/featurepack-service-and-editor.md`，本树 sha `dcf374fe…`）；
+③worktree 移除 + 分支删除（先 `wt-guard.ps1` 干净）；④plan-artifacts/plan-007
+全域删除（关键证据已折入本文件的 §5/§9）；⑤READER-013 pin 交接（AC-07：
+发布件 sha256 `2e5e2898…` 全值 + 代码提交 `3e81811`/`83ae6ac` + 本节回执）|
+findings: **F-1 closed**（20 轮 17.0s→5.4–6.3s；lockwindow 11.1s→6.0s；断言面
+未削）· **F-2 closed**（重锚 `2e5e2898…` + 构建上下文表 + 可复现边界；同生成件
+同源对示例）· **F-3 closed**（Spec 示例改为同源对 + 「示例须同生成件」前提）·
+**F-4 closed**（回执 Spec 哈希更正 `dcf374fe…`，勘误在案；回执哈希自检落地并
+通过）| evidence: ①回执哈希自检 `plan-artifacts/plan-007/receipt-hash-check.py`
+→ `tokens=44 ok=34 historical=9 errata=1 bad=0`，exit 0（本轮 review 亲跑）；
+②**oracle 变异验证**：把 Plan 中 `dcf374fe…` 改为 `deadbeef…` 后同一检查器
+输出 `UNKNOWN deadbeef` + `bad=1`，exit 1 —— 证明自检能捕获该类错误；
+③在盘件复核：release sha `2e5e2898…`/17,836,032B、Spec `dcf374fe…` 与
+`git show 0e2fd19:` 一致、worktree HEAD `0e2fd19` 且工作树干净；
+④自上次复核（`9a5dc97`）以来 Plan 仅 +36/−8 行（F-4 更正 + 回执 + 自检纪律），
+worktree 自 `0e2fd19` 起零改动——未触代码/测试/发布件；⑤复用的既有证据：
+R2 的 fp battery/gates/R-04 均在当前锚 `2e5e2898…` 上取得（第 3 轮），R4 的
+F-1 复演（5.41/6.10s）输入未变（worktree 代码提交未动）| 测试计时（本轮）:
+仅文档/证据类检查——回执哈希自检 ~3s、变异测试 ~2s、在盘件复核 <1s；**未运行
+产品测试**（代码与发布件自 `0e2fd19` 起零改动，既有证据按「输入未变」复用，
+已在回执中标明复用而非重跑）| next: merge（T-05）
+
+2026-11-16 · stage: goal | plan_id: NOTES-007 | plan_revision: r1 | round: 8 |
+from: review | to: merge | status: reviewed | outcome: pass |
+worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 0e2fd19 |
+next: merge（T-05：归档 + canonical 落地 + worktree/分支/plan-artifacts 清理 +
+READER-013 pin 交接）
 
 ## 10. 待澄清事项
 
