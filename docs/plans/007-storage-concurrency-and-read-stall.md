@@ -1,12 +1,12 @@
 ---
 plan_id: NOTES-007
-status: execution_done
+status: executing
 feature_name: notes sqlite 存储并发模型修复——读快照瞬态停摆
 author: [Codex]
 created_at: 2026-11-16
 updated_at: 2026-11-16
 plan_revision: 1
-current_step: 3
+current_step: 2
 total_steps: 5
 depends_on: []
 supersedes_spec_components: [docs/specs/notes/featurepack-service-and-editor.md]
@@ -254,11 +254,10 @@ profile，release 仅 T-03 交付门一步。
 | T-04 | review | T-03 | 独立上下文复演 R-01～R-04，绑定源码与发布件版本，核 AC-01～05 | AC-06 |
 | T-05 | merge | T-04 pass | 归档回执 + READER-013 pin 交接（新 sha + 提交；其 T-08 复跑消费） | AC-07 |
 
-执行进度（2026-11-16 复审修复轮）：**T-01 ✓ · T-02 ✓ · T-03 ✓（F-1/F-2 修复闭合）**
-· T-04 待复评（owner=review，上一轮 needs_fix）· T-05 待合并（owner=merge）。
-修复提交：`6395323`（F-1：`--round-ops`/lockwindow 默认 hold 5s，20 轮门 5.2–6.3s）
-+ `dcc7a6f`（F-2：发布件重锚 `2e5e2898…` + 构建上下文/可复现边界 + 验证入口计时）。
-代码提交仍为 `3e81811` + `83ae6ac`（F-1/F-2 未触产品代码）。
+执行进度（2026-11-16 复评轮）：**T-01 ✓ · T-02 ✓ · T-03 重开（needs_fix：F-3
+文档示例错配）** · T-04 已执行（复评判定 needs_fix，见 §9 诊断）· T-05 待合并。
+F-1/F-2 已闭合并经复评复演（20 轮 5.4–6.3s、lockwindow 6.0s、锚 `2e5e2898…`
+一致且 R-04 11/0）；仅 Spec 锚节的一处因果示例 sha 对错配需修正。
 
 ## 9. 复审记录
 
@@ -438,6 +437,56 @@ from: work | to: review | status: execution_done | outcome: pass |
 worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 6395323 + dcc7a6f +
 8dd5e25（锚定件大小 17,836,032B 补正；Spec sha256 `1d8b2cdb…`）|
 next: review（T-04 复评：F-1/F-2 闭合 + 新锚 `2e5e2898…` 上复演）
+
+2026-11-16 · stage: review（复评）| review_scope: final（F-1/F-2 修复后）|
+reviewer_identity: 实现同会话复审（limitation 同前：按工件重构裁决）| plan_id:
+NOTES-007 | plan_revision: r1 | reviewed_commit: `8dd5e25` | base_commit:
+`ba31252` | spec_inputs: docs/specs/notes/featurepack-service-and-editor.md
+sha256 `1d8b2cdb…` | outcome: **needs_fix**（窄口：仅 Spec 锚节一处因果示例
+sha 对错配；产品/行为面无新增问题）|
+**F-1 复演（通过）**：`--mode ui --rounds 20`（debug）**5.41s / 6.10s**（两跑；
+759 采样、121 notes、读 max 140.4ms、p99 ≤128ms、26/0）；`--mode lockwindow`
+（release，hold 5）**6.01s** 17/0；`--mode smoke` **0.59s** 7/0；
+`storage_trace` **6.68s** 80/0；`--rounds 5`（release）**1.61s** 11/0——全部
+≤10s，原 17.0s / 11.1s 违规已消除且断言面未削弱（≥3 并发写者 + ≥3 并发读者 +
+draft + 同修订争用 + 每轮零丢失核对 + 20 轮）。
+**F-2 复演（通过）**：在盘发布件 sha256 `2e5e2898…92426240`、17,836,032B、
+mtime 17:11:21 与 Spec 锚行一致；R-04 复跑 11/0（读 max 35.8ms）后 sha 不变；
+锚节全部数值回推核对**全部命中**：CLI `c7dbb9f4…`、auto-lang `107b23d0f`
+（`crates/`/`stdlib/`/`vendor/` 自该点至 HEAD 零 diff，且 auto-lang 17:20 的
+ace 提交不动 payload 输入）、vendor `c39ac7f9`、repository.rs `f17cdc3b…`、
+db.rs `64eba72b…`、entry_adapters.rs `6738bba6…`、main.rs `3f8ad97e…`、
+fingerprint `757bff4b6348ccd4`、generation.json `578a6595…`、size 17,836,032B。
+**F-3（新，narrow，blocking）**：Spec 锚节把「构建路径导致字节漂移」的示例
+写成 `e067c3e9… ↔ 02016f3a…`——该对不是同一生成源：`e067c3e9` 构建于 16:31
+（服务启动横幅 `assembly_fingerprint=35f70de4…`），其 `main.rs` 与 17:02 的
+`02016f3a`（`main.rs 3f8ad97e…`/`757bff4b…`）不同代；实测的**同源**对照是
+`02016f3a…`（17:02 手工 `cargo build --release`）↔ `2e5e2898…`（17:11
+`auto service` 受管构建），两者共享 `main.rs 3f8ad97e…`。规则本身（身份 =
+发布件 + 构建上下文；同上下文 no-op）成立，须把示例换成该同源对并补一句
+「示例须为同一生成件下的对照」。附带（非阻断）：Plan §9 修复回执「后两次
+restart 0.5s no-op」仅 start-2 直接观测（0.53s），start-3 未留构建行、仅有
+sha 不变证据——措辞应改为「start-2 实测 0.53s；全程 sha 不变」。
+**AC 判定**：AC-01 pass（复用+复演一致）· AC-02 pass（trace 80/0 复跑）·
+AC-03 pass（20 轮门 5.4–6.3s 且行为口径全绿）· AC-04 pass（受限边界不变：
+本轮仅 tests/docs 改动，产品/前端代码未动，Vue suite 12 红=基线同集结论仍成立）·
+AC-05 pass（锚行/上下文/R-04 全部核对一致）——结论 needs_fix 仅因 **SD-02
+知识增量文本的示例不实**，不能对含错误陈述的 Spec delta 发 pass。
+**诊断检查点（连续两次 final review 未过，按协议前置）**：
+- 链：R2 needs_fix（F-1/F-2）→ 修复 6395323/dcc7a6f/8dd5e25 → R4 needs_fix（F-3）。
+- 漏因：F-2 修复时用**时间线相关**（16:31 件 ↔ 17:02 件）拼示例，未用「同一
+  生成件」作对照；上一轮 review 只核了规则与数值表，未把「每个因果示例的 sha
+  对必须共享同一生成源」列为核对项。
+- 校正后的 oracle（下轮适用）：①锚节每个 sha/尺寸/指纹须能从
+  plan-artifacts/plan-007/anchor-context.json + 在盘文件**逐项回推**（本轮已
+  执行、全部命中）；②任何因果示例必须附「同一 `main.rs`/fingerprint」前提；
+  ③该回推与同源前提写入复评清单。| next_responsible_role: work（F-3 文本修正，
+  不触代码/发布件；修完直接回 review 复评）
+
+2026-11-16 · stage: goal | plan_id: NOTES-007 | plan_revision: r1 | round: 4 |
+from: review | to: work | status: executing | outcome: needs_fix |
+worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 8dd5e25 |
+next: work（F-3：Spec 锚节示例改为同源对 02016f3a↔2e5e2898 + Plan 回执措辞）
 
 ## 10. 待澄清事项
 
