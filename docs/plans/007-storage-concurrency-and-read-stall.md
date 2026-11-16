@@ -1,12 +1,12 @@
 ---
 plan_id: NOTES-007
-status: executing
+status: execution_done
 feature_name: notes sqlite 存储并发模型修复——读快照瞬态停摆
 author: [Codex]
 created_at: 2026-11-16
 updated_at: 2026-11-16
 plan_revision: 1
-current_step: 2
+current_step: 3
 total_steps: 5
 depends_on: []
 supersedes_spec_components: [docs/specs/notes/featurepack-service-and-editor.md]
@@ -254,11 +254,11 @@ profile，release 仅 T-03 交付门一步。
 | T-04 | review | T-03 | 独立上下文复演 R-01～R-04，绑定源码与发布件版本，核 AC-01～05 | AC-06 |
 | T-05 | merge | T-04 pass | 归档回执 + READER-013 pin 交接（新 sha + 提交；其 T-08 复跑消费） | AC-07 |
 
-执行进度（2026-11-16 终评轮）：**T-01 ✓ · T-02 ✓ · T-03 重开（needs_fix：F-4
-回执哈希错绑）** · T-04 已执行（终评判定 needs_fix）· T-05 待合并。
-F-3 文本已修正且经复核（Spec 锚节示例同源、前提在案）；终评新增**唯一**缺陷
-=F-4 修复轮回执里 Spec sha256 写作 `634f7de0…`，实际 `dcf374fe…`（逐项扫描
-Plan 内全部哈希令牌，仅此一处不符）。
+执行进度（2026-11-16 F-4 修复轮）：**T-01 ✓ · T-02 ✓ · T-03 ✓（F-1..F-4 闭合）**
+· T-04 待终评（owner=review）· T-05 待合并（owner=merge）。F-4 = 回执 Spec
+哈希笔误更正（`634f7de0…` → `dcf374fe…`，勘误在案）+ 回执哈希自检落地
+（44 令牌：34 回推命中 / 9 历史值 / 1 文档化勘误 / 0 不符 / 0 未登记）。本轮
+未触代码与发布件（artifact 仍 `2e5e2898…`）。
 
 ## 9. 复审记录
 
@@ -511,7 +511,8 @@ restart 表述收敛为「同上下文重复构建为 no-op（start-2 实测 0.5
 构建，随 `main.rs 3f8ad97e…`）与 `2e5e2898…`（17:11 服务构建，同一
 `main.rs 3f8ad97e…`）同源；`35f70de4…` 见 16:31 服务横幅；锚件尺寸/sha/上下文
 在本轮开工前复核仍为 `2e5e2898…`/17,836,032B/`main.rs 3f8ad97e…`；
-Spec sha256 `634f7de0…`（修正后）。| blockers: 无 | next_responsible_role:
+Spec sha256 `dcf374fe…`（0e2fd19 树；**F-4 更正**：原写 `634f7de0…` 系笔误，
+该值不存在）。| blockers: 无 | next_responsible_role:
 review（T-04 终评：F-3 文本准确性 + 前两轮 F-1/F-2 复演结论复用）
 
 2026-11-16 · stage: goal | plan_id: NOTES-007 | plan_revision: r1 | round: 5 |
@@ -560,6 +561,33 @@ next_responsible_role: work（F-4 更正 + 自检脚本/记录落地；不触代
 from: review | to: work | status: executing | outcome: needs_fix |
 worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 0e2fd19 |
 next: work（F-4：回执 Spec 哈希更正 + 回执哈希自检落地）
+
+2026-11-16 · stage: work（F-4 修复轮）| plan_id: NOTES-007 | plan_revision: r1 |
+outcome: pass（F-4 闭合，execution_done）| worktree:
+D:/autostack/.wt/notes-007/auto-notes | branch: notes-007-dev | code_commit:
+无代码改动（产品 `3e81811`/`83ae6ac`、测试 `6395323`、Spec `0e2fd19` 不变）|
+**F-4 闭合**：①F-3 修复轮回执的 Spec 哈希更正为 `dcf374fe…`（0e2fd19 树）；
+勘误原值 `634f7de0…` 保留在旁并注明「笔误、该值不存在」，以保审计链。②**回执
+哈希自检落地**（review 诊断的强制 oracle）：新增
+`plan-artifacts/plan-007/receipt-hash-check.py`——抽取 Plan 内全部 hex 令牌，
+按来源逐项回推（提交存在性 `git cat-file -e`；Spec 版本 `git show
+<commit>:<path> | sha256sum`；在盘件 `Get-FileHash`/hashlib；assembly 指纹取自
+`main.rs` 常量；vendor pin 取自 `git submodule status`），未登记令牌 = FAIL，
+历史/勘误令牌走显式白名单。**首跑结果**（`receipt-hash-check.log`）：
+`tokens=44 ok=34 historical=9 errata=1 bad=0`，exit 0。③**纪律沉淀**（写入
+本回执、对后续轮次强制）：回执/正文中的每个 sha、尺寸、指纹必须从当轮命令
+输出**逐字复制**，禁止手写；提交前必须运行本自检并 exit 0；自检日志随回执
+入档。④本轮未触代码/测试/发布件（artifact 复核仍为
+`2e5e2898…`/17,836,032B；Spec `dcf374fe…` 未变）。| evidence:
+`receipt-hash-check.py` + `receipt-hash-check.log`（44 令牌逐项表）；Spec
+双路径复核（工作树 `Get-FileHash` 与 `git show 0e2fd19:` 一致）；
+artifact 开工/收工两次复核同值。| blockers: 无 | next_responsible_role:
+review（T-04 终评：F-4 更正与自检落地；F-1/F-2/F-3 结论复用）
+
+2026-11-16 · stage: goal | plan_id: NOTES-007 | plan_revision: r1 | round: 7 |
+from: work | to: review | status: execution_done | outcome: pass |
+worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 0e2fd19（未变） |
+next: review（T-04 终评：F-4 闭合 + 全量哈希自检）
 
 ## 10. 待澄清事项
 
