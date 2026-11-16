@@ -1,12 +1,12 @@
 ---
 plan_id: NOTES-007
-status: executing
+status: execution_done
 feature_name: notes sqlite 存储并发模型修复——读快照瞬态停摆
 author: [Codex]
 created_at: 2026-11-16
 updated_at: 2026-11-16
 plan_revision: 1
-current_step: 2
+current_step: 3
 total_steps: 5
 depends_on: []
 supersedes_spec_components: [docs/specs/notes/featurepack-service-and-editor.md]
@@ -254,10 +254,10 @@ profile，release 仅 T-03 交付门一步。
 | T-04 | review | T-03 | 独立上下文复演 R-01～R-04，绑定源码与发布件版本，核 AC-01～05 | AC-06 |
 | T-05 | merge | T-04 pass | 归档回执 + READER-013 pin 交接（新 sha + 提交；其 T-08 复跑消费） | AC-07 |
 
-执行进度（2026-11-16 复评轮）：**T-01 ✓ · T-02 ✓ · T-03 重开（needs_fix：F-3
-文档示例错配）** · T-04 已执行（复评判定 needs_fix，见 §9 诊断）· T-05 待合并。
-F-1/F-2 已闭合并经复评复演（20 轮 5.4–6.3s、lockwindow 6.0s、锚 `2e5e2898…`
-一致且 R-04 11/0）；仅 Spec 锚节的一处因果示例 sha 对错配需修正。
+执行进度（2026-11-16 F-3 修复轮）：**T-01 ✓ · T-02 ✓ · T-03 ✓（F-1/F-2/F-3 闭合）**
+· T-04 待终评（owner=review）· T-05 待合并（owner=merge）。F-3 为纯文本修正
+（Spec 锚节因果示例改为同源对 + “示例须同生成件”前提；Plan 修复回执措辞/尺寸
+更正），**未触代码与发布件**（artifact sha 恒为 `2e5e2898…`）。
 
 ## 9. 复审记录
 
@@ -397,12 +397,13 @@ c39ac7f9、CLI r7-t19-24-g54fe407-dirty）| task_ids: T-03（重开→闭合）|
 **5.98/5.98/6.32s**、759 采样、121 notes、读 max 64.2–166.6ms、26/0；smoke
 1.75s、`--rounds 5` 2.65s、lockwindow 5.95–6.18s（13–17 断言）、storage_trace
 6.55–6.9s——**全部 ≤10s**（原 20 轮 17.0s、hold 8 的 11.1s 均已消除）。
-**F-2 闭合**：身份根因=发布路径上下文（同一 commit 下 `auto service` 受管构建
-与手工 `cargo build --release` 的 flag 钉法不同 → 两个 sha；同上下文重复构建
-为 no-op、sha 不变——本轮 3 次服务启动中仅首次构建 9.0s，后两次 0.5s no-op、
-sha 恒为 `2e5e2898…`）。重锚：发布件 sha256
+**F-2 闭合**：身份根因=发布路径上下文（同一 commit 且**同一生成件**下，
+`auto service` 受管构建与手工 `cargo build --release` 的 flag 钉法不同 →
+两个 sha；同上下文重复构建为 no-op、sha 不变——首次构建 9.0s，start-2 实测
+0.53s no-op、start-3 无构建行，三次启动前后 sha 恒为 `2e5e2898…`）。重锚：
+发布件 sha256
 `2e5e28986706e9e3cb6954412b0e67904c09cc12b5fc8e3ba049a62892426240`
-（17,835,520B，`auto service` 17:11 构建；生成件 main.rs `3f8ad97e…`、
+（17,836,032B，`auto service` 17:11 构建；生成件 main.rs `3f8ad97e…`、
 fingerprint `757bff4b6348ccd4`，上下文与文件哈希入 Spec 锚节）。**在该锚定件上
 重跑**：`verify_featurepack_service` **67/0/0**（17:17:39）、后端门
 `run_v1_battery.sh` S0–S22 **fails=0** + `verify_backend_scratch.py` 52
@@ -487,6 +488,35 @@ AC-05 pass（锚行/上下文/R-04 全部核对一致）——结论 needs_fix �
 from: review | to: work | status: executing | outcome: needs_fix |
 worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 8dd5e25 |
 next: work（F-3：Spec 锚节示例改为同源对 02016f3a↔2e5e2898 + Plan 回执措辞）
+
+2026-11-16 · stage: work（F-3 文本修正轮）| plan_id: NOTES-007 | plan_revision: r1 |
+outcome: pass（F-3 闭合，execution_done）| worktree:
+D:/autostack/.wt/notes-007/auto-notes | branch: notes-007-dev | code_commit:
+`0e2fd19`（Spec 锚节文本；产品代码仍 `3e81811`/`83ae6ac`，测试 `6395323`）|
+**F-3 闭合**：①Spec 锚节把「构建路径导致字节漂移」示例改为**同源对**——
+同一生成件（`main.rs 3f8ad97e…`）下 `cargo build --release`（17:02）产
+`02016f3a…`、`auto service` 受管构建（17:11）产 `2e5e2898…`；并写入
+「**因果示例必须取自同一生成件**，混用不同生成件会把指纹漂移错记成构建路径
+差异」的前提（原示例混入了 16:31 的 `e067c3e9…`，其横幅指纹为 `35f70de4…`，
+属另一代生成件）。②锚节上下文表头改为「构建 17:11；验收 17:17–17:19」，并把
+restart 表述收敛为「同上下文重复构建为 no-op（start-2 实测 0.53s）、三次启动
+前后 sha 不变」。③Plan §5 修复回执同步更正：锚定件尺寸 **17,836,032B**（原文
+误写 17,835,520B）、「后两次 0.5s no-op」→「start-2 实测 0.53s no-op、start-3
+无构建行」。④**更正复审回执的一处数值**：`02016f3a…` 当时的实测尺寸是
+**17,835,520B**（anchor-context.json 17:09:05 记录），17,836,032B 是锚定件
+`2e5e2898…` 的尺寸——回执原句的尺寸归错，现以本行更正（不改写历史回执）。
+⑤Spec 锚行「代码提交」列改为「`83ae6ac`（代码；其后仅测试脚本/文档提交）」，
+避免随 HEAD 前进而陈旧。| evidence: 修正后回推核对——`02016f3a…`（17:02 手工
+构建，随 `main.rs 3f8ad97e…`）与 `2e5e2898…`（17:11 服务构建，同一
+`main.rs 3f8ad97e…`）同源；`35f70de4…` 见 16:31 服务横幅；锚件尺寸/sha/上下文
+在本轮开工前复核仍为 `2e5e2898…`/17,836,032B/`main.rs 3f8ad97e…`；
+Spec sha256 `634f7de0…`（修正后）。| blockers: 无 | next_responsible_role:
+review（T-04 终评：F-3 文本准确性 + 前两轮 F-1/F-2 复演结论复用）
+
+2026-11-16 · stage: goal | plan_id: NOTES-007 | plan_revision: r1 | round: 5 |
+from: work | to: review | status: execution_done | outcome: pass |
+worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 0e2fd19 |
+next: review（T-04 终评：F-3 已闭合，复核 Spec 文本与锚一致性）
 
 ## 10. 待澄清事项
 
