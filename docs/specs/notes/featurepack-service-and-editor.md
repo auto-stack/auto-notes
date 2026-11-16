@@ -190,7 +190,7 @@
 | 版本 | 成员 | sha256 | 提交 | 状态 |
 |---|---|---|---|---|
 | NOTES-006 r2 交付件 | auto-notes-57d3816f-back | `6939bafa3544…` | 80a6d98 代际 | **退役**（NOTES-007 起被下表取代；Reader 的 6939bafa pin 随之升级） |
-| NOTES-007 r1 | auto-notes-9e77e6a3-back | `7c808802c8a08cac44115a12e4be90070920f27f75af7d91fdbcf0c359419322` | `@@CODE_COMMIT@@` | current |
+| NOTES-007 r1 | auto-notes-9e77e6a3-back | `7c808802c8a08cac44115a12e4be90070920f27f75af7d91fdbcf0c359419322` | `3e81811`（代码提交；本锚随其后文档提交） | current |
 
 重建命令（本仓根）：
 
