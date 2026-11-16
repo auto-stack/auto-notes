@@ -1,12 +1,12 @@
 ---
 plan_id: NOTES-007
-status: executing
+status: execution_done
 feature_name: notes sqlite 存储并发模型修复——读快照瞬态停摆
 author: [Codex]
 created_at: 2026-11-16
 updated_at: 2026-11-16
 plan_revision: 1
-current_step: 2
+current_step: 3
 total_steps: 5
 depends_on: []
 supersedes_spec_components: [docs/specs/notes/featurepack-service-and-editor.md]
@@ -254,12 +254,11 @@ profile，release 仅 T-03 交付门一步。
 | T-04 | review | T-03 | 独立上下文复演 R-01～R-04，绑定源码与发布件版本，核 AC-01～05 | AC-06 |
 | T-05 | merge | T-04 pass | 归档回执 + READER-013 pin 交接（新 sha + 提交；其 T-08 复跑消费） | AC-07 |
 
-执行进度（2026-11-16 复审轮）：**T-01 ✓ · T-02 ✓ · T-03 重开（needs_fix）** ·
-T-04 已执行（final review 判定 needs_fix，见 §9）· T-05 待合并（owner=merge）。
-T-03 重开原因：F-1（R-01 20 轮调用 17.0s 超新用例 10s 门）/ F-2（发布件锚与在盘
-artifact 不一致、同 commit 不可复现）。代码提交 `3e81811`（T-02 实现 + Spec
-SD-01/02 + 决策制品 + 两脚本）+ `83ae6ac`（legacy 代际归属修复）；文档提交
-`4dcd740` + `dbe5195`（锚 `e067c3e9…`，复审后需按 F-2 重新锚定）。
+执行进度（2026-11-16 复审修复轮）：**T-01 ✓ · T-02 ✓ · T-03 ✓（F-1/F-2 修复闭合）**
+· T-04 待复评（owner=review，上一轮 needs_fix）· T-05 待合并（owner=merge）。
+修复提交：`6395323`（F-1：`--round-ops`/lockwindow 默认 hold 5s，20 轮门 5.2–6.3s）
++ `dcc7a6f`（F-2：发布件重锚 `2e5e2898…` + 构建上下文/可复现边界 + 验证入口计时）。
+代码提交仍为 `3e81811` + `83ae6ac`（F-1/F-2 未触产品代码）。
 
 ## 9. 复审记录
 
@@ -386,6 +385,58 @@ PASS** · lockwindow **7.0s PASS** · storage_trace **6.6s PASS** ·
 from: review | to: work | status: executing | outcome: needs_fix |
 worktree: D:/autostack/.wt/notes-007/auto-notes | commit: dbe5195 |
 next: work（T-03 重开：F-1 新用例成本、F-2 发布件重锚 + 重跑 R-04/电池）
+
+2026-11-16 · stage: work（复审修复轮）| plan_id: NOTES-007 | plan_revision: r1 |
+outcome: pass（F-1/F-2 闭合，重新 execution_done）| worktree:
+D:/autostack/.wt/notes-007/auto-notes | branch: notes-007-dev | base_commit:
+ba31252 | code_commit: `6395323`（F-1）+ `dcc7a6f`（F-2 文档）；产品代码仍
+`3e81811`/`83ae6ac` | dependency_revisions: 未变（auto-lang 只读、vendor
+c39ac7f9、CLI r7-t19-24-g54fe407-dirty）| task_ids: T-03（重开→闭合）|
+**F-1 闭合**：`concurrent_hammer.py` 增 `--round-ops`（默认 1，每写/读线程每轮
+1 轮 op——仍 ≥3 并发写者 + ≥3 并发读者 + draft 面 + 同修订争用 + 每轮零丢失
+核对 + 20 轮）；lockwindow 默认 `--hold 5`。实测（debug 20 轮 ×3 跑）
+**5.98/5.98/6.32s**、759 采样、121 notes、读 max 64.2–166.6ms、26/0；smoke
+1.75s、`--rounds 5` 2.65s、lockwindow 5.95–6.18s（13–17 断言）、storage_trace
+6.55–6.9s——**全部 ≤10s**（原 20 轮 17.0s、hold 8 的 11.1s 均已消除）。
+**F-2 闭合**：身份根因=发布路径上下文（同一 commit 下 `auto service` 受管构建
+与手工 `cargo build --release` 的 flag 钉法不同 → 两个 sha；同上下文重复构建
+为 no-op、sha 不变——本轮 3 次服务启动中仅首次构建 9.0s，后两次 0.5s no-op、
+sha 恒为 `2e5e2898…`）。重锚：发布件 sha256
+`2e5e28986706e9e3cb6954412b0e67904c09cc12b5fc8e3ba049a62892426240`
+（17,835,520B，`auto service` 17:11 构建；生成件 main.rs `3f8ad97e…`、
+fingerprint `757bff4b6348ccd4`，上下文与文件哈希入 Spec 锚节）。**在该锚定件上
+重跑**：`verify_featurepack_service` **67/0/0**（17:17:39）、后端门
+`run_v1_battery.sh` S0–S22 **fails=0** + `verify_backend_scratch.py` 52
+**fails=0**（25.1s）、R-04 `--rounds 5` **11/0**（1.5s，读 max 64.2ms）、R-01
+`--rounds 20` **26/0**（5.22s，读 max 59.1ms，p99 ≤54.9ms）、lockwindow
+**17/0**（6.09s）、storage_trace **80/0**（6.55s）；全部跑完 artifact sha 不变。
+Spec 增补：发布件身份 = 成员 + sha256 + 构建上下文（非 commit⇒字节）、r1 上下文
+表、可复现边界；验证入口改为 lockwindow 默认 hold 5s 并标注各入口实测时长。
+**未重跑且可复用**：Vue suite（本轮只改 tests/probe 与 docs，产品/前端代码未动，
+AC-04 的 12 红=基线同集结论仍成立）。| blockers: 无 | next_responsible_role:
+review（T-04 复评：F-1/F-2 与 AC-05/AC-03 证据在新锚上复核）
+
+### 修复轮测试计时（test-discipline 报告）
+
+| 测试模块 / 实际范围 | 结果 | 准备构建 | 执行 | 清理 | 总墙钟 |
+|---|---|---|---|---|---|
+| `--mode ui --rounds 20`（debug ×3） | 26 PASS / 0 FAIL，759 采样 | 无 | 4.9–6.0s | 自管 | **5.98 / 5.98 / 6.32s** |
+| `--mode ui --rounds 20`（release 锚定件） | 26 PASS / 0 FAIL | 无 | 4.9s | 自管 | 5.22s |
+| `--mode ui --rounds 5`（release 锚定件） | 11 PASS / 0 FAIL | 无 | 1.2s | 自管 | 1.5s |
+| `--mode lockwindow`（hold 5，release 锚定件） | 17 PASS / 0 FAIL | 无 | ~5s | 自管 | 6.09s |
+| `--mode smoke`（debug） | 7 PASS / 0 FAIL | 无 | ~1s | 自管 | 1.75s |
+| `storage_trace.py`（anchored release） | 80 PASS / 0 FAIL | 无 | ~6s | 自管 | 6.55s（debug 6.9s） |
+| `verify_featurepack_service.py`（anchored release） | 67 PASS / 0 FAIL / 0 SKIP | 生成 + release 构建 9.0s | 含 2 次 restart（各 no-op 0.5s） | 自管 | 8m27s |
+| `run_v1_battery.sh` S0–S22 + scratch 52（anchored release） | fails=0 + fails=0 | 无 | ~25s | 自管 | 25.1s |
+
+新增用例计时（≤10s 门）：`--rounds 20` **5.2–6.3s PASS**（原 17.0s → F-1 修复）·
+lockwindow（hold 5）**6.1s PASS**（原 hold 8 的 11.1s 不再作为回归入口）·
+smoke 1.75s · `--rounds 5` 1.5s · storage_trace 6.55–6.9s——全部合格。
+
+2026-11-16 · stage: goal | plan_id: NOTES-007 | plan_revision: r1 | round: 3 |
+from: work | to: review | status: execution_done | outcome: pass |
+worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 6395323 + dcc7a6f |
+next: review（T-04 复评：F-1/F-2 闭合 + 新锚 `2e5e2898…` 上复演）
 
 ## 10. 待澄清事项
 
