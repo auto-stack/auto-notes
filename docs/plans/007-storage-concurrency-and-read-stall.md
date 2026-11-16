@@ -1,12 +1,12 @@
 ---
 plan_id: NOTES-007
-status: execution_done
+status: executing
 feature_name: notes sqlite 存储并发模型修复——读快照瞬态停摆
 author: [Codex]
 created_at: 2026-11-16
 updated_at: 2026-11-16
 plan_revision: 1
-current_step: 3
+current_step: 2
 total_steps: 5
 depends_on: []
 supersedes_spec_components: [docs/specs/notes/featurepack-service-and-editor.md]
@@ -254,11 +254,12 @@ profile，release 仅 T-03 交付门一步。
 | T-04 | review | T-03 | 独立上下文复演 R-01～R-04，绑定源码与发布件版本，核 AC-01～05 | AC-06 |
 | T-05 | merge | T-04 pass | 归档回执 + READER-013 pin 交接（新 sha + 提交；其 T-08 复跑消费） | AC-07 |
 
-执行进度（work，2026-11-16）：**T-01 ✓ · T-02 ✓ · T-03 ✓**（R-01 20 轮 / R-03 电池 /
-R-04 发布件复跑全绿，Spec 版本锚在案）· T-04 待复审（owner=review）· T-05 待合并
-（owner=merge）。代码提交 `3e81811`（T-02 实现 + Spec SD-01/02 + 决策制品 + 两脚本）
-+ `83ae6ac`（legacy 代际归属补充修复）；文档提交 `4dcd740`（首版锚）+
-`dbe5195`（终版发布件锚 `e067c3e9…` + legacy 规则）。
+执行进度（2026-11-16 复审轮）：**T-01 ✓ · T-02 ✓ · T-03 重开（needs_fix）** ·
+T-04 已执行（final review 判定 needs_fix，见 §9）· T-05 待合并（owner=merge）。
+T-03 重开原因：F-1（R-01 20 轮调用 17.0s 超新用例 10s 门）/ F-2（发布件锚与在盘
+artifact 不一致、同 commit 不可复现）。代码提交 `3e81811`（T-02 实现 + Spec
+SD-01/02 + 决策制品 + 两脚本）+ `83ae6ac`（legacy 代际归属修复）；文档提交
+`4dcd740` + `dbe5195`（锚 `e067c3e9…`，复审后需按 F-2 重新锚定）。
 
 ## 9. 复审记录
 
@@ -317,6 +318,74 @@ next_responsible_role: review（T-04）
 from: drafting | to: review | status: execution_done | outcome: pass |
 worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 3e81811 + 83ae6ac |
 next: review（T-04：独立复演 R-01～R-04、核 AC-01～05、绑定源码与发布件版本）
+
+2026-11-16 · stage: review | review_scope: final | reviewer_identity: 实现同会话
+复审（目标授权链内未创建独立 agent；limitation = 与实现同上下文——按工件重构
+裁决：重读 base..HEAD 全 diff/Spec/Plan，独立重跑 R-01/R-02/R-04 与 review-owned
+反例，不采信执行者摘要）| plan_id: NOTES-007 | plan_revision: r1 | outcome:
+**needs_fix** | worktree: D:/autostack/.wt/notes-007/auto-notes | branch:
+notes-007-dev | reviewed_commit: `dbe5195` | base_commit: `ba31252` |
+dependency_revisions: auto-lang 本地检出（读侧未改；assembly 指纹源含其
+crates/stdlib 内容哈希）；vendor/auto-down `c39ac7f9`；CLI
+`0.1.0+plan-890-verified-r7-t19-24-g54fe407-dirty` | spec_inputs:
+docs/specs/notes/featurepack-service-and-editor.md sha256 `a300e8ae…`（SD-01
+存储并发模型 + SD-02 验证入口/版本锚；正文与代码一致，除 F-2 的锚可复现性缺口）|
+acceptance_results: **AC-01 pass**（决策制品三因子归因 + 最小可重跑负载形状，数字
+与 plan-artifacts 原始 JSON 一致）· **AC-02 pass**（静态 80 项：读路径 10 入口
+单连接、零 BEGIN IMMEDIATE/ALTER/meta 写；运行时：外部写锁窗口读 max
+25.5–56.4ms、schema init 1 行、重启 0 行；review-owned 冷启动反例 5 轮 × 8 并发
+首读 = 40/40 成功，无悬挂）· **AC-03 pass（行为口径）**（复审重跑 20 轮 26/0、
+2199 采样、读 max 136.1ms、写 p99 ≤293.7ms、361 notes、零丢失）——但同一调用的
+成本超新用例 10s 门（F-1）· **AC-04 pass（受限，见 evidence ④）**：fp service
+67/0/0 + v1 电池 S0–S22 fails=0 + scratch 52 fails=0 为 work 在 `e067c3e9` 上
+取得（行为在现锚 `02016f3a` 上仅以 R-04 复核）；Vue suite 19/12/2 与修复前基线
+**逐项同集**（Compare-Object 零差异）= 前端/工具链漂移，非本改动 · **AC-05
+fail**（F-2）| pending_closeout_gates: 修复后须在新锚上重跑 R-04（≥5 轮）与
+fp service 电池；合并归档 + READER-013 pin 交接（AC-07，owner=merge）| findings:
+**F-1**（R-01 20 轮 17.0s > 新用例 10s 门；affected AC-03/R-01/T-03；severity
+gate/blocking；replay `python tests/probe/concurrent_hammer.py --mode ui
+--rounds 20`（debug exe `466986f5`，in-run 16.7s / wall 17.0s，两独立运行一致）；
+同批新增用例均合格：smoke 1.1s / `--rounds 5` 4.0s / lockwindow 7.0s /
+storage_trace 6.6s；修法=降每轮每线程 op 数（保 ≥3 写者+≥3 读者+draft+20 轮+
+全部断言）后复测 ≤10.0s，或拆成 ≤10s 单元并逐单元计时——「正式负载门」重分类
+不豁免该门）· **F-2**（发布件锚不可复现/已漂移；affected AC-05/T-03/Spec 版本锚；
+severity gate；观察=入审时锚 `e067c3e9…` 与在盘件一致，复审侧 provenance 检查
+用同 commit 再生成后 `main.rs` 变（`__assembly_fingerprint` 35f70de4…→757bff4b…，
+文件 244349e9…→3f8ad97e…），release 重建得 `02016f3a…`（17,836,032B）；随后两次
+再生成（含 suite 同 env）稳定为 3f8ad97e → 漂移是「16:29 work 期生成 vs 其后
+生成」之间的一次性变化，非每次随机；`generation.json` 的 assembly payload 含
+notes 树外输入（stdlib/*、auto-lang crates、`selection/*` consumer inputs）⇒
+notes commit 不能决定字节；后果=Spec 锚与在盘件不一致、work 的 R-03/R-04 证据
+绑定到已不存在的二进制；修法=在记录的构建上下文中重建 release（CLI 身份 +
+auto-lang commit/dirty + 生成/构建命令）、重锚、在该件上重跑 R-04 ≥5 轮与 fp
+service 电池、Spec 锚节写明可复现边界（identity = 发布件+上下文，非「commit⇒
+字节」），并顺带修正 §9 表里 storage_trace ≈12s（实测 6.6s））| evidence:
+① 复审重跑 `--rounds 20`（debug）26/0 17.0s、`--rounds 5`（release）11/0 4.0s、
+lockwindow（release）17/0 7.0s、storage_trace debug/release 各 80/0 6.6/6.9s；
+② review-owned 反例 rev-coldstart.py 5×8 全 ok；③ provenance：再生成后
+main.rs 变 + release 重建 sha 变（见 F-2）；④ UI suite 12 红与修复前基线同集
+（Compare-Object 零差异；红因=CLI r7-t19-24/auto-ui 11-16 漂移）；⑤ 现锚
+`02016f3a` 上 R-04 复跑 11/0（读 max 77.3ms）| next: work（T-03 重开：F-1 + F-2）
+
+### 复审轮测试计时（test-discipline 报告）
+
+| 测试模块 / 实际范围 | 结果 | 准备构建 | 执行 | 清理 | 总墙钟 |
+|---|---|---|---|---|---|
+| `concurrent_hammer --mode ui --rounds 20`（debug） | 26 PASS / 0 FAIL，2199 采样 | 无（预备产物） | 16.7s | 自管 | **17.0s** |
+| `concurrent_hammer --mode ui --rounds 5`（release） | 11 PASS / 0 FAIL，549 采样 | 无 | 3.6s | 自管 | 4.0s |
+| `concurrent_hammer --mode lockwindow --hold 6`（release） | 17 PASS / 0 FAIL | 无 | ~5s | 自管 | 7.0s |
+| `storage_trace.py`（debug / release） | 80 PASS / 0 FAIL ×2 | 无 | ~6s | 自管 | 6.6s / 6.9s |
+| review-owned `rev-coldstart.py`（5 轮 × 8 并发首读） | 40/40 ok（无 second_writer 悬挂） | 无 | ~3s | 自管 | ~4s |
+| `verify_featurepack_service.py` / v1 电池 / scratch | **复用** work 轮在 `e067c3e9` 上的 67/0/0、fails=0、fails=0 | 未重跑 | — | — | — |
+
+新增用例计时（≤10s 门，复审口径）：smoke **1.1s PASS** · `--rounds 5` **4.0s
+PASS** · lockwindow **7.0s PASS** · storage_trace **6.6s PASS** ·
+`--rounds 20` **17.0s FAIL（F-1）**。
+
+2026-11-16 · stage: goal | plan_id: NOTES-007 | plan_revision: r1 | round: 2 |
+from: review | to: work | status: executing | outcome: needs_fix |
+worktree: D:/autostack/.wt/notes-007/auto-notes | commit: dbe5195 |
+next: work（T-03 重开：F-1 新用例成本、F-2 发布件重锚 + 重跑 R-04/电池）
 
 ## 10. 待澄清事项
 
