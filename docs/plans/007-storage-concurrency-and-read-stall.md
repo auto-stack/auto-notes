@@ -1,12 +1,12 @@
 ---
 plan_id: NOTES-007
-status: execution_done
+status: executing
 feature_name: notes sqlite 存储并发模型修复——读快照瞬态停摆
 author: [Codex]
 created_at: 2026-11-16
 updated_at: 2026-11-16
 plan_revision: 1
-current_step: 3
+current_step: 2
 total_steps: 5
 depends_on: []
 supersedes_spec_components: [docs/specs/notes/featurepack-service-and-editor.md]
@@ -254,10 +254,11 @@ profile，release 仅 T-03 交付门一步。
 | T-04 | review | T-03 | 独立上下文复演 R-01～R-04，绑定源码与发布件版本，核 AC-01～05 | AC-06 |
 | T-05 | merge | T-04 pass | 归档回执 + READER-013 pin 交接（新 sha + 提交；其 T-08 复跑消费） | AC-07 |
 
-执行进度（2026-11-16 F-3 修复轮）：**T-01 ✓ · T-02 ✓ · T-03 ✓（F-1/F-2/F-3 闭合）**
-· T-04 待终评（owner=review）· T-05 待合并（owner=merge）。F-3 为纯文本修正
-（Spec 锚节因果示例改为同源对 + “示例须同生成件”前提；Plan 修复回执措辞/尺寸
-更正），**未触代码与发布件**（artifact sha 恒为 `2e5e2898…`）。
+执行进度（2026-11-16 终评轮）：**T-01 ✓ · T-02 ✓ · T-03 重开（needs_fix：F-4
+回执哈希错绑）** · T-04 已执行（终评判定 needs_fix）· T-05 待合并。
+F-3 文本已修正且经复核（Spec 锚节示例同源、前提在案）；终评新增**唯一**缺陷
+=F-4 修复轮回执里 Spec sha256 写作 `634f7de0…`，实际 `dcf374fe…`（逐项扫描
+Plan 内全部哈希令牌，仅此一处不符）。
 
 ## 9. 复审记录
 
@@ -517,6 +518,48 @@ review（T-04 终评：F-3 文本准确性 + 前两轮 F-1/F-2 复演结论复�
 from: work | to: review | status: execution_done | outcome: pass |
 worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 0e2fd19 |
 next: review（T-04 终评：F-3 已闭合，复核 Spec 文本与锚一致性）
+
+2026-11-16 · stage: review（终评）| review_scope: final（F-3 修复后）|
+reviewer_identity: 实现同会话复审（limitation 同前）| plan_id: NOTES-007 |
+plan_revision: r1 | reviewed_commit: `0e2fd19` | base_commit: `ba31252` |
+spec_inputs: docs/specs/notes/featurepack-service-and-editor.md sha256
+`dcf374fe…`（0e2fd19 棵树；`git show 0e2fd19:…` 与工作树一致）| outcome:
+**needs_fix**（窄口：回执证据哈希错绑；交付物/行为面零新增问题）|
+**F-3 复核（通过）**：Spec 锚节示例已改为同源对——同一 `main.rs 3f8ad97e…`
+下 `cargo build --release`（17:02）`02016f3a…` vs `auto service`（17:11）
+`2e5e2898…`，并写入「因果示例必须取自同一生成件」前提；16:31 的
+`35f70de4…` 正确归入指纹漂移而非构建路径差异；上下文表头/尺寸（17,836,032B）
+/锚行提交格均与在盘事实一致（发布件 sha `2e5e2898…` 复算命中）。
+**F-4（新，narrow，blocking）**：F-3 修复轮 work 回执写「Spec sha256
+`634f7de0…`（修正后）」——该值在任何位置都不存在；0e2fd19 树内 Spec 实际
+sha256 = `dcf374fe063d450de583fd0a0eb6c84a2e09400bd773aaaae55039b98cf1f229`
+（工作树 `Get-FileHash` 与 `git show 0e2fd19:docs/specs/...` 两条路径一致）。
+影响：回执对 Spec 版本绑定不成立，且与 F-3 刚建立的「证据须可回推」纪律冲突。
+**全量哈希令牌扫描（终评自检）**：Plan 内全部 8/12/16/64-hex 令牌逐项核验——
+`a300e8ae…`（dbe5195 Spec）✓、`1d8b2cdb…`（8dd5e25 Spec）✓、`634f7de0…` ✗、
+`e067c3e9…`/`02016f3a…`（历史件，当时实测）✓、`2e5e2898…`（在盘锚）✓、
+`35f70de4…`/`757bff4b6348ccd4`（指纹）✓、`f17cdc3b…`/`64eba72b…`/`6738bba6…`/
+`3f8ad97e…`/`578a6595…`（生成件）✓、`c7dbb9f4…`（CLI）✓、`c39ac7f9`（vendor）
+✓、`107b23d0f`（auto-lang 构建期）✓、`466986f5`（debug exe）✓、全部提交号
+（3e81811/83ae6ac/6395323/dcc7a6f/8dd5e25/0e2fd19/ba31252/d92fc93/e7f1539/
+9b07084/ea418bb/cf1dbfe/d11c1a6）存在且指向所声称内容——**仅 F-4 一处不符**。
+**诊断检查点（连续第三次 final review 未过，按协议前置）**：
+- 链：R2 needs_fix（F-1/F-2）→ 修复 → R4 needs_fix（F-3）→ 修复 → R6 needs_fix（F-4）。
+- 同类根因：F-3 与 F-4 都是**证据文本不实**（前者错配 sha 对、后者写不存在
+  的 Spec 哈希）——两者都源于按记忆/手写填写证据字段，而非把命令输出逐字
+  粘贴；前一轮只加了「内容须可回推」的核对，没有加**回执字段的机械自检**。
+- 校正后的 oracle（下轮起强制）：①所有回执/正文中的 sha、尺寸、指纹必须
+  从当轮命令输出**逐字复制**，禁止手写；②提交前运行「回执哈希自检」——抽取
+  回执内全部 hex 令牌，逐个用 `git show <commit>:<path> | sha256sum`、在盘
+  `Get-FileHash`、git 提交存在性重新推导，任一不符即不得提交；③自检记录
+  （令牌 → 来源 → 实测值）随回执入档；④该自检同时覆盖 Spec 与 Plan 的
+  数值断言（尺寸/sha/指纹）。本轮已执行 ② 并把结果写在上方。|
+next_responsible_role: work（F-4 更正 + 自检脚本/记录落地；不触代码与发布件）
+
+2026-11-16 · stage: goal | plan_id: NOTES-007 | plan_revision: r1 | round: 6 |
+from: review | to: work | status: executing | outcome: needs_fix |
+worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 0e2fd19 |
+next: work（F-4：回执 Spec 哈希更正 + 回执哈希自检落地）
 
 ## 10. 待澄清事项
 
