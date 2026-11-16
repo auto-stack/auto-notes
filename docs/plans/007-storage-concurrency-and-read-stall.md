@@ -1,12 +1,12 @@
 ---
 plan_id: NOTES-007
-status: drafting
+status: execution_done
 feature_name: notes sqlite 存储并发模型修复——读快照瞬态停摆
 author: [Codex]
 created_at: 2026-11-16
 updated_at: 2026-11-16
 plan_revision: 1
-current_step: 0
+current_step: 3
 total_steps: 5
 depends_on: []
 supersedes_spec_components: [docs/specs/notes/featurepack-service-and-editor.md]
@@ -135,6 +135,79 @@ sha256 写入 Spec 来源快照表（旧 6939bafa3544 退役登记）。
 | SD-01 | modify | docs/specs/notes/featurepack-service-and-editor.md | 无并发模型章节 → 新增「存储并发模型」节：读路径零写锁单连接、schema/迁移进程级一次、BUSY→`second_writer` 具名快速失败、并发写负载下读 p99 ≤ 2s 预算、health 与存储面分离语义 | 停摆修复的合同面从"未规定"变为可验收 | AC-02/03 |
 | SD-02 | modify | docs/specs/notes/featurepack-service-and-editor.md | 验证入口节 → 增补并发锤入口与发布件版本锚更新（6939bafa→新 sha） | 复现与回归的常设入口 | AC-03/05 |
 
+### 执行结果（work，2026-11-16）
+
+**T-01 诊断（AC-01）** — 工具 `tests/probe/concurrent_hammer.py`（`ui` / `lockwindow` /
+`smoke` 三模；自管隔离 `NOTES_DATA_DIR` + 临时端口 + 自建 fp policy；**绝不触发编译**，
+exe 解析 = `--exe` → `NOTES_BACK_EXE` → 本仓 `rust-workspace/.cargo/config.toml` 的
+`target-dir` + `*-back` 成员；缺失即具名预备失败）。归因 = **三因子组合**：环境文件锁
+（外部 `FileShare=None` 句柄下 `sqlite.open` 1.459s 后失败，busy_timeout 不覆盖打开）
+× 旧读路径形状（每读 2 次打开 + 每请求无条件 `INSERT OR REPLACE meta schema_v`）
+× a2r `sqlite.open` 失败**静默回退内存库**（幽灵库 ⇒ 幻影 `not_found` / 冻结空列表 /
+`status` 谎报 loaded:true entries:0 / 假成功写）。共享 facade 定责 = **否**（每次新建
+连接、句柄内 Arc<Mutex>，无跨请求共享）→ 无 engine 线移交件。
+修复前取证（`--mode lockwindow --hold 8`，exe sha `4ed458fb…`）：`get` → `not_found`
+2.912–2.956s（真实存在 id）、`list` → `[]` 无错误 2.9s、`status` → `loaded:true entries:0`
+（真实 5 条）1.47s、`create` → `storage_unwritable` 2.93s。语句级微探针：meta 写
+3.377s `database is locked`、重复 `ALTER` 0.000s 不取锁、纯 `SELECT` 0.000s、
+`BEGIN IMMEDIATE` 3.365s。
+**起草假设修正登记**：每读 **2** 连接（非 3，实测 2×1.46s 吻合）；"5×ALTER 每请求两次
+拿写锁"不成立（列已存在时 prepare 期失败、零锁；真写锁点 = 无条件 meta 写）；分钟级
+墙钟来自并发/重试放大，非单调用无界。决策制品 `docs/plans/evidence/007-attribution.md`
+（原始数据 `plan-artifacts/plan-007/`：`sqlite-microprobe.py` / `sqlite-open-lock-probe.py` /
+`prefix-lockwindow.json` / `prefix-smoke.json`）。
+
+**T-02 修复（AC-02）** — `repository.at` 新增 `conn_is_file_backed / table_has_column /
+table_exists / schema_structurally_ready / ensure_schema_once / open_ready /
+write_conn_ok / storage_err_json / storage_error_of / slow_op`；读路径 10 入口
+（repo_get / repo_list_active / repo_search / read_receipt / repo_status / fp_get /
+fp_list_by_book / fp_receipt / fp_draft_get / fp_source_of_view）改**单连接零写锁**；
+写路径 `busy_timeout` 3000→5000 + 写连接背衬校验 + BEGIN BUSY/schema 失败具名日志 +
+>2s `storage_slow`；`repo_status` 增 `storage_error` 且 legacy 拒绝语义原样
+（`upgrade_error`，S-16/S-19 对齐——见 `legacy-status-probe.py` 全过）。
+`db.at` / `entry_adapters.at`：读失败具名映射（单文档端点 `storage_unavailable`；
+typed 数组端点空集 + status 具名，类型面限制在 Spec 登记）。
+**设计调整（记录）**：a2r Rust 后端不支持模块级可变 `let`（`auto trans` 实测降为 main
+内局部变量、跨函数不可见）→ 进程级 once-guard 改为「版本 + 结构就绪探针（全只读，
+零写）+ 单写事务内二次确认」的等价实现（更强：每库至多一次，且半途迁移/列被外部
+DROP 仍自愈）。R-02 追踪断言 `tests/probe/storage_trace.py`：debug **80/0**、
+release **80/0**；外部写锁窗口读 max 28.2–145.7ms 且数据正确；schema 初始化日志
+1 行、重启 0 行。
+
+**补充修复（R-03 电池回归发现）**：legacy 升级代际归属必须留在 repo 文档/来源访问
+入口——`repo_status` / `read_receipt` / 测试 setup（`test_reset`）/ 显式
+`migrate_legacy_at` 只做 schema 就绪（新增 `open_ready_schema_only`），不得抢先写
+`meta.upgraded=1`；否则「先 setup/状态查询、随后旧树就位」的用例会让旧树永不升级
+（r5 电池 U1..U10/S21 与 scratch 15 项红）。修复后 r5 电池 **S0–S22 fails=0**、
+scratch 52 项 **fails=0**。Spec 已登记该条（legacy 升级代际归属）。
+
+**T-03 验证与发布（AC-03/04/05）** —
+- **R-01**（debug，与发布件同源）：`--mode ui --rounds 20` = **26/0**（2199 采样；
+  读 max **141.3ms**、p99 ≤128.3ms；361 notes；同修订争用 20/20 恰一胜；零幻影/零
+  丢失），墙钟 15.9s；`--mode smoke`（1 轮）= **7/0**，1.1s。
+- **R-02**：`storage_trace.py` debug **80/0**、release **80/0**；外部写锁窗口读
+  max 25.5–56.4ms 且数据正确；schema 初始化日志 1 行、重启 0 行。
+- **R-03**（release 发布件上）：`verify_featurepack_service.py` **67 PASS / 0 FAIL /
+  0 SKIP**（含 S-01 跨重启重放、S-02 迁移半途自愈）；后端门 `run_v1_battery.sh`
+  （S0–S22）**fails=0** + `verify_backend_scratch.py`（52 项）**fails=0**；
+  `verify_standalone.py --profile vue --case suite` = **19 passed / 12 failed /
+  2 skipped**，且与**修复前基线逐项同集**（Compare-Object 零差异；12 条 = accent-dark
+  主题色 2 + negatives-r8 1 + negatives-r9 5 + smoke 4）。红因 = 前端/工具链漂移
+  （当前 CLI `0.1.0+plan-890-verified-r7-t19-24-g54fe407-dirty` + auto-ui 11-16，
+  非 NOTES-004 记录绿的 `r7-t19-14-g47d8f7b` + auto-ui-tool 13:09），**非本改动
+  引入**——A/B 基线（`git checkout ba31252 -- src/back` 重建 debug 后端）同集复现。
+- **发布件**：release 重建（`auto service --server rust`）→
+  `auto-notes-9e77e6a3-back.exe` sha256
+  `e067c3e92baa14b2459ae8adf03c409035464471873c8bc914cb29d23d0e46f1`
+  （17,836,032B）；Spec 版本锚已入（NOTES-006 的 `6939bafa3544` 退役）。
+- **R-04**：发布件复跑 `--mode ui --rounds 5` = **11/0**、`--mode lockwindow` =
+  **17/0**、`storage_trace` = **80/0**（读 max 75.3ms）。
+- **测试计时（test-discipline）**：新增用例 smoke（1 轮）**1.1s** ≤10s；20 轮并发门
+  **16.6s** 与 lockwindow（含 6–8s 环境锁窗口）**~20s** 为计划规定的正式负载/取证门，
+  单独计时报告；`storage_trace` ~12s；`verify_featurepack_service` 本轮 **6m59s**
+  （热 release；首轮冷构建 15m35s）、后端门 **23.7s**、`--case suite` **5m48s**
+  （含准备构建）。
+
 ## 6. 测试设计
 
 | ID / owner_stage | AC | 入口、反例与独立断言 |
@@ -164,7 +237,14 @@ profile，release 仅 T-03 交付门一步。
 
 拟实施位置 D:/autostack/.wt/notes-007/auto-notes，分支 notes-007-dev（work
 确认实际树/分支/HEAD 后以此为准）。日常构建走 AGENTS.md dev 快环
-（rust-workspace 内 cargo build -p auto-notes-30db9907-back，热增量 ~7s）。
+（rust-workspace 内 `cargo build -p <member>`，热增量 ~7s）。
+
+**实测树/分支/成员（2026-11-16 work）**：树 `D:/autostack/.wt/notes-007/auto-notes`、
+分支 `notes-007-dev`、BASE `ba31252`；生成成员名由项目路径派生，工作树为
+`auto-notes-9e77e6a3-back`（主检出为 `auto-notes-30db9907-back`）——文中
+`auto-notes-30db9907-back` 一类的固定名按实际生成成员解释。后端生成链
+（`auto build --gen-only -r rust` 不产 back 成员；back 由 `auto service --server rust`
+的 `generate_api` 产生）见 §5 T-03 记录。
 
 | ID | owner_stage | 依赖 | 工作与验证 | 验收 |
 |---|---|---|---|---|
@@ -174,6 +254,12 @@ profile，release 仅 T-03 交付门一步。
 | T-04 | review | T-03 | 独立上下文复演 R-01～R-04，绑定源码与发布件版本，核 AC-01～05 | AC-06 |
 | T-05 | merge | T-04 pass | 归档回执 + READER-013 pin 交接（新 sha + 提交；其 T-08 复跑消费） | AC-07 |
 
+执行进度（work，2026-11-16）：**T-01 ✓ · T-02 ✓ · T-03 ✓**（R-01 20 轮 / R-03 电池 /
+R-04 发布件复跑全绿，Spec 版本锚在案）· T-04 待复审（owner=review）· T-05 待合并
+（owner=merge）。代码提交 `3e81811`（T-02 实现 + Spec SD-01/02 + 决策制品 + 两脚本）
++ `83ae6ac`（legacy 代际归属补充修复）；文档提交 `4dcd740`（首版锚）+
+`dbe5195`（终版发布件锚 `e067c3e9…` + legacy 规则）。
+
 ## 9. 复审记录
 
 2026-11-16 · stage: new · NOTES-007 r1 · outcome: pass（草案就绪）·
@@ -182,6 +268,55 @@ next: work T-01。依据 READER-013 7 轮收口证据 + BACK-STALL-BLOCKER.md +
 无条件 meta 写 / busy_timeout=3000 不覆盖文件打开）起草；诊断任务带
 facade→engine 线 bounded 移交出口；消费方 READER-013 只收 pin 交接，
 不构成本计划前置。
+
+2026-11-16 · stage: work | plan_id: NOTES-007 | plan_revision: r1 |
+outcome: pass（T-01/T-02/T-03 闭合，execution_done）| worktree:
+D:/autostack/.wt/notes-007/auto-notes | branch: notes-007-dev | base_commit:
+ba31252 | code_commit: 3e81811 + 83ae6ac（文档 4dcd740 + dbe5195）|
+dependency_revisions: auto-lang 本地检出（a2r-std/sqlite.rs 只读实读、未改）；
+vendor/auto-down 子模块 c39ac7f9（pin 未变）；工具 auto
+0.1.0+plan-890-verified-r7-t19-24-g54fe407-dirty | task_ids: T-01 / T-02 / T-03 |
+evidence: （1）T-01 决策制品 docs/plans/evidence/007-attribution.md + 原始数据
+plan-artifacts/plan-007/{sqlite-microprobe.py 语句级 3.377s busy / 重复 ALTER 0ms、
+sqlite-open-lock-probe.py 打开失败 1.459s、prefix-lockwindow.json 修复前
+get not_found 2.912s / list [] / status loaded:true entries:0、postfix 全具名
+storage_unavailable}；（2）T-02 `tests/probe/storage_trace.py` debug/release
+80/0（读路径 10 入口零 BEGIN IMMEDIATE/ALTER/meta 写 + 单连接；写锁窗口读
+max 25.5–56.4ms；schema init 日志 1 行、重启 0 行）；（3）R-01
+`concurrent_hammer.py --mode ui --rounds 20` 26/0（2199 采样、读 max 141.3ms、
+361 notes、争用 20/20 恰一胜）、smoke 1.1s；（4）R-03 release：
+verify_featurepack_service 67/0/0 + run_v1_battery.sh S0–S22 fails=0 +
+verify_backend_scratch 52 fails=0；`--case suite` 19 passed/12 failed/2 skipped
+与**修复前基线逐项同集**（Compare-Object 零差异；红因=前端/工具链漂移，
+当前 CLI r7-t19-24 + auto-ui 11-16 非 NOTES-004 记录绿的 r7-t19-14/auto-ui-tool
+13:09）；（5）R-04：发布件 sha256 e067c3e9…（17,836,032B）ui 5 轮 11/0 +
+lockwindow 17/0 + trace 80/0 | blockers: 无（suite31 的 12 条红为工具链漂移，
+A/B 基线同集已实证，归前端/codegen 线观察，非本计划可交付面）|
+next_responsible_role: review（T-04）
+
+### 本会话测试计时（test-discipline 报告）
+
+| 测试模块 / 实际范围 | 结果（执行/跳过） | 准备构建 | 执行 | 清理 | 总墙钟 |
+|---|---|---|---|---|---|
+| `verify_featurepack_service.py`（release 自管） | 67 PASS / 0 FAIL / 0 SKIP | 生成 ~2m + release 重建（冷 3m17s） | 含 2 次重启（各 ~2m 生成） | 自管（kill_tree） | 6m59s（首轮冷 15m35s） |
+| `run_v1_battery.sh` S0–S22（Git bash，release） | fails=0 | 无（exe 就绪） | ~20s | 自管 | 23.7s（含 scratch） |
+| `verify_backend_scratch.py` 52 项 | fails=0 | 无 | ~8s | 自管 | 同上 |
+| `concurrent_hammer.py --mode ui --rounds 20` | 26 PASS / 0 FAIL（2199 采样） | 无（预备产物） | 15.9s | 自管临时目录 | 16.6s |
+| `concurrent_hammer.py --mode smoke`（1 轮） | 7 PASS / 0 FAIL | 无 | 1.1s | 自管 | 1.1s |
+| `concurrent_hammer.py --mode lockwindow`（hold 6–8s） | 17–21 PASS / 0 FAIL | 无 | ~15–20s | 自管 | ~20s |
+| `storage_trace.py` | 80 PASS / 0 FAIL | 无 | ~10s（含 2 次服务启停） | 自管 | ~12s |
+| `verify_standalone.py --profile vue --case suite` | 19 passed / 12 failed / 2 skipped（基线同集） | `auto build -r vue` ~2.5m | 2m48s | 自管 | 5m48s |
+
+新增用例计时（≤10s 门）：`concurrent_hammer --mode smoke`（1 轮 UI 形状并发）
+**1.1s PASS**；`storage_trace` 80 项总 **~12s**（含两次服务启停；单断言为毫秒级）。
+计划规定的正式门单独计时：20 轮并发门 **16.6s**、lockwindow 取证 **~20s**
+（含 6–8s 外部文件锁窗口）——二者是按 AC-03/AC-01 规定样本量的负载/取证门，
+不是日常单测；日常回归用 smoke（1.1s）。
+
+2026-11-16 · stage: goal | plan_id: NOTES-007 | plan_revision: r1 | round: 1 |
+from: drafting | to: review | status: execution_done | outcome: pass |
+worktree: D:/autostack/.wt/notes-007/auto-notes | commit: 3e81811 + 83ae6ac |
+next: review（T-04：独立复演 R-01～R-04、核 AC-01～05、绑定源码与发布件版本）
 
 ## 10. 待澄清事项
 
