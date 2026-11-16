@@ -6,7 +6,7 @@ author: [Codex]
 created_at: 2026-11-16
 updated_at: 2026-11-16
 plan_revision: 1
-current_step: 4
+current_step: 5
 total_steps: 5
 base_branch: main
 base_commit: ba312523d0e027de58b8a0625d69a05951a7b978
@@ -256,10 +256,12 @@ profile，release 仅 T-03 交付门一步。
 | T-04 | review | T-03 | 独立上下文复演 R-01～R-04，绑定源码与发布件版本，核 AC-01～05 | AC-06 |
 | T-05 | merge | T-04 pass | 归档回执 + READER-013 pin 交接（新 sha + 提交；其 T-08 复跑消费） | AC-07 |
 
-执行进度（2026-11-16 终评 pass）：**T-01 ✓ · T-02 ✓ · T-03 ✓（F-1..F-4 全闭）·
-T-04 ✓（final review pass）** · T-05 待合并（owner=merge；归档 + canonical 落地 +
-worktree 清理 + plan-artifacts 删除 + READER-013 pin 交接）。发布件锚
-`2e5e2898…`、Spec `dcf374fe…`、worktree HEAD `0e2fd19`。
+执行进度（2026-11-16 merge 收尾）：**T-01 ✓ · T-02 ✓ · T-03 ✓（F-1..F-4 全闭）·
+T-04 ✓（final review pass）· T-05 ✓（landed / canonical_verified / archived /
+cleaned）**。发布件锚 `2e5e2898…`（发布件身份=件 sha256+构建上下文）、canonical
+Spec `dcf374fe…`、delivery commit `3fff9cf`、归档于
+`docs/plans/archived/007-storage-concurrency-and-read-stall.md`（status:
+archived）。
 
 ## 9. 复审记录
 
@@ -686,3 +688,25 @@ pre-land_guard: `wt-guard.ps1` 初次 BLOCKED（728 个 pnpm junction/symlink：
 worktree 提交前工作树干净。|
 next: cleanup（worktree 移除 + 分支删除 + plan-artifacts/plan-007 删除 +
 registry 刷新 + READER-013 pin 交接）
+
+2026-11-16 · stage: merge（收尾）| checkpoints 补记：**cleaned** |
+cleanup: ①worktree `D:/autostack/.wt/notes-007/auto-notes` 删除——移除前
+`wt-guard.ps1` 复跑 clean（728 个 pnpm junction/symlink 已按护栏只删链接、
+零穿透），`git worktree remove --force` 因 Windows 长路径失败后注册已摘除，
+改用 `cmd /c rd /s /q \\?\…` 清空并验证目录不存在；空组目录
+`.wt/notes-007` 一并删除；分支 `notes-007-dev` 已删（was `3fff9cf`）。
+②`plan-artifacts/plan-007` 全域删除（289 文件 / 2,641,049B；关键证据已折入
+本文件 §5/§9）。③`plan-artifacts/.retention/policy.json` 刷新：新增
+`auto-notes/NOTES-007` = `deleted-at-merge (no holds)`（含交付件锚、
+交付提交、清理范围与 named_leftovers）。④现存 42 个 `verify-standalone-*`
+孤儿目录经抽查均为他计划/他仓（auto-reader epub 面、11-04..11-13），非本计划
+创建 → 按 fail-closed 规则**未删除**，仅登记上报。|
+**READER-013 pin 交接（AC-07）**：发布件 = `auto-notes-9e77e6a3-back`，
+sha256 `2e5e2898…92426240`（全值见 §9 终评回执与 Spec 锚节；17,836,032B；
+成员名由路径派生，跨检出不同）；可引用提交 = 代码 `d8a1313`（原 `83ae6ac`，
+rebase 后）、交付 `3fff9cf`；其 T-08 复跑使用该 pin 即可解除第二外部阻塞。|
+deployment observation: 交付件即本次锚定 release；主检出未另做 release/生成
+重建（避免锚漂移，属授权范围外），运行中桌面实例未重启。|
+final_state: status=archived、current_step=5/5、T-01..T-05 全完成；
+canonical Spec 在主检出（blob `6a4f9f4d…` / sha256 `dcf374fe…`）；
+`src`/`docs/specs`/`tests/probe` 与 reviewed 树逐 blob 相同。
