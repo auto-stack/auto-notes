@@ -398,6 +398,26 @@ fn ensure_schema_once(db SqliteDb, op str) str {
     return ""
 }
 
+/// 只做「文件背衬 + schema 就绪」的就绪入口（**不碰 legacy 升级状态机**）。
+/// 给诊断面 read_receipt / repo_status 用：旧实现这两处只跑 ensure_schema，
+/// 不得抢先把 meta.upgraded 写成 1——否则先到的一次状态/回执查询会让随后
+/// 就位的旧树永远不再升级（r5 电池 U1..U10 / S21 实测回归面）。
+fn open_ready_schema_only(db SqliteDb, op str) str {
+    var t0 int = time.now_ms()
+    if conn_is_file_backed(db) == false {
+        print("storage_error op=" + op + " phase=open err=storage_unavailable")
+        return "storage_unavailable"
+    }
+    if schema_structurally_ready(db) == false {
+        var serr str = ensure_schema_once(db, op)
+        if serr != "" {
+            return serr
+        }
+    }
+    slow_op(op, "open_ready", t0)
+    return ""
+}
+
 /// 读写共用的就绪入口：文件背衬验证 → 结构探针（全只读）→ 必要时一次性慢
 /// 路径 → legacy 升级状态机（就绪后只读）。返回 "" = 可安全读写。
 fn open_ready(db SqliteDb, op str) str {
@@ -1319,10 +1339,11 @@ pub fn read_receipt(request_id str) str {
     if request_id == "" {
         return rc
     }
-    // 读路径（NOTES-007）：单连接、零写锁。
+    // 读路径（NOTES-007）：单连接、零写锁；回执查询不驱动 legacy 升级
+    // （旧实现在此处只跑 ensure_schema——不得抢先占 generation）。
     var db SqliteDb = sqlite.open(db_path())
     db.exec("PRAGMA busy_timeout=3000")
-    var oerr str = open_ready(db, "read_receipt")
+    var oerr str = open_ready_schema_only(db, "read_receipt")
     if oerr != "" {
         return "{\"schema_version\":1,\"request_id\":" + json.encode(request_id) + ",\"note_id\":\"\",\"revision\":0,\"status\":\"\",\"err_code\":\"" + oerr + "\"}"
     }
@@ -1645,19 +1666,10 @@ pub fn repo_search(query str) str {
 pub fn repo_status() str {
     var db SqliteDb = sqlite.open(db_path())
     db.exec("PRAGMA busy_timeout=3000")
-    if conn_is_file_backed(db) == false {
-        print("storage_error op=repo_status phase=open err=storage_unavailable")
-        return "{\"loaded\":false,\"err\":\"storage_unavailable\",\"counter\":0,\"entries\":0,\"max_legacy_id\":0,\"migrated\":\"\",\"upgrade_error\":\"storage_unavailable\",\"storage_error\":\"storage_unavailable\",\"data_dir\":" + json.encode(data_dir()) + "}"
+    var oerr str = open_ready_schema_only(db, "repo_status")
+    if oerr != "" {
+        return "{\"loaded\":false,\"err\":\"" + oerr + "\",\"counter\":0,\"entries\":0,\"max_legacy_id\":0,\"migrated\":\"\",\"upgrade_error\":\"" + oerr + "\",\"storage_error\":\"" + oerr + "\",\"data_dir\":" + json.encode(data_dir()) + "}"
     }
-    if schema_structurally_ready(db) == false {
-        var serr str = ensure_schema_once(db, "repo_status")
-        if serr != "" {
-            return "{\"loaded\":false,\"err\":\"" + serr + "\",\"counter\":0,\"entries\":0,\"max_legacy_id\":0,\"migrated\":\"\",\"upgrade_error\":\"" + serr + "\",\"storage_error\":\"" + serr + "\",\"data_dir\":" + json.encode(data_dir()) + "}"
-        }
-    }
-    // legacy 状态机：拒绝原因只入 upgrade_error（meta 由 upgrade_if_legacy 写），
-    // 不阻断状态报告（否则一次历史冲突会让诊断面整体失明）。
-    var uerr str = upgrade_if_legacy(db)
     var rows List<List<str>> = db.query("SELECT COUNT(*), COALESCE(MAX(CAST(legacy_id AS INTEGER)),0) FROM notes")
     var cnt int = 0
     var maxleg int = 0
@@ -1667,17 +1679,14 @@ pub fn repo_status() str {
         maxleg = parse_int(row0[1])
     }
     var migrated str = meta_get_on(db, "migrated")
-    var ue str = meta_get_on(db, "upgrade_error")
-    if ue == "" {
-        ue = uerr
-    }
     var s str = "{\"loaded\":true,\"err\":\"\","
     s = s + "\"counter\":" + json.encode(next_counter_on(db))
     s = s + ",\"entries\":" + json.encode(cnt)
     s = s + ",\"max_legacy_id\":" + json.encode(maxleg)
     s = s + ",\"migrated\":" + json.encode(migrated)
-    // 升级失败显式可见（F-R5-01：不得以 loaded=true/err 空掩盖不完整升级）
-    s = s + ",\"upgrade_error\":" + json.encode(ue)
+    // 升级失败显式可见（F-R5-01：不得以 loaded=true/err 空掩盖不完整升级）。
+    // 状态面只**报告** meta 里的既有失败原因，不驱动升级（见 open_ready_schema_only）。
+    s = s + ",\"upgrade_error\":" + json.encode(meta_get_on(db, "upgrade_error"))
     s = s + ",\"storage_error\":\"\""
     s = s + ",\"data_dir\":" + json.encode(data_dir())
     s = s + "}"
@@ -1693,7 +1702,9 @@ pub fn repo_status() str {
 pub fn migrate_legacy_at(legacy_path str) str {
     var db SqliteDb = sqlite.open(db_path())
     db.exec("PRAGMA busy_timeout=5000")
-    var rerr str = open_ready(db, "migrate_legacy_at")
+    // 只做 schema 就绪：显式迁移入口不得驱动 legacy 树升级（旧实现同——
+    // 旧树升级归 repo 访问入口，显式迁移只读 NOTES_LEGACY_FILE 文件面）。
+    var rerr str = open_ready_schema_only(db, "migrate_legacy_at")
     if rerr != "" {
         return "{\"attempted\":true,\"migrated\":0,\"skipped_existing\":false,\"saved\":false,\"err\":\"" + rerr + "\",\"backup_file\":\"\",\"corrupted\":[]}"
     }
@@ -2163,7 +2174,9 @@ fn salvage_objects(raw str) str {
 pub fn test_reset() {
     var db SqliteDb = sqlite.open(db_path())
     db.exec("PRAGMA busy_timeout=5000")
-    var rerr str = open_ready(db, "test_reset")
+    // 测试 setup 只做 schema 就绪（旧实现同）：升级由后续 repo 访问驱动，
+    // 否则「先 setup 后把旧树就位」的电池用例会被提前占掉 generation。
+    var rerr str = open_ready_schema_only(db, "test_reset")
     if rerr != "" {
         print("storage_error op=test_reset err=" + rerr)
     }
