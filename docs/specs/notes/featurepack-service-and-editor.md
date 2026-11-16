@@ -219,7 +219,7 @@
 - 生成件 sha256：repository.rs `f17cdc3b…`、db.rs `64eba72b…`、
   entry_adapters.rs `6738bba6…`、main.rs `3f8ad97e…`；assembly consumer 指纹
   `757bff4b6348ccd4`。
-- 文件：17,835,520 B。
+- 文件：17,836,032 B。
 
 发布件复跑：`python tests/probe/concurrent_hammer.py --mode ui --rounds 5
 --exe <release exe>`（R-04，≥5 轮零停摆；r1 锚定件实测 11/0）。
