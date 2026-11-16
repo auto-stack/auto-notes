@@ -175,38 +175,54 @@
   --mode ui --rounds 20`——UI 形状并发（≥3 写者 create/update/capture/draft put
   + ≥3 读者 list/get/search/status/receipt/fp get/draft get + 同修订争用对），
   断言零 >2s 读、零幻影 `not_found`、capture 幂等回执不变、错误全部具名、
-  数据零丢失。`--mode smoke`（1 轮）为日常快验入口。
+  数据零丢失。`--mode smoke`（1 轮）为日常快验入口。每个入口实测 ≤10s
+  （test-discipline 新用例门）：`--rounds 20` ≈5–6s、`--rounds 5` ≈2s、
+  `smoke` ≈1.7s；`--round-ops` 加码属自担时长的加严模式。
 - **停摆放大器取证/回归（NOTES-007）**：`python
-  tests/probe/concurrent_hammer.py --mode lockwindow --hold 8`——外部进程以
-  Windows `FileShare=None` 独占 `inbox.db`（AV/EDR 排他扫描形状），断言窗口内
-  「要么正确数据、要么具名失败」，绝不允许静默空库/幻影 not_found；释放后数据
-  完整且窗口内成功写已落盘。
+  tests/probe/concurrent_hammer.py --mode lockwindow`（默认 hold 5s，≈6s）——
+  外部进程以 Windows `FileShare=None` 独占 `inbox.db`（AV/EDR 排他扫描形状），
+  断言窗口内「要么正确数据、要么具名失败」，绝不允许静默空库/幻影 not_found；
+  释放后数据完整且窗口内成功写已落盘。加长窗口（`--hold`）属取证自担时长。
 - **存储并发模型追踪（NOTES-007 R-02）**：`python tests/probe/storage_trace.py`
   ——生成后端读路径函数体静态断言（零 `BEGIN IMMEDIATE`/`ALTER TABLE`/meta 写、
   恰好一次 `sqlite::open`）+ 运行时（schema 初始化日志恰好 1 行、重启 0 行、
-  外部写锁下读 ≤2s 且数据正确、健康态 `storage_error` 为空）。
+  外部写锁下读 ≤2s 且数据正确、健康态 `storage_error` 为空；实测 ≈6.6s）。
 
 ## 发布件版本锚（NOTES-007，SD-02）
 
 发布件 = `auto service --server rust` 生成的 Rust 服务二进制（`cargo run
---release`，AGENTS.md：release 仅交付门）。锚身份 = **成员目录名 + sha256 +
-构建提交 + 构建命令**（成员目录名由项目路径派生，跨检出路径不同；跨检出重建
-须由发布流程重发并更新本表）。
+--release`，AGENTS.md：release 仅交付门）。**身份 = 成员目录名 + 发布件 sha256 +
+构建上下文**，不是「commit ⇒ 字节」：
 
-| 版本 | 成员 | sha256 | 提交 | 状态 |
+- 成员目录名由项目路径派生（跨检出不同）；
+- 生成件 `main.rs` 内嵌 assembly consumer 指纹，其输入含 notes 树之外的
+  stdlib / auto-lang / selection 来源闭包，且**构建 env 的 flag 钉法参与
+  cargo 指纹**——NOTES-007 复审 F-2 实测：同 commit 下 `auto service` 受管
+  构建与手工 `cargo build --release` 在两个 sha 间切换（`e067c3e9…` ↔
+  `02016f3a…`），同上下文重复构建为 no-op、sha 不变；
+- 因此发布件复核以「文件 sha256 + 下表上下文」为准；跨上下文/跨检出重建须由
+  发布流程重发并更新本表，不得假定可从 commit 复现。
+
+| 版本 | 成员 | sha256 | 代码提交 | 状态 |
 |---|---|---|---|---|
 | NOTES-006 r2 交付件 | auto-notes-57d3816f-back | `6939bafa3544…` | 80a6d98 代际 | **退役**（NOTES-007 起被下表取代；Reader 的 6939bafa pin 随之升级） |
-| NOTES-007 r1 | auto-notes-9e77e6a3-back | `e067c3e92baa14b2459ae8adf03c409035464471873c8bc914cb29d23d0e46f1` | `83ae6ac`（代码提交；生成/构建期源码与 HEAD 一致） | current |
+| NOTES-007 r1 | auto-notes-9e77e6a3-back | `2e5e28986706e9e3cb6954412b0e67904c09cc12b5fc8e3ba049a62892426240` | `83ae6ac`（代码；HEAD `6395323` 仅测试脚本改动） | current |
 
-重建命令（本仓根）：
+**r1 锚定件构建上下文（2026-11-16 17:17–17:19）**：
 
-```
-auto service --server rust -B 17819            # 生成 + release 构建 + 直启（AGENTS.md 交付门）
-# 或仅取构件：cd rust-workspace && cargo build --release -p auto-notes-<id>-back
-```
+- 发布路径：`auto service --server rust -B <port>`（生成 → release 构建 → 直启）；
+  同一上下文内 3 次服务启动中仅首次构建（9.0s），后续 restart 0.5s no-op、sha 不变。
+- CLI：`auto 0.1.0+plan-890-verified-r7-t19-24-g54fe407-dirty`，
+  sha256 `c7dbb9f4eba8de88f03b6725e9c3bcb3024456d5243521ee397d73772f65df97`。
+- auto-lang `107b23d0f`（`crates/`/`stdlib/`/`vendor/` 干净）；vendor/auto-down
+  `c39ac7f9`。
+- 生成件 sha256：repository.rs `f17cdc3b…`、db.rs `64eba72b…`、
+  entry_adapters.rs `6738bba6…`、main.rs `3f8ad97e…`；assembly consumer 指纹
+  `757bff4b6348ccd4`。
+- 文件：17,835,520 B。
 
 发布件复跑：`python tests/probe/concurrent_hammer.py --mode ui --rounds 5
---exe <release exe>`（R-04，≥5 轮零停摆）。
+--exe <release exe>`（R-04，≥5 轮零停摆；r1 锚定件实测 11/0）。
 
 ## 附件能力面（NOTES-002，SD-03：可协商附件扩展）
 
