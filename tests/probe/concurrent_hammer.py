@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """concurrent_hammer.py — NOTES-007 并发负载/停摆取证入口（T-01 建，T-03 定版 R-01）。
 
-用法（auto-notes 仓根）：
-    python tests/probe/concurrent_hammer.py --mode ui --rounds 20
-    python tests/probe/concurrent_hammer.py --mode lockwindow --hold 6
-    python tests/probe/concurrent_hammer.py --mode smoke
+用法（auto-notes 仓根；每个入口实测 ≤10s，test-discipline 新用例门）：
+    python tests/probe/concurrent_hammer.py --mode ui --rounds 20    # AC-03 门 ≈6s
+    python tests/probe/concurrent_hammer.py --mode lockwindow        # 环境锁取证 ≈6s（hold 5s）
+    python tests/probe/concurrent_hammer.py --mode smoke             # 1 轮快验 ≈1.7s
 
 模式：
   ui          UI 形状并发锤：≥3 并发写者（create/update/capture/draft put）+ ≥3 并发
@@ -324,7 +324,14 @@ def writer_once(svc, stats, rnd, seq, own):
             check(False, "R-01-capture-replay", {"first": cres, "replay": rep})
 
 
-def run_ui(svc, rounds, max_seconds, stats, known):
+def run_ui(svc, rounds, max_seconds, stats, known, round_ops=1):
+    """逐轮并发爆：round_ops = 每个写/读线程每轮的操作轮次。
+
+    NOTES-007 复审 F-1：20 轮整轮调用必须 ≤ 10s（test-discipline 新用例门），
+    故默认每线程每轮 1 轮 op（仍是 ≥3 并发写者 + ≥3 并发读者 + draft 面 +
+    同修订争用 + 每轮零丢失核对；20 轮 × 6 客户端）。需要更重的样本量时用
+    `--round-ops 2|3` 显式加码，并自行承担 >10s 的正式负载门计时。
+    """
     deadline = time.time() + max_seconds
     done_rounds = 0
     for rnd in range(rounds):
@@ -334,10 +341,12 @@ def run_ui(svc, rounds, max_seconds, stats, known):
         owns = [{"id": i, "created": [], "captures": []} for i in range(3)]
         threads = []
         for i, own in enumerate(owns):
-            t = threading.Thread(target=lambda o=own: [writer_once(svc, stats, rnd, s, o) for s in range(3)])
+            t = threading.Thread(target=lambda o=own: [writer_once(svc, stats, rnd, s, o)
+                                                       for s in range(round_ops)])
             threads.append(t)
         for i in range(3):
-            t = threading.Thread(target=lambda: [read_once(svc, stats, known) for _ in range(3)])
+            t = threading.Thread(target=lambda: [read_once(svc, stats, known)
+                                                 for _ in range(round_ops)])
             threads.append(t)
         for t in threads:
             t.start()
@@ -509,8 +518,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", choices=["ui", "lockwindow", "smoke"], default="ui")
     ap.add_argument("--rounds", type=int, default=20)
+    ap.add_argument("--round-ops", type=int, default=1, help="每写/读线程每轮的 op 轮次（默认 1；加码会超 10s 新用例门）")
     ap.add_argument("--max-seconds", type=float, default=300.0)
-    ap.add_argument("--hold", type=float, default=6.0)
+    ap.add_argument("--hold", type=float, default=5.0, help="环境锁窗口秒数（默认 5；回归门按 5s 计时，加长属取证自担）")
     ap.add_argument("--exe", default="")
     ap.add_argument("--port", type=int, default=0)
     ap.add_argument("--keep", action="store_true")
@@ -558,7 +568,7 @@ def main():
             summary = run_lockwindow(svc, args.hold)
             note("lockwindow summary " + json.dumps(summary, ensure_ascii=False))
         else:
-            rounds_done = run_ui(svc, args.rounds, args.max_seconds, stats, known)
+            rounds_done = run_ui(svc, args.rounds, args.max_seconds, stats, known, args.round_ops)
             check(rounds_done >= args.rounds, "R-01-rounds", f"{rounds_done}/{args.rounds}")
             # 终局：数据零丢失
             fresp = svc.http("GET", "/api/v1/notes", timeout=30)
